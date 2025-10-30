@@ -1,70 +1,71 @@
-# Social Network Analyst - Mạng Lưới Nghệ Sĩ Quốc tế
+## Social-network-analyst
 
-Dự án này tập trung vào việc xây dựng và phân tích mạng lưới xã hội của các nghệ sĩ trong ngành công nghiệp âm nhạc Hàn Quốc (K-pop). Dữ liệu được thu thập tự động từ Wikipedia tiếng Việt và được xử lý để tạo thành một đồ thị (graph) có cấu trúc, biểu diễn các mối quan hệ phức tạp giữa các nghệ sĩ, nhóm nhạc, album, và các thực thể liên quan.
+Thu thập, chuẩn hóa và xây dựng mạng lưới nghệ sĩ/nhóm nhạc/album/bài hát Hàn Quốc từ Wikipedia tiếng Việt, kèm xuất dữ liệu sang Neo4j và notebook phân tích.
 
-## Tổng quan dự án
+### 1) Yêu cầu môi trường
+- Python 3.9+
+- pip packages: requests, beautifulsoup4, pandas, matplotlib, networkx (tùy chọn), neo4j (tùy chọn)
 
-Mục tiêu chính là tạo ra một tập dữ liệu đồ thị chất lượng cao, nơi mỗi nút (node) và cạnh (edge) đều mang một ý nghĩa cụ thể. Dữ liệu này sau đó được sử dụng để phân tích và trực quan hóa, nhằm tìm ra những hiểu biết sâu sắc (insights) về cấu trúc của mạng lưới.
+```bash
+pip install -r requirements.txt  # nếu có
+# hoặc
+pip install requests beautifulsoup4 pandas matplotlib networkx neo4j
+```
 
-Quy trình thực hiện bao gồm:
-1.  **Thu thập dữ liệu (Crawling/Scraping)**: Một script Python trong tệp Jupyter Notebook sẽ truy cập Wikipedia, bắt đầu từ một danh sách các nghệ sĩ/nhóm nhạc hạt giống.
-2.  **Xây dựng đồ thị**: Script sử dụng thuật toán **BFS (Tìm kiếm theo chiều rộng)** để mở rộng mạng lưới, thu thập các trang liên quan và xác định mối quan hệ giữa chúng.
-3.  **Lưu trữ dữ liệu**: Toàn bộ đồ thị gồm các nút và cạnh được lưu vào tệp `korean_artists_graph_bfs.json`.
-4.  **Phân tích và Trực quan hóa**: Tệp Notebook cũng chứa các bước để đọc dữ liệu từ tệp JSON, thực hiện phân tích (ví dụ: tìm các nút trung tâm, phát hiện cộng đồng) và trực quan hóa đồ thị.
+### 2) Chạy crawler và lưu JSON
+```bash
+python korean_music_bfs.py \
+  --max-nodes 3000 --top-k 40 --delay 0.2 \
+  --output korean_artists_graph_bfs.json
+```
 
-## Cấu trúc Repository
+Các tham số chính:
+- `--seeds`: danh sách hạt giống (tiêu đề Wikipedia TV)
+- `--max-nodes`: số node tối đa
+- `--top-k`: số liên kết ưu tiên tối đa mỗi node
+- `--delay`: độ trễ giữa các request (giây)
 
--   `Social Network Analyst.ipynb`: Tệp Jupyter Notebook chính, chứa toàn bộ mã nguồn Python để:
-    -   Thu thập dữ liệu từ Wikipedia.
-    -   Xử lý và làm sạch dữ liệu.
-    -   Xây dựng đồ thị.
-    -   Phân tích và trực quan hóa mạng lưới.
--   `korean_artists_graph_bfs.json`: Tệp dữ liệu đầu ra chứa thông tin về các nút và cạnh của đồ thị sau khi thu thập.
--   `README.md`: Tệp tài liệu hướng dẫn này.
+Crawler đã có nhiều bộ lọc để loại các thực thể ngoài lĩnh vực âm nhạc (công ty, phim, địa danh, esports, chính trị, lịch sử…), và logic siết chặt cho Artist (bắt buộc có trường nghề nghiệp thuộc âm nhạc trong infobox).
 
-## Mô hình dữ liệu
+### 3) Xuất sang Neo4j (tùy chọn)
+Khởi chạy Neo4j Desktop/Aura, sau đó:
+```bash
+python korean_music_bfs.py --output korean_artists_graph_bfs.json \
+  --neo4j-uri bolt://localhost:7687 --neo4j-user neo4j --neo4j-pass <password> \
+  --neo4j-db neo4j --neo4j-batch 2000 --neo4j-create-constraints
+```
+Driver sẽ MERGE node theo `id`, ghi quan hệ theo `type`, và (nếu bật) tạo UNIQUE CONSTRAINT cho từng label chính.
 
-### Nodes (Nút)
-Đại diện cho một thực thể (ví dụ: nghệ sĩ, nhóm nhạc, album).
--   **`title`**: Tên trang Wikipedia, dùng làm ID.
--   **`label`**: Phân loại thực thể.
--   **`url`**: Liên kết đến trang Wikipedia.
--   **`infobox`**: Dữ liệu có cấu trúc từ bảng thông tin của trang.
+### 4) Phân tích và trực quan hóa
+Mở notebook `network_analysis.ipynb`:
+- Đọc `korean_artists_graph_bfs.json`
+- Thống kê phân bố label, loại quan hệ
+- Top node theo độ kết nối (nếu đã cài networkx)
 
-### Edges (Cạnh)
-Đại diện cho mối quan hệ giữa hai nút.
--   **`source`**: Nút bắt đầu.
--   **`target`**: Nút kết thúc.
--   **`type`**: Loại quan hệ (`MEMBER_OF`, `MANAGED_BY`, `COLLABORATED_WITH`, v.v.).
+Chạy nhanh cell cài đặt nếu cần:
+```python
+!pip install pandas matplotlib networkx plotly
+```
 
-## Hướng dẫn sử dụng
+### 5) Cấu trúc dữ liệu JSON
+```json
+{
+  "nodes": { "<title>": {"label": "Artist|Group|Album|Song|Genre|Instrument|Occupation", "infobox": {...}, ... }, ... },
+  "edges": [ {"source": "<title>", "target": "<title>", "type": "IS_GENRE|PLAYS|MANAGED_BY|...", "text": "..."}, ... ],
+  "statistics": { ... },
+  "metadata": { "generation_date": "YYYY-MM-DD HH:MM:SS", ... }
+}
+```
 
-1.  **Cài đặt môi trường:**
-    -   Đảm bảo bạn đã cài đặt Python 3 và Jupyter Notebook/JupyterLab.
-    -   Cài đặt các thư viện cần thiết bằng cách chạy các cell cài đặt ở đầu tệp `Social Network Analyst.ipynb`. Các thư viện chính bao gồm:
-        ```
-        pip install requests beautifulsoup4 networkx matplotlib
-        ```
+### 6) Gợi ý xử lý sự cố
+- Không thấy log: chạy Python ở chế độ unbuffered `python -u ...`
+- Chậm: tăng `--delay` hoặc giảm `--top-k`; khi export Neo4j nhớ bật `--neo4j-create-constraints`
+- Kết quả còn lọt thực thể ngoài âm nhạc: bổ sung từ khóa blacklist hoặc mở rộng bộ chỉ dấu trong `korean_music_bfs.py`
 
-2.  **Chạy Notebook:**
-    -   Mở tệp `Social Network Analyst.ipynb` bằng Jupyter.
-    -   Bạn có thể chạy tuần tự từng cell để thực hiện lại toàn bộ quy trình từ thu thập đến phân tích.
-    -   **Lưu ý**: Quá trình thu thập dữ liệu có thể mất một khoảng thời gian tùy thuộc vào số lượng node bạn muốn lấy.
+### 7) File chính
+- `korean_music_bfs.py`: crawler + lọc + export Neo4j
+- `korean_artists_graph_bfs.json`: kết quả mạng
+- `network_analysis.ipynb`: notebook phân tích
+- `BAO_CAO_MANG_LUOI_NGHE_SI_HAN_QUOC.md`: báo cáo tóm tắt
 
-3.  **Sử dụng dữ liệu có sẵn:**
-    -   Nếu bạn không muốn chạy lại quá trình thu thập, bạn có thể bỏ qua các cell đó và bắt đầu trực tiếp từ phần đọc và phân tích dữ liệu từ tệp `korean_artists_graph_bfs.json` đã có sẵn trong repository.
 
-## Kết quả và Phân tích
-
-Phần cuối của Notebook trình bày các kết quả phân tích, bao gồm:
--   Thống kê tổng quan về đồ thị (số nút, số cạnh, mật độ).
--   Xác định các nghệ sĩ có tầm ảnh hưởng lớn nhất dựa trên các độ đo trung tâm (centrality measures).
--   Phát hiện các cụm/cộng đồng (community detection) để tìm ra các nhóm nghệ sĩ thường xuyên tương tác với nhau.
--   Trực quan hóa đồ thị để thể hiện rõ các mối quan hệ và cấu trúc mạng lưới.
-
-## Hướng phát triển
-
--   Tích hợp các thuật toán duyệt khác (DFS, Priority-based) để so sánh hiệu quả.
--   Làm giàu mô hình dữ liệu với nhiều loại nút và quan hệ hơn.
--   Import dữ liệu vào một hệ quản trị CSDL đồ thị chuyên dụng như **Neo4j** hoặc **ArangoDB** để truy vấn và phân tích ở quy mô lớn hơn.
--   Xây dựng một giao diện web tương tác để khám phá đồ thị.
