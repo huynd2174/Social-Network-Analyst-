@@ -2311,10 +2311,10 @@ class WikipediaBFScraper:
 					print(f"  ✗ [SEED BỊ LOẠI] {current_title} - Không lấy được soup")
 				continue
 
-			# if not self.is_relevant_page(current_title, soup, is_seed=is_seed):
-			# 	if is_seed:
-			# 		print(f"  ✗ [SEED BỊ LOẠI] {current_title} - is_relevant_page = False")
-			# 	continue
+			if not self.is_relevant_page(current_title, soup, is_seed=is_seed):
+				if is_seed:
+					print(f"  ✗ [SEED BỊ LOẠI] {current_title} - is_relevant_page = False")
+				continue
 
 			infobox = self.extract_infobox(soup)
 			page_text_lower = soup.get_text(separator=' ').lower()
