@@ -859,7 +859,9 @@ class WikipediaBFScraper:
 						# Latin
 						'enrique iglesias','ricky martin','bad bunny','j balvin','maluma','anitta','karol g','becky g','shakira','rosalía','alanis morissette','alicia keys',
 				# Others / J-pop non-targets
-				'britney spears','camila cabello','avril lavigne','sia','p!nk','ellie goulding','rita ora','zara larsson','lorde','halsey','bebe rexha','nogizaka46','arashi','jay chou','jolin tsai','jj lin','the white stripes','damage','artists for haiti','bon iver','mika'
+				'britney spears','camila cabello','avril lavigne','sia','p!nk','ellie goulding','rita ora','zara larsson','lorde','halsey','bebe rexha','nogizaka46','arashi','jay chou','jolin tsai','jj lin','the white stripes','damage','artists for haiti','bon iver','mika',
+				# User-specified additions
+				'george benson','extreme','r.e.m.','rem','michael bublé','michael buble','chicago','jimmy ruffin'
 					}
 					if not has_kpop_entity and any(w in performed_by_value for w in western_block):
 						return 0.0
@@ -888,12 +890,16 @@ class WikipediaBFScraper:
 			'taylor swift', 'kacey musgraves', 'luke combs', 'morgan wallen','janet jackson'
 			# Additional Western artists
 			'kesha', 'james fauntleroy', 'backstreet boys', 'nsync',
-			'onerepublic', 'imagine dragons', 'maroon 5', 'coldplay', 'nogizaka46', 'arashi', 'jay chou', 'jolin tsai', 'jj lin'
+			'onerepublic', 'imagine dragons', 'maroon 5', 'coldplay', 'nogizaka46', 'arashi', 'jay chou', 'jolin tsai', 'jj lin',
+			# User-specified additions
+			'george benson', 'extreme', 'r.e.m.', 'rem', 'michael bublé', 'michael buble', 'chicago', 'jimmy ruffin'
 		]
         
-		# DIRECT REJECTION: Check title first
+		# DIRECT REJECTION: Check title first (bỏ qua nếu đã xác nhận performer K-pop)
 		for artist in western_artists:
 			if artist in title_lower:
+				if label in ('Song','Album') and has_kpop_entity:
+					continue
 				return 0.0  # Reject immediately
         
 		# Penalty cho nghệ sĩ có quốc tịch/nơi sinh không phải Hàn Quốc
@@ -925,6 +931,8 @@ class WikipediaBFScraper:
         
 		for pattern in western_artist_patterns:
 			if pattern in title_lower:
+				if label in ('Song','Album') and has_kpop_entity:
+					continue
 				return 0.0  # Reject immediately
         
 		# Strong penalty for Chinese/Taiwanese/HK markers
@@ -938,15 +946,38 @@ class WikipediaBFScraper:
 			score += 15
         
 		# Check for Korean language indicators in infobox
-		language_fields = ['Ngôn ngữ', 'Ngôn ngữ gốc', 'Ngôn ngữ âm nhạc', 'Language']
+		language_fields = ['Ngôn ngữ', 'Ngôn ngữ gốc', 'Ngôn ngữ âm nhạc', 'Ngôn ngữ bài hát', 'Language', 'Languages']
 		for field in language_fields:
 			if field in infobox:
 				field_value = str(infobox[field]).lower()
-				if 'tiếng hàn' in field_value or 'korean' in field_value or 'hangul' in field_value:
+				# Broader positive signals for Korean language
+				positive_korean_lang = [
+					'tiếng hàn', 'tiếng hàn quốc', 'tieng han', 'tieng han quoc',
+					'korean', 'korean language', 'ko-kr', 'ko_kR', 'ko kr',
+					'hangul', 'hangeul', 'tiếng triều tiên', 'tieng trieu tien'
+				]
+				if any(kw in field_value for kw in positive_korean_lang):
 					score += 16
 					break
 				if any(lang in field_value for lang in ['tiếng trung', 'tiếng nhật', 'chinese', 'japanese', 'mandarin', 'cantonese']):
 					score -= 15
+
+		# Bonus for Korean geography/location indicators (cities/regions/venues)
+		korean_geo_keywords = [
+			# Common with diacritics
+			'hàn quốc', 'đại hàn', 'triều tiên', 'nam hàn', 'bắc hàn',
+			# Non-diacritics fallbacks
+			'han quoc', 'dai han', 'trieu tien', 'nam han', 'bac han',
+			# English
+			'korea', 'south korea', 'republic of korea',
+			# Cities/regions
+			'seoul', 'busan', 'incheon', 'daegu', 'daejeon', 'gwangju', 'ulsan', 'suwon',
+			'jeju', 'jeju-do', 'jeonju', 'gyeonggi', 'gangwon', 'chungcheong', 'jeolla', 'gyeongsang',
+			# Districts/areas often referenced in music context
+			'gangnam', 'hongdae', 'itaewon', 'myeongdong'
+		]
+		if any(kw in title_lower or kw in infobox_lower for kw in korean_geo_keywords):
+			score += 12
         
 		# Check for Korean nationality/origin in infobox
 		korean_fields = ['Quốc tịch', 'Quốc gia', 'Nguồn gốc', 'Nơi sinh', 'Quê quán']
@@ -1065,9 +1096,9 @@ class WikipediaBFScraper:
 				'thanK you aIMee', 'i hate it here', 'thanK you aIMee', 'i hate it here'
 			]
             
-			# Kiểm tra trong title
+			# Kiểm tra trong title (bỏ qua nếu đã xác nhận performer K-pop trong infobox)
 			for artist in non_kpop_artists:
-				if f' {artist} ' in f' {title_lower} ':
+				if f' {artist} ' in f' {title_lower} ' and not has_kpop_entity:
 					# Kiểm tra xem có phải collaboration không (có cả nghệ sĩ K-pop và Western)
 					has_kpop_artist = False
 					kpop_artists = ['bts', 'blackpink', 'exo', 'twice', 'red velvet', 'nct', 'seventeen', 'stray kids', 'itzy', 'aespa', 'newjeans', 'big bang', "girls' generation", 'super junior', '2ne1', 'got7', 'psy', 'taeyeon', 'jennie', 'rosé', 'jisoo', 'jimin', 'jungkook', 'suga', 'j-hope']
@@ -1363,6 +1394,158 @@ class WikipediaBFScraper:
 			# Quyết định: Nếu không có dấu hiệu Hàn Quốc nào, trừ 30 điểm
 			if not korean_signals:
 				score -= 30.0
+
+		# PHẠT MẠNH: Nghệ sĩ thiếu/không có nghề nghiệp âm nhạc trong infobox => -70 điểm
+		if label == 'Artist':
+			occupation_fields = ['Nghề nghiệp', 'Occupation', 'Nghề', 'Professions']
+			music_occu_keywords = [
+				'ca sĩ', 'ca si', 'singer', 'vocalist', 'rapper', 'nhạc sĩ', 'nhac si',
+				'nhà sản xuất âm nhạc', 'producer', 'music producer', 'composer', 'songwriter',
+				'idol', 'thần tượng', 'dancer'
+			]
+			has_occupation_field = any(f in infobox for f in occupation_fields)
+			has_occupation_music = False
+			for f in occupation_fields:
+				if f in infobox:
+					val = str(infobox[f]).lower()
+					if any(k in val for k in music_occu_keywords):
+						has_occupation_music = True
+						break
+			if (not has_occupation_field) or (not has_occupation_music):
+				score -= 70.0
+
+			# PHẠT MẠNH: Nghệ sĩ có dấu hiệu thể thao/eSports thay vì âm nhạc
+			sports_fields = [
+				'Đội hiện nay', 'Số áo', 'Vị trí', 'Câu lạc bộ', 'Đội tuyển quốc gia',
+				'Sự nghiệp cầu thủ', 'Sự nghiệp trẻ', 'Ghi bàn', 'Bàn thắng', 'Bàn thua',
+				'Youth career', 'Senior career', 'Current team', 'Club number', 'Position'
+			]
+			esports_fields = [
+				'Đội tuyển', 'Tổ chức', 'Tuyển thủ', 'Trò chơi', 'Game', 'Vai trò', 'Role',
+				'Giải đấu', 'League', 'Vị trí thi đấu', 'Main role', 'Coach', 'Huấn luyện viên trưởng'
+			]
+			if any(f in infobox for f in sports_fields):
+				score -= 80.0
+			if any(f in infobox for f in esports_fields):
+				score -= 80.0
+			# Keyword-based hints inside infobox values
+			if any(kw in infobox_lower for kw in ['footballer', 'soccer player', 'esports', 'thể thao điện tử', 'pro gamer']):
+				score -= 80.0
+
+			# PHẠT: Nghệ sĩ có trường lịch sử/hoàng gia (không phải âm nhạc)
+			history_fields = [
+				'Triều đại', 'Triều', 'Dynasty', 'Reign', 'Miếu hiệu', 'Temple name',
+				'Thụy hiệu', 'Posthumous name', 'Tôn hiệu', 'Era name', 'Regnal name',
+				'Phối ngẫu', 'Spouse', 'Hậu duệ', 'Issue', 'Con cái', 'Children'
+			]
+			if any(f in infobox for f in history_fields) and not has_occupation_music:
+				score -= 60.0
+
+		# PHẠT MẠNH: Group thiếu "Thành viên" hoặc không có dấu hiệu nhóm nhạc => -70 điểm
+		if label == 'Group':
+			member_fields = ['Thành viên', 'Members', 'Cựu thành viên', 'Former Members']
+			has_members = any(f in infobox for f in member_fields)
+			# Kiểm tra trong infobox text có từ khóa nhóm nhạc không
+			has_group_keyword = any(k in infobox_lower for k in ['nhóm nhạc', 'ban nhạc', 'group', 'band'])
+			if not has_members and not has_group_keyword:
+				score -= 70.0
+
+		# PHẠT: Trang có dấu hiệu công ty/agency khi được phân loại là Artist/Group
+		if label in ('Artist', 'Group'):
+			company_markers = ['entertainment', 'music and live', 'division', 'agency', 'company', 'công ty', 'corp', 'inc.', 'co., ltd', 'headquarters', 'parent', 'subsidiary']
+			if any(m in title_lower for m in company_markers) or any(m in infobox_lower for m in company_markers):
+				score -= 40.0
+			
+			# PHẠT: Artist/Group có field của Album/Song mà không phải Album/Song => nhầm lẫn
+			if any(f in infobox for f in ['Thời lượng', 'Running time', 'Tên album', 'Mô tả album']):
+				# Nếu không có field đặc trưng của person như Sinh, Nghề nghiệp thì có thể nhầm
+				if not any(f in infobox for f in ['Sinh', 'Birth', 'Nghề nghiệp', 'Occupation']):
+					score -= 30.0  # Có thể là Album/Song bị phân loại nhầm
+
+		# PHẠT: Loại bỏ các title cụ thể không thuộc K-pop
+		if 'fifth harmony' in title_lower:
+			score -= 80.0
+
+		# PHẠT: Trang về Họ (surname) khi không có từ khóa âm nhạc
+		surname_markers = ['họ người', 'họ (họ người)', 'là một họ', 'họ tiếng', 'họ trong tiếng']
+		if any(m in infobox_lower for m in surname_markers) and not any(k in infobox_lower for k in ['ca sĩ','nhạc sĩ','nhóm nhạc','album','bài hát']):
+			score -= 70.0
+		
+		# PHẠT: Title có pattern không hợp lệ (list, category, disambiguation, năm)
+		invalid_patterns = ['danh sách', 'list of', 'category:', 'thể loại:', 'disambiguation', 
+						   'định hướng', 'template:', 'mẫu:', '(năm)', '(year)', 'timeline']
+		if any(p in title_lower for p in invalid_patterns):
+			score -= 70.0
+
+		# PHẠT: Album/Song không phải K-pop (OST phương Tây, không dấu hiệu Hàn)
+		if label in ('Album', 'Song'):
+			foreign_music_indicators = [
+				'original motion picture soundtrack', 'soundtrack',
+				'hollywood', 'disney', 'warner bros', 'universal music', 'atlantic records',
+				'columbia records', 'republic records', 'sony music', 'united states', 'usa', 'anh', 'uk', 'canada', 'mỹ'
+			]
+			has_korean_signal = self._has_hangul(node_title) or self._has_hangul(infobox_text) or \
+								 any('hàn quốc' in str(infobox.get(f, '')).lower() for f in ['Quốc tịch', 'Quốc gia', 'Nguồn gốc', 'Nơi sinh'])
+			if (any(x in title_lower for x in foreign_music_indicators) or any(x in infobox_lower for x in foreign_music_indicators)) and not has_korean_signal:
+				score -= 70.0
+
+		# PHẠT: Company/Award/Genre/Instrument/Entity/Occupation không phải node chính
+		if label in ('Company', 'Award', 'Genre', 'Instrument', 'Entity', 'Occupation'):
+			score -= 80.0
+		
+		# PHẠT: Group có dấu hiệu thể thao/eSports (không phải nhóm nhạc)
+		if label == 'Group':
+			sports_fields = [
+				'Đội hiện nay', 'Số áo', 'Vị trí', 'Câu lạc bộ', 'Đội tuyển quốc gia',
+				'Sự nghiệp cầu thủ', 'Sự nghiệp trẻ', 'Ghi bàn', 'Bàn thắng', 'Bàn thua'
+			]
+			esports_fields = [
+				'Đội tuyển', 'Tổ chức', 'Tuyển thủ', 'Trò chơi', 'Game', 'Vai trò', 'Role',
+				'Giải đấu', 'League', 'Vị trí thi đấu', 'Main role', 'Coach', 'Huấn luyện viên trưởng'
+			]
+			if any(f in infobox for f in sports_fields):
+				score -= 80.0
+			if any(f in infobox for f in esports_fields):
+				score -= 80.0
+		
+		# PHẠT: Album/Song có field thể thao (có thể nhầm lẫn)
+		if label in ('Album', 'Song'):
+			if any(f in infobox for f in ['Đội hiện nay', 'Số áo', 'Vị trí', 'Câu lạc bộ', 'Position', 'Current team']):
+				score -= 60.0  # Có thể là trang thể thao bị phân loại nhầm
+
+		# PHẠT MẠNH: Bài hát thiếu label hoặc thiếu (sáng tác/nhà sản xuất) trong infobox => -70 điểm
+		if label == 'Song':
+			label_fields = ['Hãng đĩa', 'Label', 'Nhãn đĩa', 'Record label', 'Hãng thu âm']
+			writer_fields = ['Sáng tác', 'Nhạc sĩ', 'Tác giả', 'Composer', 'Lyricist', 'Writers', 'Songwriter']
+			producer_fields = ['Sản xuất', 'Producer', 'Production', 'Nhà sản xuất', 'Produced by', 'Sản xuất bởi']
+			performer_fields = ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi']
+			has_label = any((f in infobox) and str(infobox.get(f, '')).strip() for f in label_fields)
+			has_writer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in writer_fields)
+			has_producer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in producer_fields)
+			has_performer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in performer_fields)
+			
+			if not (has_label and (has_writer or has_producer)):
+				score -= 70.0
+			# PHẠT: Song thiếu performer (người thực hiện) => -50 điểm
+			if not has_performer:
+				score -= 50.0
+
+		# PHẠT MẠNH: Album thiếu label hoặc thiếu (sáng tác/nhà sản xuất) trong infobox => -70 điểm
+		if label == 'Album':
+			label_fields = ['Hãng đĩa', 'Label', 'Nhãn đĩa', 'Record label', 'Hãng thu âm']
+			writer_fields = ['Sáng tác', 'Nhạc sĩ', 'Tác giả', 'Composer', 'Lyricist', 'Writers', 'Songwriter']
+			producer_fields = ['Sản xuất', 'Producer', 'Production', 'Nhà sản xuất', 'Produced by', 'Sản xuất bởi']
+			performer_fields = ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi']
+			has_label = any((f in infobox) and str(infobox.get(f, '')).strip() for f in label_fields)
+			has_writer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in writer_fields)
+			has_producer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in producer_fields)
+			has_performer = any((f in infobox) and str(infobox.get(f, '')).strip() for f in performer_fields)
+			
+			if not (has_label and (has_writer or has_producer)):
+				score -= 70.0
+			# PHẠT: Album thiếu performer (người thực hiện) => -50 điểm
+			if not has_performer:
+				score -= 50.0
         
 		# Đặc biệt kiểm tra cho các bài hát/album có 0 điểm
 		if label in ('Song', 'Album') and score == 0.0:
@@ -1411,6 +1594,39 @@ class WikipediaBFScraper:
 					pass
             
         
+
+		# PHẠT: Album/Song có điểm thấp (<=15) nhưng không có bất kỳ tín hiệu liên quan Hàn Quốc
+		# Tín hiệu Hàn Quốc gồm: has_kpop_entity, có Hangul, hoặc có từ khóa 'hàn quốc'/'korean'/'k-pop' trong tiêu đề/infobox
+		if label in ('Song', 'Album') and score <= 15:
+			korean_keywords = [
+				# Language/country
+				'hàn quốc', 'han quoc', 'đại hàn', 'dai han', 'triều tiên', 'trieu tien',
+				'korean', 'korea', 'south korea', 'republic of korea', 'hangul', 'hangeul',
+				# Scene terms
+				'k-pop', 'kpop', 'k-hip hop', 'khiphop', 'k r&b', 'k-indie', 'hallyu', 'làn sóng hàn', 'korean wave',
+				# Geography
+				'seoul', 'busan', 'incheon', 'daegu', 'daejeon', 'gwangju', 'ulsan', 'suwon',
+				'jeju', 'jeju-do', 'jeonju', 'gyeonggi', 'gangwon', 'chungcheong', 'jeolla', 'gyeongsang',
+				'gangnam', 'hongdae', 'itaewon', 'myeongdong'
+			]
+			has_korean_keyword = any(kw in title_lower or kw in infobox_lower for kw in korean_keywords)
+			# Explicitly detect Korean in language fields to skip penalty
+			language_fields_penalty_check = ['Ngôn ngữ', 'Ngôn ngữ gốc', 'Ngôn ngữ âm nhạc', 'Ngôn ngữ bài hát', 'Language', 'Languages']
+			positive_korean_lang_penalty = [
+				'tiếng hàn', 'tiếng hàn quốc', 'tieng han', 'tieng han quoc',
+				'korean', 'korean language', 'ko-kr', 'ko kr',
+				'hangul', 'hangeul', 'tiếng triều tiên', 'tieng trieu tien'
+			]
+			has_korean_language_field = False
+			for lf in language_fields_penalty_check:
+				if lf in infobox:
+					val = str(infobox[lf]).lower()
+					if any(kw in val for kw in positive_korean_lang_penalty):
+						has_korean_language_field = True
+						break
+			if not (has_kpop_entity or has_hangul or has_korean_keyword or has_korean_language_field):
+				score -= 70.0
+
 		return score
 
 	def get_page_soup(self, title: str) -> BeautifulSoup | None:
@@ -1911,11 +2127,6 @@ class WikipediaBFScraper:
 		title_lower = title.lower()
 		description_lower = str(infobox.get('description', '')).lower()
 
-		# Nếu tiêu đề rõ ràng là công ty/agency/entertainment → gán nhãn Company ngay
-		company_title_markers = ['entertainment', 'music and live', 'division', 'company', 'công ty', 'agency', 'co., ltd', 'corp', 'inc.', 'holding', 'subsidiary']
-		if any(k in title_lower for k in company_title_markers):
-			return 'Company'
-
 		# Initialize scores
 		scores = {
 			'Artist': 0.0,
@@ -1923,12 +2134,6 @@ class WikipediaBFScraper:
 			'Album': 0.0,
 			'Song': 0.0,
 		}
-
-		# Company detection by content: if strong company markers and weak music-person markers -> Company
-		company_markers = ['entertainment', 'music and live', 'division', 'agency', 'company', 'công ty', 'trụ sở', 'thành lập', 'người sáng lập', 'founder', 'headquarters', 'parent', 'subsidiary', 'chủ sở hữu', 'công ty mẹ', 'dịch vụ']
-		person_markers = ['ca sĩ', 'nhạc sĩ', 'diễn viên', 'rapper']
-		if any(k in title_lower for k in company_markers) or (any(k in infobox_text for k in company_markers) and not any(k in infobox_text for k in person_markers)):
-			return 'Company'
 
 		# Title-based cues
 		if '(bài hát' in title_lower or '(song)' in title_lower:
@@ -1943,27 +2148,65 @@ class WikipediaBFScraper:
 			scores['Artist'] += 40
 
 		# Infobox field presence
-		if 'Thành viên' in infobox or 'Members' in infobox or 'Cựu thành viên' in infobox:
-			scores['Group'] += 35
-		if 'Nghề nghiệp' in infobox:
+		has_members = 'Thành viên' in infobox or 'Members' in infobox or 'Cựu thành viên' in infobox or 'Former Members' in infobox
+		has_occupation = 'Nghề nghiệp' in infobox
+		
+		# BOOST RẤT CAO cho Group khi có trường thành viên/cựu thành viên (dấu hiệu rõ ràng nhất)
+		if has_members:
+			scores['Group'] += 80  # Tăng từ 35 lên 80 - boost rất cao
+			# Nếu có cả "Thành viên" và "Nghề nghiệp" thì ưu tiên Group (nghệ sĩ solo không có field "Thành viên")
+			if has_occupation:
+				occupation = str(infobox.get('Nghề nghiệp', '')).lower()
+				if 'thành viên' in occupation or 'cựu thành viên' in occupation:
+					scores['Group'] += 20  # Boost thêm cho Group (tăng từ 15)
+		
+		# BOOST RẤT CAO cho Artist khi có trường nghề nghiệp với từ khóa âm nhạc (dấu hiệu rõ ràng nhất)
+		if has_occupation:
 			occupation = str(infobox.get('Nghề nghiệp', '')).lower()
-			if any(k in occupation for k in ['ca sĩ', 'nhạc sĩ', 'rapper', 'nghệ sĩ']):
-				scores['Artist'] += 25
-				if 'thành viên' in occupation or 'Cựu thành viên' in occupation:
-					scores['Group'] += 10
-		if any(f in infobox for f in ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer']):
+			music_occupation_keywords = ['ca sĩ', 'ca si', 'nhạc sĩ', 'nhac si', 'rapper', 'nghệ sĩ', 'nghe si', 
+										'singer', 'vocalist', 'composer', 'songwriter', 'producer', 'nhà sản xuất',
+										'music producer', 'idol', 'thần tượng']
+			if any(k in occupation for k in music_occupation_keywords):
+				# Nếu không có "Thành viên" thì chắc chắn là Artist solo
+				if not has_members:
+					scores['Artist'] += 80  # Tăng từ 30 lên 80 - boost rất cao cho Artist solo
+				else:
+					scores['Artist'] += 50  # Tăng từ 20 lên 50 - vẫn có thể là Artist trong Group
+		
+		# Field đặc trưng cho Artist: Nhạc cụ, Chiều cao, Cân nặng, Học vị
+		if any(f in infobox for f in ['Nhạc cụ', 'Instrument', 'Instruments', 'Chiều cao', 'Height', 'Cân nặng', 'Weight', 'Học vị', 'Education']):
+			scores['Artist'] += 15
+		# Chỉ cộng điểm Album/Song nếu có performer rõ ràng
+		if any(f in infobox for f in ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi']):
 			# Could be Album or Song, disambiguate by other signals below
 			scores['Album'] += 15
 			scores['Song'] += 20
+		# Field đặc trưng cho Song: Thời lượng, Tên album, Mô tả album
 		if any(f in infobox for f in ['Thời lượng', 'Running time']):
 			scores['Song'] += 20
 			scores['Album'] += 10
-		if any(f in infobox for f in ['Phát hành', 'Release date']):
+		if any(f in infobox for f in ['Tên album', 'Mô tả album', 'from album']):
+			scores['Song'] += 25  # Field này chỉ có trong Song
+		
+		# Field đặc trưng cho Album: Phát hành (với performer), Số bài hát
+		if any(f in infobox for f in ['Phát hành', 'Release date']) and any(f in infobox for f in ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi']):
 			scores['Album'] += 20
 			scores['Song'] += 15
-		if any(f in infobox for f in ['Hãng đĩa', 'Label', 'Công ty quản lý', 'Agency']):
+		if any(f in infobox for f in ['Số bài hát', 'Số track', 'Number of tracks', 'Tracks']):
+			scores['Album'] += 25  # Field này chỉ có trong Album
+		# Hãng đĩa với performer
+		if any(f in infobox for f in ['Hãng đĩa', 'Label', 'Công ty quản lý', 'Agency']) and any(f in infobox for f in ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi']):
 			scores['Album'] += 12
 			scores['Song'] += 10
+		
+		# PENALTY: Album/Song không được có field của person nếu không có performer
+		person_fields = ['Sinh', 'Birth', 'Nghề nghiệp', 'Occupation', 'Chiều cao', 'Height', 'Cân nặng', 'Weight', 'Học vị', 'Education']
+		has_person_fields = any(f in infobox for f in person_fields)
+		has_performer = any(f in infobox for f in ['Nghệ sĩ', 'Ca sĩ', 'Nhóm nhạc', 'Artist', 'Performer', 'Được thực hiện bởi'])
+		if has_person_fields and not has_performer:
+			# Nếu có field của person mà không có performer thì không phải Album/Song
+			scores['Album'] -= 50
+			scores['Song'] -= 50
 
 		# Description-based cues (infobox['description'] extracted earlier)
 		if any(k in description_lower for k in ['album phòng thu', 'album tuyển tập', 'mini album', 'ep']):
@@ -1971,8 +2214,8 @@ class WikipediaBFScraper:
 		if any(k in description_lower for k in ['đĩa đơn', 'single', 'bài hát']):
 			scores['Song'] += 35
 
-		# Album title pattern "(album của X)" – cộng điểm mạnh cho album của nghệ sĩ K-pop
-		if 'album của' in title_lower:
+		# Title patterns: "(album của X)" và "(bài hát của X)"
+		if 'album của' in title_lower or '(album' in title_lower:
 			# Ưu tiên seed artists
 			for seed_artist in self.seed_artists:
 				seed_lower = seed_artist.lower().replace('(nhóm nhạc)', '').replace('(ca sĩ)', '').strip()
@@ -1984,6 +2227,9 @@ class WikipediaBFScraper:
 				if entity in title_lower:
 					scores['Album'] += 25
 					break
+		# Pattern "(bài hát của X)" hoặc "(song"
+		if 'bài hát của' in title_lower or '(bài hát' in title_lower:
+			scores['Song'] += 30
 
 		# Avoid misclassification for organizations/charts
 		if any(k in title_lower for k in ['company', 'công ty', 'official charts', 'chart', 'charts', 'entertainment', 'agency']):
@@ -1995,6 +2241,33 @@ class WikipediaBFScraper:
 		if any(k in infobox_text for k in ['k-pop', 'kpop', 'ca sĩ', 'nhóm nhạc']):
 			scores['Artist'] += 5
 			scores['Group'] += 5
+
+		# Boost mạnh cho Artist khi infobox có đủ bộ 'Sinh' + 'Nghề nghiệp' + 'Năm hoạt động'
+		if all(f in infobox for f in ['Sinh', 'Nghề nghiệp', 'Năm hoạt động']):
+			# Kiểm tra nghề nghiệp thuộc âm nhạc để tránh boost nhầm lịch sử/vận động viên
+			occupation = str(infobox.get('Nghề nghiệp', '')).lower()
+			music_occu_keywords = ['ca sĩ', 'ca si', 'nhạc sĩ', 'nhac si', 'rapper', 'nghệ sĩ', 'nghe si',
+									'producer', 'nhà sản xuất', 'songwriter', 'composer', 'idol', 'thần tượng',
+									'singer', 'vocalist', 'dancer', 'music producer']
+			if any(k in occupation for k in music_occu_keywords):
+				# Nếu không có "Thành viên" thì chắc chắn là Artist solo
+				if not has_members:
+					scores['Artist'] += 60  # Tăng từ 40 lên 60 - boost rất cao cho Artist solo có đủ thông tin
+				else:
+					scores['Artist'] += 40  # Tăng từ 25 lên 40 - có thể là Artist trong Group
+		
+		# Boost cho Group khi có nhiều thành viên (dấu hiệu rõ ràng hơn)
+		if has_members:
+			members_text = ''
+			for field in ['Thành viên', 'Members', 'Cựu thành viên', 'Former Members']:
+				if field in infobox:
+					members_text = str(infobox.get(field, ''))
+					break
+			# Đếm số thành viên (tách theo dấu phẩy)
+			if members_text:
+				member_count = len([m.strip() for m in members_text.split(',') if m.strip()])
+				if member_count >= 2:
+					scores['Group'] += 25  # Tăng từ 10 lên 25 - boost cao hơn khi có nhiều thành viên
 
 		# Final selection with tie-breakers
 		# Prefer Artist/Group when tied with Album/Song to keep entities as people/groups
@@ -2065,136 +2338,17 @@ class WikipediaBFScraper:
 		return False
 
 	def is_relevant_page(self, title: str, soup: BeautifulSoup, is_seed: bool = False) -> bool:
-		"""Accept only Korean-scope music entities (artist/group/album/song/company/award)."""
+		"""Chấp nhận trang để chấm điểm; lọc cứng chỉ loại namespace Wikipedia."""
 		# Always keep seeds regardless of checks
 		if is_seed:
 			return True
-		full_text = soup.get_text(separator=' ')
-		text_lower = full_text.lower()
-		title_lower_only = title.lower()
-		# Hard-ban specific non-targets
-		if 'fifth harmony' in title_lower_only:
-			return False
-		infobox = self.extract_infobox(soup)
-		infobox_text = ' '.join(infobox.values()).lower()
-
-		# Loại trang về Họ (surname)
-		surname_markers = ['họ người', 'họ (họ người)', 'là một họ', 'họ tiếng', 'họ trong tiếng']
-		if any(m in text_lower for m in surname_markers) and not any(k in text_lower for k in ['ca sĩ','nhạc sĩ','nhóm nhạc','album','bài hát']):
-			return False
-
-		# Quick label guess
-		label = self.classify_label(unquote(title), infobox, text_lower)
-
-		# Korean markers
-		has_hangul = self._has_hangul(unquote(title)) or self._has_hangul(full_text) or self._has_hangul(' '.join(infobox.values()))
-		is_korean_marker = ('hàn quốc' in text_lower) or ('hàn quốc' in infobox_text) or ('k-pop' in text_lower)
-		is_korean_national = any('hàn quốc' in infobox.get(kf, '').lower() for kf in ['Quốc tịch', 'Quốc gia', 'Nguồn gốc', 'Nơi sinh', 'Quê quán'])
-		is_korean = has_hangul or is_korean_marker or is_korean_national
-
-		# Music/Entertainment marker
-		is_music = any(k in infobox_text for k in ['ca sĩ', 'nhạc sĩ', 'nhóm nhạc', 'album', 'bài hát', 'đĩa đơn', 'entertainment']) or \
-			any(k in text_lower for k in ['ca sĩ', 'nhạc sĩ', 'nhóm nhạc', 'album', 'k-pop'])
-
-		# Exclude generic pages
+		# Chỉ loại namespace Wikipedia và các trang không phải bài viết
 		exclude_markers = ['wikipedia:', 'tập tin:', 'đặc biệt:', 'chủ đề:', 'thể loại:']
 		title_lower = title.lower()
 		if any(m in title_lower for m in exclude_markers):
 			return False
-
-		# Apply rules per label
-		if label == 'Artist':
-			# BẮT BUỘC có trường nghề nghiệp và phải thuộc âm nhạc
-			occupation_fields = ['Nghề nghiệp', 'Occupation', 'Nghề', 'Professions']
-			music_occu_keywords = [
-				'ca sĩ', 'ca si', 'singer', 'vocalist', 'rapper', 'nhạc sĩ', 'nhac si',
-				'nhà sản xuất âm nhạc', 'producer', 'music producer', 'composer', 'songwriter',
-				'idol', 'thần tượng', 'dancer'
-			]
-			has_occupation_field = any(f in infobox for f in occupation_fields)
-			if not has_occupation_field:
-				return False
-			has_occupation_music = False
-			for f in occupation_fields:
-				if f in infobox:
-					val = str(infobox[f]).lower()
-					if any(k in val for k in music_occu_keywords):
-						has_occupation_music = True
-						break
-			if not has_occupation_music:
-				return False
-
-			# Loại các nhân vật lịch sử/hoàng gia không thuộc âm nhạc
-			history_indicators_text = [
-				'vua', 'hoàng đế', 'hoàng hậu', 'thái tử', 'vương', 'quý tộc',
-				'triều đại', 'vương triều', 'triều joseon', 'triều goryeo', 'baekje', 'silla',
-				'sinh', 'mất', 'trị vì', 'lên ngôi', 'miếu hiệu', 'thụy hiệu', 'tôn hiệu', 'hậu duệ', 'tổ tiên', 'phối ngẫu', 'con cái'
-			]
-			history_fields = [
-				'Triều đại', 'Triều', 'Dynasty', 'Reign', 'Miếu hiệu', 'Temple name',
-				'Thụy hiệu', 'Posthumous name', 'Tôn hiệu', 'Era name', 'Regnal name',
-				'Phối ngẫu', 'Spouse', 'Hậu duệ', 'Issue', 'Con cái', 'Children',
-				'Sinh', 'Birth', 'Mất', 'Death'
-			]
-			is_historical = any(ind in text_lower for ind in history_indicators_text)
-			for hf in history_fields:
-				if hf in infobox:
-					is_historical = True
-					break
-			if is_historical and not has_occupation_music:
-				return False
-
-			# Loại các vận động viên/cầu thủ bóng đá không thuộc mạng lưới âm nhạc
-			sports_indicators_text = ['cầu thủ bóng đá', 'bóng đá', 'footballer', 'soccer player']
-			sports_fields = [
-				'Đội hiện nay', 'Số áo', 'Vị trí', 'Câu lạc bộ', 'Đội tuyển quốc gia',
-				'Sự nghiệp cầu thủ', 'Sự nghiệp trẻ', 'Ghi bàn', 'Bàn thắng', 'Bàn thua',
-				'Chiều cao', 'Cân nặng', 'Huấn luyện viên', 'Youth career', 'Senior career',
-				'Current team', 'Club number', 'Position'
-			]
-			is_sports = any(ind in text_lower for ind in sports_indicators_text)
-			for sf in sports_fields:
-				if sf in infobox:
-					is_sports = True
-					break
-			# Loại tuyển thủ eSports
-			esports_indicators_text = [
-				'esports', 'thể thao điện tử', 'game thủ', 'tuyển thủ', 'pro gamer',
-				'league of legends', 'liên minh huyền thoại', 'lck', 't1', 'faker',
-				'dota 2', 'overwatch', 'starcraft', 'pubg', 'valorant'
-			]
-			esports_fields = [
-				'Đội tuyển', 'Tổ chức', 'Tuyển thủ', 'Trò chơi', 'Game', 'Vai trò', 'Role',
-				'Giải đấu', 'League', 'Vị trí thi đấu', 'Main role', 'Coach', 'Huấn luyện viên trưởng'
-			]
-			is_esports = any(ind in text_lower for ind in esports_indicators_text)
-			for ef in esports_fields:
-				if ef in infobox:
-					is_esports = True
-					break
-			if is_sports or is_esports:
-				return False
-			return is_music and is_korean
-		elif label == 'Group':
-			return is_music and is_korean
-		elif label in ('Album', 'Song'):
-			# Loại các album/bài hát nước ngoài (OST phương Tây, không dấu hiệu Hàn)
-			foreign_music_indicators = [
-				'original motion picture soundtrack', 'soundtrack',
-				'hollywood', 'disney', 'warner bros', 'universal music', 'atlantic records',
-				'columbia records', 'republic records', 'sony music', 'united states', 'usa', 'anh', 'uk', 'canada', 'mỹ'
-			]
-			if any(x in title_lower_only for x in foreign_music_indicators) or any(x in infobox_text for x in foreign_music_indicators):
-				if not is_korean:
-					return False
-			# Chấp nhận chỉ khi có dấu hiệu Hàn rõ ràng
-			return is_music and (has_hangul or is_korean_marker)
-		elif label == 'Company':
-			return False  # Không thu thập Company như một node chính
-		elif label == 'Award':
-			return False  # Không thu thập Award như một node chính
-		else:
-			return False
+		# Chấp nhận tất cả các trang còn lại để chấm điểm
+		return True
 
 	def is_excluded_title(self, title: str) -> bool:
 		"""Filter out disambiguation, list, year, and overly generic titles early."""
@@ -2321,29 +2475,20 @@ class WikipediaBFScraper:
 			infobox_text = ' '.join(infobox.values()).lower()
 			label = self.classify_label(current_title, infobox, page_text_lower)
 
-			# LỌC NGAY: Chỉ chấp nhận node nếu label rõ ràng
-			# NHƯNG: Với hạt giống, nếu label là Entity nhưng có từ khóa âm nhạc thì cũng chấp nhận
+			# LỌC NGAY: Chỉ chấp nhận node nếu label rõ ràng (trừ seed - seed luôn được lấy)
 			if label not in ('Artist', 'Group', 'Album', 'Song'):
 				if is_seed:
-					# Kiểm tra xem có phải là music entity không
-					has_music_keyword = any(k in infobox_text for k in ['ca sĩ', 'nhạc sĩ', 'nhóm nhạc', 'album', 'bài hát']) or \
-										any(k in page_text_lower for k in ['ca sĩ', 'nhạc sĩ', 'nhóm nhạc', 'k-pop'])
-					if has_music_keyword:
-						# Thử phân loại lại dựa vào nội dung infobox
-						if 'nhóm nhạc' in infobox_text or 'thành viên' in infobox_text or 'Cựu thành viên' in infobox_text:
-							label = 'Group'
-						elif 'ca sĩ' in infobox_text or 'nghề nghiệp' in infobox:
-							label = 'Artist'
-						else:
-							# Mặc định là Group nếu không chắc
-							label = 'Group'
-						print(f"  ℹ [SEED RELABEL] {current_title}: Entity -> {label}")
-					else:
-						if is_seed:
-							print(f"  ✗ [SEED BỊ LOẠI] {current_title} - label = {label}, không có từ khóa music")
-						continue
+					# Seed luôn được lấy, bỏ qua kiểm tra label
+					pass
 				else:
-					continue
+					# Không phải seed: Company/Award sẽ bị trừ điểm nặng ở scoring, không cần continue ở đây
+					# Chỉ continue nếu không phải label hợp lệ và không có dấu hiệu music
+					if label in ('Company', 'Award'):
+						# Để scoring function xử lý penalty
+						pass
+					else:
+						# Entity hoặc label khác không rõ -> bỏ qua
+						continue
             
 			# Tạo node tạm để tính quality score
 			temp_node = {
@@ -2378,18 +2523,12 @@ class WikipediaBFScraper:
             
 			# CHẤP NHẬN HẠT GIỐNG BẤT KỂ ĐIỂM (để đảm bảo có đầy đủ)
 			if is_seed:
-				# Bỏ qua kiểm tra điểm cho hạt giống
-				# Kiểm tra trùng chữ ký trước khi thêm
+				# Seed luôn được thêm vào, không kiểm tra trùng
 				signature = self._compute_node_signature(label, infobox)
-				if signature in self.node_signature_index:
-					original = self.node_signature_index[signature]
-					self.title_alias[current_title] = original
-					print(f"  ↷ Bỏ qua node trùng (SEED): {current_title} ≡ {original}")
-					# Không thêm node trùng
-				else:
-					self.nodes[current_title] = temp_node
+				self.nodes[current_title] = temp_node
+				if signature not in self.node_signature_index:
 					self.node_signature_index[signature] = current_title
-					print(f"✓ [SEED] [{len(self.nodes)}/{max_nodes}] {current_title} ({label}, điểm: {quality_score:.1f}) - Hạt giống")
+				print(f"✓ [SEED] [{len(self.nodes)}/{max_nodes}] {current_title} ({label}, điểm: {quality_score:.1f}) - Hạt giống")
 				# Tiếp tục xử lý (không skip)
 			elif quality_score < quality_threshold:
 				print(f"  ✗ Bỏ qua '{current_title}' ({label}, điểm: {quality_score:.1f} < {quality_threshold})")
@@ -3414,16 +3553,33 @@ class WikipediaBFScraper:
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description='Korean Artists/Groups BFS Scraper (Wikipedia Vietnamese)')
 	parser.add_argument('--seeds', nargs='*', default=[
-		"BTS", "Blackpink", "Big Bang (nhóm nhạc)", "Girls' Generation", "EXO",
-		"Red Velvet (nhóm nhạc)", "NCT (nhóm nhạc)", "Psy", "IU (ca sĩ)", "Cha Eun-woo",
-		"TWICE", "SEVENTEEN", "Stray Kids", "NewJeans", "LE SSERAFIM",
-		"ITZY", "IVE", "(G)I-dle", "TXT (ban nhạc)", "SHINee",
-		"Super Junior", "2NE1", "Mamamoo", "Kara (nhóm nhạc Hàn Quốc)"
+		# Gen 1/2 pioneers
+		"H.O.T.", "Sechs Kies", "g.o.d", "Shinhwa", "S.E.S.", "Fin.K.L",
+		# Big 3/4 flagships and 2nd gen groups
+		"TVXQ", "Super Junior", "Girls' Generation", "Big Bang (nhóm nhạc)", "2NE1",
+		"Kara (nhóm nhạc Hàn Quốc)", "T-ara", "Wonder Girls", "f(x)", "SHINee",
+		# 3rd gen and beyond
+		"EXO", "Red Velvet (nhóm nhạc)", "TWICE", "BLACKPINK", "BTS",
+		"Seventeen", "GOT7", "MONSTA X", "NCT (nhóm nhạc)", "WINNER",
+		"iKON", "DAY6", "MAMAMOO", "GFriend", "OH MY GIRL", "Lovelyz",
+		"WJSN", "APRIL", "fromis_9", "LOONA",
+		# 4th gen leaders
+		"Stray Kids", "ITZY", "ATEEZ", "The Boyz", "TXT (ban nhạc)",
+		"ENHYPEN", "TREASURE", "STAYC", "IVE", "NMIXX", "NewJeans", "LE SSERAFIM",
+		"Kep1er", "(G)I-dle",
+		# Soloists and producers
+		"IU (ca sĩ)", "Psy", "Taeyeon", "BoA", "Sunmi", "Chungha",
+		"HyunA", "Jay Park", "Zico", "Heize", "DEAN", "G-Dragon",
+		"Taeyang", "Rosé", "Jennie", "Jisoo", "Lisa",
+		# Duos/bands
+		"AKMU", "Bolbbalgan4",
+		# Rising/others
+		"IVE", "NewJeans", "aespa"
 	], help='Danh sách hạt giống (tiêu đề trang Wikipedia tiếng Việt)')
-	parser.add_argument('--max-nodes', type=int, default=1700, help='Số lượng node tối đa')
+	parser.add_argument('--max-nodes', type=int, default=2000, help='Số lượng node tối đa')
 	parser.add_argument('--delay', type=float, default=0.2, help='Độ trễ giữa các request (giây)')
 	parser.add_argument('--timeout', type=int, default=10, help='Timeout mỗi request (giây)')
-	parser.add_argument('--top-k', type=int, default=30, help='Số liên kết ưu tiên tối đa mỗi node')
+	parser.add_argument('--top-k', type=int, default=150, help='Số liên kết ưu tiên tối đa mỗi node')
 	parser.add_argument('--output', type=str, default='korean_artists_graph_bfs.json', help='Tên file JSON đầu ra')
 	# Neo4j optional export flags
 	parser.add_argument('--neo4j-uri', type=str, default=None, help='Neo4j Bolt URI, ví dụ bolt://localhost:7687')

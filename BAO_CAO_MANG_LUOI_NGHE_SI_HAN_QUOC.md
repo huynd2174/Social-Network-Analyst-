@@ -1,10 +1,10 @@
 XÂY DỰNG MẠNG LƯỚI NGHỆ SĨ VÀ CA SĨ HÀN QUỐC TỪ WIKIPEDIA TIẾNG VIỆT
 
-Tóm tắt — Báo cáo này trình bày một hệ thống thu thập, chuẩn hóa và biểu diễn dữ liệu dưới dạng đồ thị có hướng nhằm mô hình hóa mạng lưới các nghệ sĩ và ca sĩ Hàn Quốc sử dụng nguồn dữ liệu duy nhất từ Wikipedia tiếng Việt. Hệ thống lựa chọn nút và cạnh dựa trên bằng chứng chặt chẽ từ infobox, ưu tiên tính chính xác ngữ nghĩa và hạn chế suy đoán. Ảnh chụp hiện tại của mạng ghi nhận 103 nút và 131 cạnh, với phân bố chủ yếu ở các quan hệ thể loại âm nhạc và công ty quản lý/phát hành. Pipeline đã được thiết kế để mở rộng tối thiểu 1000 nút theo yêu cầu, đồng thời hỗ trợ xuất dữ liệu sang Neo4j để phục vụ phân tích đồ thị nâng cao.
+Tóm tắt — Báo cáo này giới thiệu cách chúng tôi xây dựng một mạng lưới tri thức về nghệ sĩ và ca sĩ Hàn Quốc dựa trên Wikipedia tiếng Việt. Thay vì “thu thập cho nhiều”, chúng tôi tập trung vào “thu thập đúng” và “thu thập sạch”: mọi nút và cạnh đều được tạo ra từ bằng chứng rõ ràng trong infobox, các tên gọi được chuẩn hóa ngay khi trích xuất để tránh trùng lặp, và dữ liệu luôn có thể kiểm chứng lại từ nguồn. Ảnh chụp hiện tại của mạng gồm 103 nút và 131 cạnh, trong đó các quan hệ thể loại và công ty quản lý/phát hành chiếm ưu thế – đúng với đặc trưng của ngành âm nhạc đại chúng. Hệ thống đã sẵn sàng mở rộng lên tối thiểu 1000 nút theo yêu cầu và hỗ trợ xuất sang Neo4j để phân tích đồ thị nâng cao.
 
 1. Giới thiệu
 
-Trong bối cảnh âm nhạc Hàn Quốc phát triển mạnh mẽ và lan tỏa toàn cầu, việc xây dựng một mạng lưới tri thức về nghệ sĩ, nhóm nhạc, sản phẩm âm nhạc và các chủ thể liên quan mang ý nghĩa quan trọng đối với nghiên cứu khoa học dữ liệu và khoa học xã hội tính toán. Mục tiêu của công trình này là hình thành một đồ thị có hướng, nhiều nhãn, phản ánh trung thực các mối quan hệ nghề nghiệp cốt lõi trong hệ sinh thái âm nhạc, bao gồm thành viên–nhóm, thể loại âm nhạc, công ty quản lý/phát hành, mối liên hệ giữa nghệ sĩ và sản phẩm (album, bài hát), nhạc cụ và nghề nghiệp. Điểm nhấn của hệ thống là nguyên tắc “cạnh có bằng chứng”: mọi quan hệ đều được xác lập từ dữ liệu có cấu trúc trong infobox, hạn chế suy luận dựa trên văn bản tự do. Báo cáo mô tả đầy đủ thiết kế phương pháp, quy trình tiền xử lý, các lựa chọn kỹ thuật, thống kê mạng, cùng các kết luận và hướng phát triển.
+Âm nhạc Hàn Quốc không chỉ là các bản hit hay những nhóm nhạc nổi tiếng; đằng sau đó là một mạng lưới phong phú các mối liên hệ giữa nghệ sĩ, nhóm, công ty và sản phẩm âm nhạc. Mục tiêu của chúng tôi là tái hiện mạng lưới này bằng dữ liệu mở từ Wikipedia tiếng Việt, dưới dạng một đồ thị có hướng và nhiều nhãn, nơi các quan hệ nghề nghiệp cốt lõi được thể hiện rõ ràng: nghệ sĩ là thành viên nhóm nào, theo đuổi thể loại gì, làm việc với công ty nào, phát hành album hay trình bày bài hát nào. Xuyên suốt quá trình, chúng tôi kiên định với nguyên tắc “cạnh có bằng chứng”: chỉ tạo quan hệ khi có dấu vết cụ thể trong infobox, tránh suy diễn từ nội dung tự do. Phần còn lại của báo cáo trình bày phương pháp, cách xử lý dữ liệu, kết quả thống kê và những gì chúng tôi học được khi hiện thực hóa mạng lưới này.
 
 2. Mạng lưới đã xây dựng: lựa chọn nút và cạnh
 
@@ -16,7 +16,31 @@ Các cạnh của mạng được xác định theo nguyên tắc bằng chứng
 
 Hệ thống được triển khai bằng Python, sử dụng requests để thực hiện HTTP theo phiên, thiết lập User-Agent rõ ràng và timeout nhằm bảo toàn tính lịch sự truy cập; BeautifulSoup đảm nhiệm phân tích cú pháp HTML và trích xuất infobox. Chiến lược crawling áp dụng BFS với điều tiết nhịp truy vấn (delay) và cơ chế ưu tiên liên kết theo từ khóa âm nhạc và các chỉ dấu Hàn Quốc. Dữ liệu được biểu diễn và lưu trữ tạm thời bằng JSON, kèm thống kê tự động để kiểm định chất lượng. Tầng lưu trữ đồ thị sử dụng Neo4j với cơ chế MERGE cho nút và cạnh, nhóm lệnh theo lô nhằm tối ưu hiệu năng, và các ràng buộc duy nhất trên thuộc tính định danh theo nhãn (Artist, Group, Album, Song, Genre, Instrument, Company, Occupation). Nhờ vậy, pipeline có tính idempotent: chạy lặp không tạo trùng, thuận tiện cho mở rộng và cập nhật định kỳ.
 
-4. Các bước tiền xử lý dữ liệu
+4. Quy trình thực hiện
+
+Chúng tôi tổ chức toàn bộ dự án thành năm chặng nối tiếp: chuẩn bị môi trường, thu thập dữ liệu, mở rộng và biến đổi, xây dựng đồ thị, rồi đến phân tích và đánh giá. Cách làm này giúp kiểm soát chất lượng ở từng bước, hạn chế trùng lặp và giữ cho pipeline luôn có thể chạy lại một cách nhất quán.
+
+4.1. Chuẩn bị môi trường và công cụ
+
+Chúng tôi tạo một kho GitHub chung để lưu mã nguồn, dữ liệu và tài liệu, giúp làm việc nhóm trơn tru và theo dõi thay đổi dễ dàng. Mỗi thành viên chuẩn bị môi trường Python (cục bộ hoặc Colab) với các thư viện cần thiết như requests, BeautifulSoup và neo4j. Kết nối thử Neo4j được thiết lập sớm để chắc chắn rằng quy trình ghi – đọc đồ thị vận hành ổn định. Công việc được chia theo dòng: có người lo crawler và chuẩn hóa infobox, có người tập trung xây cạnh và kiểm định, và có người phụ trách thống kê, trực quan và viết báo cáo.
+
+4.2. Thu thập dữ liệu (Extract)
+
+Chúng tôi xác định phạm vi là nghệ sĩ và ca sĩ Hàn Quốc trên Wikipedia tiếng Việt, rồi khởi động bằng một tập hạt giống giàu liên kết và có tính đại diện cao như BTS, Blackpink, Big Bang, Girls’ Generation, EXO, Red Velvet, NCT, Psy, IU, Cha Eun-woo, TWICE, SEVENTEEN, Stray Kids, NewJeans, LE SSERAFIM, ITZY, IVE, (G)I-dle, TXT, SHINee, Super Junior, 2NE1, Mamamoo và Kara. Từ mỗi trang hạt giống, hệ thống tải nội dung, trích xuất infobox và các liên kết liên quan. Danh sách liên kết ban đầu được lưu lại ở định dạng JSON/CSV vừa để kiểm tra chéo, vừa làm hàng đợi cho bước mở rộng tiếp theo. Việc chọn hạt giống có “nhiều mối” như nhóm lớn, nghệ sĩ có nhiều sản phẩm hoặc thành viên solo giúp mạng nở ra nhanh chóng và sớm hình thành các cạnh có ý nghĩa.
+
+4.3. Mở rộng và xử lý dữ liệu (Transform)
+
+Chúng tôi dùng BFS để lần lượt đi qua các liên kết mới từ mỗi trang hợp lệ (nghệ sĩ, nhóm, bài hát, album). Trước khi đưa vào hàng đợi, mỗi trang được rà soát nhanh để loại bỏ nhiễu như trang danh sách, tour, chương trình truyền hình, concert hay showcase. Các trường infobox được chuẩn hóa tên và định dạng để nhất quán xuyên suốt pipeline; các biến thể của cùng một trường (chẳng hạn “Thể loại”, “Genre”) đều được quy về một khóa thống nhất. Ở bước này, chúng tôi cũng gộp trùng sớm: bỏ các trang thiếu dữ liệu hoặc lỗi infobox, hợp nhất các biến thể trùng của cùng thực thể dựa trên tên đã chuẩn hóa và chữ ký infobox, và duy trì bảng alias tiêu đề để không đánh mất các tham chiếu.
+
+4.4. Xây dựng cấu trúc đồ thị (Load – Build Graph)
+
+Chúng tôi sinh các nút ứng với Artist, Group, Album, Song, Genre, Company (Label/Agency), Instrument và Occupation; và chỉ tạo cạnh có hướng khi có bằng chứng trong infobox. Những quan hệ chính gồm MEMBER_OF (nghệ sĩ–nhóm), IS_GENRE (thuộc thể loại), MANAGED_BY (nghệ sĩ/nhóm–công ty), RELEASED (nghệ sĩ/nhóm–album), SINGS (nghệ sĩ/nhóm–bài hát), CONTAINS/PART_OF_ALBUM (album–bài hát), PLAYS (nghệ sĩ–nhạc cụ) và HAS_OCCUPATION (nghệ sĩ–nghề nghiệp). Dữ liệu được xuất ra JSON để kiểm thử nhanh, rồi nhập vào Neo4j nhằm kiểm tra cấu trúc, thống kê số lượng nút/cạnh và trực quan hóa mạng bằng công cụ của Neo4j hoặc Gephi.
+
+4.5. So sánh, đánh giá và phân tích kết quả (Analyze)
+
+Mỗi thành viên có thể tạo ra một phiên bản mạng khác nhau tùy cách mở rộng. Chúng tôi so sánh các phiên bản theo số nút, số cạnh, độ liên thông, tỷ lệ cạnh “có bằng chứng” và mức trùng lặp còn sót lại, rồi chọn ra bản hoàn chỉnh và nhất quán nhất để phân tích sâu. Trên Neo4j, chúng tôi dùng Degree Centrality và PageRank để nhận diện nút ảnh hưởng, dùng Louvain để phát hiện cộng đồng; sau đó trực quan hóa bằng Neo4j Bloom hoặc Gephi và tô màu theo cụm hoặc thể loại để dễ diễn giải. Từ đó, chúng tôi rút ra các cộng đồng lớn, các nghệ sĩ/nhóm có ảnh hưởng cao và những xu hướng hợp tác theo công ty hay thể loại – những điều vốn nằm ẩn trong cấu trúc mạng.
+
+5. Các bước tiền xử lý dữ liệu
 
 Tiền xử lý đóng vai trò quyết định trong bảo đảm tính chuẩn hóa và độ tinh khiết của đồ thị. Trước hết, hệ thống trích xuất infobox như một bảng thuộc tính cấu trúc, bởi đây là nguồn bằng chứng chính để xác định loại nút và cạnh. Ngay ở thời điểm trích xuất, các trường “Thể loại”, “Nhạc cụ”, “Hãng đĩa”, “Thành viên” được chuẩn hóa nhằm loại bỏ nhiễu và đồng nhất cách viết. Với thể loại âm nhạc, các biến thể như hip hop/hip-hop/hiphop được quy về “Hip hop”, r&b/rnb/r and b về “R&B”, dance-pop/dance pop về “Dance-pop”, electropop/electro-pop về “Electropop”, synthpop/synth-pop về “Synthpop”, j-pop/jpop về “J-pop”. Đặc biệt, “K-pop” được giữ lại trong infobox như ngữ cảnh, nhưng không sinh nút thể loại riêng để tránh tạo một nút hub mang tính bối cảnh. Danh sách loại trừ được áp dụng để loại các mục không phải thể loại âm nhạc (vlog, giải trí, nhạc kịch), qua đó nâng cao độ tinh khiết của lớp thể loại.
 
@@ -24,13 +48,13 @@ Tiền xử lý đóng vai trò quyết định trong bảo đảm tính chuẩn
 
 Việc xác định quan hệ được thực hiện theo cặp nhãn nguồn–đích, kết hợp đối sánh tên đã chuẩn hóa và kiểm tra xuất hiện trong trường infobox phù hợp. Các quan hệ như RELEASED và SINGS được suy xuất từ infobox của album/bài hát thay vì trang nghệ sĩ, bảo đảm hướng thông tin chính xác và hạn chế suy diễn. Nhờ vậy, tầng cạnh trở nên chặt chẽ về ngữ nghĩa và trung thực với nguồn dữ liệu.
 
-5. Thống kê về mạng đã xây dựng
+6. Thống kê về mạng đã xây dựng
 
 Ảnh chụp hiện tại của mạng ghi nhận 103 nút và 131 cạnh. Phân bố nhãn phản ánh vai trò trung tâm của các nút hỗ trợ: có 38 công ty/hãng đĩa và 24 thể loại, trong khi lớp nghệ sĩ và nhóm lần lượt là 10 và 11; lớp sản phẩm âm nhạc hiện gồm 4 album và 7 bài hát, phù hợp với một bản mẫu nhỏ và sẽ tăng lên khi mở rộng thu thập. Tầng nghề nghiệp ghi nhận 8 nút và nhạc cụ xuất hiện ở mức tối thiểu trong ảnh chụp này. Phân bố loại cạnh cho thấy quan hệ IS_GENRE và MANAGED_BY chiếm ưu thế với 51 và 48 cạnh, thể hiện đúng hai trục cốt lõi của âm nhạc đại chúng là phong cách biểu đạt và cơ cấu quản trị/phát hành. Các quan hệ gắn với sản phẩm âm nhạc (SINGS, RELEASED, CONTAINS) đạt tổng cộng 12 cạnh, và quan hệ thành viên (MEMBER_OF) được minh họa bằng 2 cạnh, con số này dự kiến tăng mạnh sau khi mở rộng lớp nghệ sĩ/nhóm. 
 
 Các chỉ số liên kết cho thấy mạng lưới thưa, với mật độ xấp xỉ 0.0249 và bậc trung bình khoảng 2.54; đây là đặc trưng quen thuộc của mạng thế giới thực, nơi quan hệ có ý nghĩa thường quy tụ quanh một số đầu mối lớn như công ty chủ chốt, nhóm đương đại có nhiều sản phẩm, hoặc nghệ sĩ có hoạt động đa dạng. Bậc tối đa đạt 11, gợi ý sự tồn tại của các nút trung tâm. Chỉ số chất lượng ghi nhận tỷ lệ nút có dấu Hangul khoảng 11.65%, chịu ảnh hưởng bởi lớp Genre/Company ít khi mang Hangul; khi tăng tỷ trọng nghệ sĩ/nhóm và sản phẩm, tỷ lệ này dự kiến tăng đáng kể. Tỷ lệ nút âm nhạc cốt lõi (Artist/Group/Album/Song) đạt khoảng 31.07%, phản ánh đúng định hướng thiết kế đặt nghệ sĩ và nhóm làm trung tâm, được bao quanh bởi các thuộc tính hỗ trợ.
 
-6. Kết luận: đạt được và chưa đạt được
+7. Kết luận: đạt được và chưa đạt được
 
 Hệ thống đã xây dựng thành công một pipeline thu thập và chuẩn hóa dữ liệu trung thực với nguồn, bảo đảm rằng mọi cạnh đều có bằng chứng từ infobox. Nguyên tắc chuẩn hóa sớm, đặc biệt đối với Genre và Company, giúp ngăn ngừa trùng lặp và nâng cao độ tinh khiết của lớp khái niệm. Tầng lưu trữ với Neo4j sử dụng MERGE theo định danh ổn định, xử lý theo lô và ràng buộc duy nhất theo nhãn, bảo đảm tính mở rộng và khả năng tái lập. Snapshot hiện tại với 103 nút và 131 cạnh đóng vai trò kiểm thử pipeline; khi vận hành với cấu hình mặc định, hệ thống được thiết kế để đạt tối thiểu 1000 nút, đáp ứng yêu cầu đề bài. 
 
