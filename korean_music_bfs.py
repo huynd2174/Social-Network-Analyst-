@@ -3572,9 +3572,19 @@ def parse_args() -> argparse.Namespace:
 		"HyunA", "Jay Park", "Zico", "Heize", "DEAN", "G-Dragon",
 		"Taeyang", "Rosé", "Jennie", "Jisoo", "Lisa",
 		# Duos/bands
-		"AKMU", "Bolbbalgan4",
+		"AKMU", "Bolbbalgan4", "Epik High", "Brown Eyed Girls", "Apink", "VIXX", "B.A.P",
+		"Block B", "BtoB", "NU'EST", "Teen Top", "2AM", "2PM", "KARD", "Pentagon (nhóm nhạc)",
+		"ONEUS", "ONEWE", "Dreamcatcher", "Everglow", "Cherry Bullet", "Rocket Punch",
+		"Weeekly", "PURPLE KISS", "LIGHTSUM", "Billlie", "Xdinary Heroes",
 		# Rising/others
-		"IVE", "NewJeans", "aespa"
+		"aespa", "tripleS", "ZEROBASEONE", "RIIZE", "BOYNEXTDOOR", "ILLIT", "BABYMONSTER",
+		# Project/produce groups
+		"WANNA ONE", "I.O.I", "IZ*ONE",
+		# More soloists
+		"Taemin", "Baekhyun", "Kai", "Key (ca sĩ)", "Minho (ca sĩ)",
+		"Wendy (ca sĩ)", "Seulgi", "Joy (ca sĩ)", "Yeri",
+		"Suzy", "Ailee", "Crush (ca sĩ)", "Zion.T",
+		"Lee Hi", "Baek A-yeon"
 	], help='Danh sách hạt giống (tiêu đề trang Wikipedia tiếng Việt)')
 	parser.add_argument('--max-nodes', type=int, default=2000, help='Số lượng node tối đa')
 	parser.add_argument('--delay', type=float, default=0.2, help='Độ trễ giữa các request (giây)')
