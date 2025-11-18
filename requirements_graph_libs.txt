@@ -1,0 +1,36 @@
+# Thư viện cần thiết cho phân tích đồ thị
+# Cài đặt: pip install -r requirements_graph_libs.txt
+
+# NetworkX - Thư viện phổ biến nhất (KHUYẾN NGHỊ BẮT ĐẦU)
+networkx>=3.0
+
+# Matplotlib - Trực quan hóa
+matplotlib>=3.5.0
+
+# Pandas - Xử lý dữ liệu
+pandas>=1.3.0
+
+# NumPy - Tính toán số học
+numpy>=1.21.0
+
+# ============================================
+# Các thư viện tùy chọn (hiệu năng cao hơn)
+# ============================================
+
+# igraph - Nhanh hơn NetworkX (tùy chọn)
+# python-igraph>=0.10.0
+
+# graph-tool - Cực kỳ nhanh (tùy chọn, cài đặt phức tạp)
+# Cần cài qua conda: conda install -c conda-forge graph-tool
+
+# PyTorch Geometric - Deep learning trên đồ thị (tùy chọn)
+# torch>=1.12.0
+# torch-geometric>=2.0.0
+
+# Neo4j driver - Đã có trong code hiện tại
+neo4j>=5.0.0
+
+# Graph Data Science (GDS) Python Client - Thư viện chuyên nghiệp của Neo4j
+# Yêu cầu: Neo4j Server với GDS plugin đã cài đặt
+graphdatascience>=1.0.0
+

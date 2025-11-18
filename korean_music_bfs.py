@@ -86,6 +86,29 @@ class WikipediaBFScraper:
 				for k, v in (data.get('properties') or {}).items():
 					if k not in props:
 						props[k] = v
+				# include full infobox fields for core labels by flattening keys
+				if label in ('Artist', 'Group', 'Song', 'Genre'):
+					infobox = data.get('infobox') or {}
+					if isinstance(infobox, dict) and infobox:
+						def _strip_diacritics_to_ascii(text: str) -> str:
+							import unicodedata as _ud
+							if not isinstance(text, str):
+								text = str(text)
+							norm = _ud.normalize('NFD', text)
+							# map Vietnamese đ/Đ manually then remove combining marks
+							norm = norm.replace('đ', 'd').replace('Đ', 'D')
+							return ''.join(ch for ch in norm if _ud.category(ch) != 'Mn')
+						def _norm_key(s: str) -> str:
+							# normalize to safe Neo4j property key without losing letters
+							import re as _re
+							key = _strip_diacritics_to_ascii(str(s).strip().lower())
+							key = _re.sub(r"[^a-z0-9]+", "_", key)
+							key = _re.sub(r"_+", "_", key).strip('_')
+							return key or "field"
+						for raw_k, raw_v in infobox.items():
+							k_norm = _norm_key(raw_k)
+							if k_norm not in ('id','name','url'):
+								props[k_norm] = str(raw_v)
 				label_to_nodes.setdefault(label, []).append({'id': node_id, 'props': props})
 
 			# Prepare relationships
@@ -790,8 +813,8 @@ class WikipediaBFScraper:
 						'bts', 'blackpink', 'exo', 'twice', 'red velvet', 'nct',
 						'seventeen', 'stray kids', 'itzy', 'aespa', 'newjeans',
 						'big bang', "girls' generation", 'super junior', '2ne1',
-						'got7', 'monsta x', 'stray kids', 'the boyz', 'ateez',
-						'enhypen', 'txt', 'treasure', 'ive', 'le sserafim',
+						'got7', 'Monsta X', 'stray kids', 'the boyz', 'ateez',
+						'enhypen', 'Tomorrow X Together', 'Treasure', 'ive', 'le sserafim',
 						'gidle', 'aespa', 'stayc', 'nmixx', 'kep1er',
 						'kara', 'wonder girls', 'girls day', 'apink', 'sistar',
 						'ailee', 'sunmi', 'chungha', 'boa', 'taeyeon',
@@ -801,10 +824,10 @@ class WikipediaBFScraper:
 						'v', 'g-dragon', 'taeyang', 'daesung', 'taemin',
 						'kai', 'baekhyun', 'chen', 'd.o.', 'chanyeol',
 						'jihyo', 'nayeon', 'jeongyeon', 'momo', 'sana',
-						'dahyun', 'chaeyoung', 'tzuyu', 'irene', 'seulgi',
+						'dahyun', 'chaeyoung', 'tzuyu', 'irene', 'Seulgi (ca sĩ)',
 						'wendy', 'joy', 'yeri', 'hyuna', 'hani',
 						'moonbyul', 'wheein', 'hwasa', 'yerin', 'eunha',
-						'cha eun-woo', 'minho', 'onew', 'key', 'shinee',
+						'cha eun-woo', 'Choi Min-ho (ca sĩ)', 'onew', 'key', 'Shinee',
 						'snsd', 'soshi', 'f(x)', 'rv', 'nct', 'seventeen'
 					]
 					
@@ -923,10 +946,24 @@ class WikipediaBFScraper:
         
 		# Check for "của [Western artist]" pattern
 		western_artist_patterns = [
-			'của adele', 'của beyoncé', 'của taylor swift', 'của ed sheeran',
-			'của eminem', 'của coldplay', 'của maroon 5', 'của rihanna',
-			'của selena gomez', 'của ariana grande', 'của justin bieber',
-			'của bad bunny', 'của doja cat', 'của billie eilish'
+			# Pop/Rock and others
+			'của adele', 'của beyoncé', 'của beyonce', 'của taylor swift', 'của ed sheeran',
+			'của eminem', 'của coldplay', 'của maroon 5', 'của rihanna', 'của lady gaga', 'của janet jackson',
+			'của ariana grande', 'của justin bieber', 'của selena gomez', 'của katy perry',
+			'của bruno mars', 'của the beatles', 'của michael jackson', 'của madonna',
+			'của drake', 'của kanye west', 'của jay-z', 'của whitney houston',
+			'của u2', 'của queen', 'của the rolling stones', 'của abba', 'của bee gees', 'của fleetwood mac', 'của the police', 'của depeche mode', 'của duran duran', 'của spice girls',
+			'của bon jovi', 'của metallica', 'của nirvana', 'của radiohead', 'của muse', 'của green day', 'của linkin park', 'của red hot chili peppers', 'của arctic monkeys', 'của oasis', 'của blur', 'của the cure', 'của the smiths', 'của evanescence', 'của paramore', 'của fall out boy', 'của panic! at the disco', 'của thirty seconds to mars', 'của the chainsmokers', 'của lmfao', 'của tears for fears', 'của the mamas & the papas', 'của fifth harmony',
+			# Latin/others
+			'của bad bunny', 'của j balvin', 'của maluma', 'của shakira', 'của ricky martin',
+			'của enrique iglesias', 'của daddy yankee', 'của ozuna', 'của karol g', 'của anitta', 'của rosalía', 'của becky g',
+			# Other international
+			'của doja cat', 'của billie eilish', 'của olivia rodrigo', 'của post malone',
+			'của the weeknd', 'của harry styles', 'của dualipa', 'của camila cabello',
+			'của shawn mendes', 'của charlie puth', 'của james arthur', 'của sia', 'của p!nk', 'của ellie goulding', 'của rita ora', 'của zara larsson', 'của lorde', 'của halsey', 'của bebe rexha',
+
+			# User-specified additions
+			'của george benson', 'của extreme', 'của r.e.m.', 'của rem', 'của michael bublé', 'của michael buble', 'của chicago', 'của jimmy ruffin'
 		]
         
 		for pattern in western_artist_patterns:
@@ -1390,6 +1427,20 @@ class WikipediaBFScraper:
 					score += 5.0   # Bonus nếu có từ 2 dấu hiệu trở lên
 				if len(korean_signals) >= 3:
 					score += 5.0   # Bonus thêm nếu có từ 3 dấu hiệu trở lên
+
+			# BONUS: Địa lý Hàn Quốc trong các trường Sinh/Nơi sinh/Quê quán
+			geo_fields = ['Sinh', 'Nơi sinh', 'Quê quán', 'Place of birth', 'Birth place', 'Born']
+			k_geo_keywords = [
+				'hàn quốc','han quoc','korea','south korea','republic of korea',
+				'seoul','gyeonggi','gyeonggi-do','busan','incheon','daegu','daejeon','gwangju','ulsan',
+				'jeju','jeju-do','jeonju','gyeongsang','jeolla','chungcheong','gangwon'
+			]
+			for gf in geo_fields:
+				if gf in infobox:
+					val = str(infobox[gf]).lower()
+					if any(kw in val for kw in k_geo_keywords) or self._has_hangul(val):
+						score += 12.0
+						break
             
 			# Quyết định: Nếu không có dấu hiệu Hàn Quốc nào, trừ 30 điểm
 			if not korean_signals:
@@ -1597,7 +1648,7 @@ class WikipediaBFScraper:
 
 		# PHẠT: Album/Song có điểm thấp (<=15) nhưng không có bất kỳ tín hiệu liên quan Hàn Quốc
 		# Tín hiệu Hàn Quốc gồm: has_kpop_entity, có Hangul, hoặc có từ khóa 'hàn quốc'/'korean'/'k-pop' trong tiêu đề/infobox
-		if label in ('Song', 'Album') and score <= 15:
+		if label in ('Song', 'Album') and score <= 20:
 			korean_keywords = [
 				# Language/country
 				'hàn quốc', 'han quoc', 'đại hàn', 'dai han', 'triều tiên', 'trieu tien',
@@ -2493,6 +2544,7 @@ class WikipediaBFScraper:
 			# Tạo node tạm để tính quality score
 			temp_node = {
 				'label': label,
+				'title': current_title,
 				'infobox': infobox,
 				'url': self.base_url + current_title.replace(" ", "_"),
 				'depth': depth
@@ -2521,6 +2573,56 @@ class WikipediaBFScraper:
 			else:  # Album, Song
 				quality_threshold = threshold_album_song
             
+			# FINAL GATE for Album/Song with low score: must have Korean signals
+			if label in ('Album','Song') and quality_score <= 20 and not is_seed:
+				infobox_lower_local = infobox_text
+				title_lower_local = current_title.lower()
+				korean_keywords_local = [
+					'hàn quốc','han quoc','korean','korea','south korea','republic of korea',
+					'k-pop','kpop','hangul','hangeul','hallyu','làn sóng hàn','korean wave',
+					'seoul','busan','incheon','daegu','daejeon','gwangju','ulsan','suwon','jeju','jeonju',
+					'gyeonggi','gangwon','chungcheong','jeolla','gyeongsang','gangnam','hongdae','itaewon','myeongdong'
+				]
+				has_lang_field_korean = False
+				for lf in ['Ngôn ngữ','Ngôn ngữ gốc','Ngôn ngữ âm nhạc','Ngôn ngữ bài hát','Language','Languages']:
+					if lf in infobox:
+						val = str(infobox[lf]).lower()
+						if any(kw in val for kw in ['tiếng hàn','tieng han','korean','hangul','hangeul','ko-kr','ko kr','tiếng triều tiên','tieng trieu tien']):
+							has_lang_field_korean = True
+							break
+				has_korean_signal = (
+					self._has_hangul(current_title) or self._has_hangul(' '.join(infobox.values())) or
+					any(kw in title_lower_local or kw in infobox_lower_local for kw in korean_keywords_local) or
+					has_lang_field_korean
+				)
+				if not has_korean_signal:
+					print(f"  ✗ Bỏ qua '{current_title}' ({label}, điểm: {quality_score:.1f} ≤ 20, không có tín hiệu Hàn Quốc)")
+					continue
+
+			# FINAL GATE for Artist: must have music-related occupation (non-seed)
+			if label == 'Artist' and not is_seed:
+				occupation_fields_fg = ['Nghề nghiệp', 'Occupation', 'Nghề', 'Professions']
+				music_occu_keywords_fg = [
+					'ca sĩ', 'ca si', 'singer', 'vocalist', 'rapper', 'nhạc sĩ', 'nhac si',
+					'nhà sản xuất âm nhạc', 'producer', 'music producer', 'composer', 'songwriter',
+					'idol', 'thần tượng', 'dancer'
+				]
+				has_occupation_field_fg = any(f in infobox for f in occupation_fields_fg)
+				has_occupation_music_fg = False
+				for f in occupation_fields_fg:
+					if f in infobox:
+						val = str(infobox[f]).lower()
+						if any(k in val for k in music_occu_keywords_fg):
+							has_occupation_music_fg = True
+							break
+				if (not has_occupation_field_fg) or (not has_occupation_music_fg):
+					print(f"  ✗ Bỏ qua '{current_title}' (Artist thiếu nghề nghiệp âm nhạc)")
+					continue
+
+			# Mặc định: chưa chấp nhận node, nhưng có thể vẫn mở rộng link
+			accepted = False
+			source_for_edges: str | None = None
+
 			# CHẤP NHẬN HẠT GIỐNG BẤT KỂ ĐIỂM (để đảm bảo có đầy đủ)
 			if is_seed:
 				# Seed luôn được thêm vào, không kiểm tra trùng
@@ -2529,10 +2631,13 @@ class WikipediaBFScraper:
 				if signature not in self.node_signature_index:
 					self.node_signature_index[signature] = current_title
 				print(f"✓ [SEED] [{len(self.nodes)}/{max_nodes}] {current_title} ({label}, điểm: {quality_score:.1f}) - Hạt giống")
-				# Tiếp tục xử lý (không skip)
+				accepted = True
+				source_for_edges = current_title
 			elif quality_score < quality_threshold:
 				print(f"  ✗ Bỏ qua '{current_title}' ({label}, điểm: {quality_score:.1f} < {quality_threshold})")
-				continue
+				# Không chấp nhận node, nhưng vẫn sẽ mở rộng outlinks (không tạo pending edge từ node này)
+				accepted = False
+				source_for_edges = None
 			else:
 				# Node đạt chuẩn - kiểm tra trùng chữ ký trước khi thêm
 				signature = self._compute_node_signature(label, infobox)
@@ -2540,15 +2645,18 @@ class WikipediaBFScraper:
 					original = self.node_signature_index[signature]
 					self.title_alias[current_title] = original
 					print(f"  ↷ Bỏ qua node trùng: {current_title} ≡ {original}")
-					# Không thêm node trùng, nhưng vẫn duyệt link của trang này? Bỏ qua tiếp tục vòng lặp.
-					continue
+					# Không thêm node trùng, nhưng vẫn mở rộng outlinks và gán cạnh về 'original'
+					accepted = False
+					source_for_edges = original
 				else:
 					self.nodes[current_title] = temp_node
 					self.node_signature_index[signature] = current_title
 					print(f"✓ [{len(self.nodes)}/{max_nodes}] {current_title} ({label}, điểm: {quality_score:.1f})")
+					accepted = True
+					source_for_edges = current_title
 
-			# Promote pending edges whose target is now accepted and allowed by labels
-			if self.pending_edges:
+			# Promote pending edges only if current node is accepted/present in graph
+			if self.pending_edges and current_title in self.nodes:
 				remaining: List[Dict[str, Any]] = []
 				for pe in self.pending_edges:
 					# Áp dụng alias nếu target đã được gộp vào node khác
@@ -2585,40 +2693,43 @@ class WikipediaBFScraper:
 							remaining.append(pe)
 				self.pending_edges = remaining
 
-			content_div = soup.find('div', id='mw-content-text')
-			if not content_div:
-				continue
+			# CHỈ mở rộng outlinks nếu node hiện tại được CHẤP NHẬN
+			if accepted:
+				content_div = soup.find('div', id='mw-content-text')
+				if not content_div:
+					continue
 
-			candidates: List[Tuple[float, str, str]] = []  # (score, target_title, link_text)
-			for link in content_div.find_all('a', href=True):
-				href = link['href']
-				if href.startswith('/wiki/') and ':' not in href and '#' not in href:
-					target_title = href.replace('/wiki/', '').replace('_', ' ')
-					# Decode percent-encoded Vietnamese characters
-					target_title = unquote(target_title)
-					if self.is_excluded_title(target_title):
-						continue
-					s = self.score_link(current_title, target_title, link.get_text(), depth)
-					candidates.append((s, target_title, link.get_text(strip=True)))
+				candidates: List[Tuple[float, str, str]] = []  # (score, target_title, link_text)
+				for link in content_div.find_all('a', href=True):
+					href = link['href']
+					if href.startswith('/wiki/') and ':' not in href and '#' not in href:
+						target_title = href.replace('/wiki/', '').replace('_', ' ')
+						# Decode percent-encoded Vietnamese characters
+						target_title = unquote(target_title)
+						if self.is_excluded_title(target_title):
+							continue
+						s = self.score_link(current_title, target_title, link.get_text(), depth)
+						candidates.append((s, target_title, link.get_text(strip=True)))
 
-			# Select top-K candidates
-			candidates.sort(reverse=True, key=lambda x: x[0])
-			selected = 0
-			for s, target_title, link_text in candidates:
-				if selected >= top_k_per_node:
-					break
-				if target_title not in queued and len(self.nodes) + len(pq) < max_nodes:
-					queued.add(target_title)
-					# Push with negative score for max-heap behavior
-					heappush(pq, (-s, target_title, depth + 1))
-					# Lưu pending edge (relation type sẽ được xác định sau khi target được chấp nhận)
-					self.pending_edges.append({
-						'source': current_title,
-						'target': target_title,
-						'type': 'PENDING',  # Sẽ được xác định lại bằng _determine_precise_relation()
-						'text': link_text
-					})
-					selected += 1
+				# Select top-K candidates
+				candidates.sort(reverse=True, key=lambda x: x[0])
+				selected = 0
+				for s, target_title, link_text in candidates:
+					if selected >= top_k_per_node:
+						break
+					if target_title not in queued and len(self.nodes) + len(pq) < max_nodes:
+						queued.add(target_title)
+						# Push with negative score for max-heap behavior
+						heappush(pq, (-s, target_title, depth + 1))
+						# Lưu pending edge chỉ khi có source_for_edges (tức là node được chấp nhận)
+						if source_for_edges:
+							self.pending_edges.append({
+								'source': source_for_edges,
+								'target': target_title,
+								'type': 'PENDING',  # Sẽ được xác định lại bằng _determine_precise_relation()
+								'text': link_text
+							})
+						selected += 1
 
 			time.sleep(self.request_delay_seconds)
 
@@ -3560,36 +3671,44 @@ def parse_args() -> argparse.Namespace:
 		"Kara (nhóm nhạc Hàn Quốc)", "T-ara", "Wonder Girls", "f(x)", "SHINee",
 		# 3rd gen and beyond
 		"EXO", "Red Velvet (nhóm nhạc)", "TWICE", "BLACKPINK", "BTS",
-		"Seventeen", "GOT7", "MONSTA X", "NCT (nhóm nhạc)", "WINNER",
-		"iKON", "DAY6", "MAMAMOO", "GFriend", "OH MY GIRL", "Lovelyz",
-		"WJSN", "APRIL", "fromis_9", "LOONA",
+		"Seventeen", "GOT7", "Monsta X", "NCT (nhóm nhạc)", "WINNER",
+		"iKON", "Day6", "MAMAMOO", "GFriend", "Oh My Girl", "Lovelyz",
+		"WJSN", "April (nhóm nhạc)", "fromis_9", "Loona (nhóm nhạc)",
 		# 4th gen leaders
-		"Stray Kids", "ITZY", "ATEEZ", "The Boyz", "TXT (ban nhạc)",
+		"Stray Kids", "ITZY", "Ateez", "The Boyz", "TXT (ban nhạc)",
 		"ENHYPEN", "TREASURE", "STAYC", "IVE", "NMIXX", "NewJeans", "LE SSERAFIM",
 		"Kep1er", "(G)I-dle",
 		# Soloists and producers
 		"IU (ca sĩ)", "Psy", "Taeyeon", "BoA", "Sunmi", "Chungha",
-		"HyunA", "Jay Park", "Zico", "Heize", "DEAN", "G-Dragon",
+		"HyunA", "Jay Park", "Zico (rapper)", "Heize", "Dean (ca sĩ Hàn Quốc)", "G-Dragon",
 		"Taeyang", "Rosé", "Jennie", "Jisoo", "Lisa",
 		# Duos/bands
 		"AKMU", "Bolbbalgan4", "Epik High", "Brown Eyed Girls", "Apink", "VIXX", "B.A.P",
-		"Block B", "BtoB", "NU'EST", "Teen Top", "2AM", "2PM", "KARD", "Pentagon (nhóm nhạc)",
-		"ONEUS", "ONEWE", "Dreamcatcher", "Everglow", "Cherry Bullet", "Rocket Punch",
-		"Weeekly", "PURPLE KISS", "LIGHTSUM", "Billlie", "Xdinary Heroes",
+		"Block B", "BtoB", "NU'EST", "Teen Top", "2AM", "2PM", "K.A.R.D", "Pentagon (nhóm nhạc Hàn Quốc)",
+		"ONEUS", "Dreamcatcher (nhóm nhạc)", "Everglow", "Cherry Bullet", "Rocket Punch",
+		"Weeekly", "PURPLE KISS", "Lightsum", "Billlie"
 		# Rising/others
-		"aespa", "tripleS", "ZEROBASEONE", "RIIZE", "BOYNEXTDOOR", "ILLIT", "BABYMONSTER",
+		"aespa", "tripleS", "ZEROBASEONE", "RIIZE", "BoyNextDoor", "Illit (nhóm nhạc)", "Babymonster",
 		# Project/produce groups
-		"WANNA ONE", "I.O.I", "IZ*ONE",
+		"Wanna One", "I.O.I", "IZ*ONE",
 		# More soloists
-		"Taemin", "Baekhyun", "Kai", "Key (ca sĩ)", "Minho (ca sĩ)",
+		"Taemin", "Baekhyun", "Kai", "Key (ca sĩ)", "Choi Min-ho (ca sĩ)",
 		"Wendy (ca sĩ)", "Seulgi", "Joy (ca sĩ)", "Yeri",
 		"Suzy", "Ailee", "Crush (ca sĩ)", "Zion.T",
-		"Lee Hi", "Baek A-yeon"
+		"Lee Hi", "Baek A-yeon",
+		# Additional diverse seeds (unique, non-duplicated)
+		"INFINITE", "VICTON", "UP10TION", "SF9", "Golden Child", "U-KISS",
+		"SS501", "Highlight (nhóm nhạc Hàn Quốc)", "CNBLUE", "FT Island", 
+		"After School (nhóm nhạc)", "Orange Caramel", "Nine Muses", "Secret (nhóm nhạc)",
+		"Rainbow (nhóm nhạc Hàn Quốc)", "Spica (nhóm nhạc)", "Crayon Pop", "AOA", "EXID", "4Minute",
+		"K.Will", "Paul Kim", "Younha", "BIBI (ca sĩ)", "Baek Yerin",
+		"10cm (nhóm nhạc)", "Dynamic Duo (ban nhạc)",
+		"Code Kunst", "Roy Kim"
 	], help='Danh sách hạt giống (tiêu đề trang Wikipedia tiếng Việt)')
 	parser.add_argument('--max-nodes', type=int, default=2000, help='Số lượng node tối đa')
 	parser.add_argument('--delay', type=float, default=0.2, help='Độ trễ giữa các request (giây)')
-	parser.add_argument('--timeout', type=int, default=10, help='Timeout mỗi request (giây)')
-	parser.add_argument('--top-k', type=int, default=150, help='Số liên kết ưu tiên tối đa mỗi node')
+	parser.add_argument('--timeout', type=int, default=30, help='Timeout mỗi request (giây)')
+	parser.add_argument('--top-k', type=int, default=200, help='Số liên kết ưu tiên tối đa mỗi node')
 	parser.add_argument('--output', type=str, default='korean_artists_graph_bfs.json', help='Tên file JSON đầu ra')
 	# Neo4j optional export flags
 	parser.add_argument('--neo4j-uri', type=str, default=None, help='Neo4j Bolt URI, ví dụ bolt://localhost:7687')
