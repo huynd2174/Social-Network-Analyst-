@@ -1,0 +1,14 @@
+# Requirements for ML-based NER (Hybrid approach)
+# Install with: pip install -r requirements_ml_ner.txt
+
+# Core ML libraries
+transformers>=4.30.0
+torch>=2.0.0
+
+# Optional: for better performance
+# accelerate>=0.20.0
+
+# Note: If you don't have GPU, torch will use CPU (slower but works)
+# For GPU support, install PyTorch with CUDA from: https://pytorch.org/
+
+

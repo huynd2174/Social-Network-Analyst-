@@ -13,13 +13,36 @@ import re
 from collections import defaultdict
 from datetime import datetime
 
+# Import ML-based NER module
+try:
+    from ml_ner import extract_ml_entities, get_ner_model
+    ML_NER_AVAILABLE = True
+except ImportError:
+    ML_NER_AVAILABLE = False
+    print("⚠️  ml_ner module không khả dụng. Chỉ sử dụng rule-based NER.")
+
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 print("=" * 70)
-print("MÔ HÌNH NHẬN DẠNG THỰC THỂ K-POP")
+print("MÔ HÌNH NHẬN DẠNG THỰC THỂ K-POP (HYBRID: RULE-BASED + ML)")
 print("=" * 70)
+
+# Khởi tạo ML model nếu có
+if ML_NER_AVAILABLE:
+    print("\n🤖 Đang khởi tạo ML-based NER model...")
+    try:
+        ml_model = get_ner_model()
+        if ml_model and ml_model.available:
+            print("  ✓ ML model đã sẵn sàng")
+        else:
+            print("  ⚠️  ML model không khả dụng, chỉ sử dụng rule-based")
+    except Exception as e:
+        print(f"  ⚠️  Lỗi khởi tạo ML model: {e}")
+        print("  → Chỉ sử dụng rule-based NER")
+else:
+    print("\n⚠️  ML-based NER không khả dụng, chỉ sử dụng rule-based")
 
 # =====================================================
 # TỪ KHÓA K-POP (để kiểm tra context)
@@ -102,6 +125,11 @@ INVALID_WORDS = {
     'day', 'night', 'time', 'year', 'week', 'month',
     'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
     'beautiful', 'because of you', 'bo peep',
+    
+    # Từ tổng quát về media/technology (không phải tên nghệ sĩ/album/bài hát)
+    'video', 'audio', 'music', 'clip', 'film', 'movie', 'photo', 'picture',
+    'image', 'graphic', 'media', 'content', 'file', 'download', 'stream',
+    'playback', 'recording', 'broadcast', 'television', 'tv', 'radio',
     
     # Chương trình thực tế/Show (không phải nghệ sĩ)
     'contest', 'season', 'episode', 'show', 'program', 'programme',
@@ -249,6 +277,8 @@ KNOWN_KPOP_GROUPS = {
     'seeya', 'shinhwa', 'the ark', 'vixx', 'wanna one',
     'up10tion', 'bonus baby',
     'hello venus', 'cosmic girls',
+    # Bổ sung thêm các nhóm mới để tránh pattern "Group + Member" bị giữ làm Artist
+    'x1',
 }
 
 # =====================================================
@@ -305,6 +335,47 @@ KOREAN_SURNAMES = {
 }
 
 # =====================================================
+# HÀM CHUẨN HÓA TÊN (PHẢI ĐỊNH NGHĨA TRƯỚC KHI SỬ DỤNG)
+# =====================================================
+def clean_text(text):
+    """Làm sạch text và loại bỏ từ thừa ở cuối"""
+    text = text.strip()
+    
+    # Xử lý dấu ngoặc đơn chưa đóng (ví dụ: "Euiwoong (Lew" -> "Euiwoong Lew")
+    # Tìm các pattern có dấu mở ngoặc nhưng không có dấu đóng ngoặc
+    if '(' in text and text.count('(') > text.count(')'):
+        # Có dấu mở ngoặc nhưng không đóng -> chuyển phần trong ngoặc thành text bình thường
+        # Pattern: "Name (Incomplete" -> "Name Incomplete"
+        # Tìm vị trí dấu mở ngoặc cuối cùng không có dấu đóng
+        last_open = text.rfind('(')
+        if last_open != -1:
+            # Lấy phần trước dấu mở ngoặc và phần sau (bỏ dấu mở ngoặc)
+            before = text[:last_open].strip()
+            after = text[last_open+1:].strip()
+            # Gộp lại với khoảng trắng
+            text = f"{before} {after}".strip()
+    
+    # Loại bỏ các pattern trong ngoặc đơn ở cuối (như "(ca sĩ)", "(nhóm nhạc)")
+    # NHƯNG giữ lại nếu là (album), (bài hát), (EP) - vì đó là thông tin quan trọng
+    text = re.sub(r'\s*\([^)]*(?:ca sĩ|nhóm nhạc|ban nhạc|nghệ sĩ|singer|group|band)[^)]*\)\s*$', '', text, flags=re.IGNORECASE)
+    
+    # Chuẩn hóa khoảng trắng
+    text = re.sub(r'\s+', ' ', text)
+    # Chuẩn hóa dấu gạch nối giữa chữ cái thành khoảng trắng (Ahn Ji-young -> Ahn Ji young)
+    text = re.sub(r'(?<=\w)-(?!\s)(?=\w)', ' ', text)
+    # Loại bỏ ký tự thừa ở đầu/cuối
+    text = text.strip('.,;:!?"\'-()[]{}')
+    
+    # Loại bỏ từ thừa ở cuối tên (như "rapping", "singing", "dancing")
+    words = text.split()
+    if len(words) > 1:
+        last_word = words[-1].lower()
+        if last_word in SUFFIX_WORDS_TO_REMOVE:
+            text = ' '.join(words[:-1])
+    
+    return text
+
+# =====================================================
 # LOAD DỮ LIỆU
 # =====================================================
 print("\n📂 Đang load dữ liệu...")
@@ -323,7 +394,13 @@ for record in records:
     text = record.get('text', '')
     node_texts[node_id] = text.lower()
     if node_name:
-        existing_lower.add(node_name.lower())
+        # CHUẨN HÓA tên node gốc để loại bỏ suffix như "(ca sĩ)", "(nhóm nhạc)"
+        normalized_name = clean_text(node_name)
+        normalized_lower = normalized_name.lower()
+        # Loại bỏ khoảng trắng để check trùng với node gốc (Big Bang = BIGBANG)
+        # Dùng để LOẠI BỎ node mới nếu trùng với node gốc
+        key_without_spaces = normalized_lower.replace(' ', '')
+        existing_lower.add(key_without_spaces)
 
 print(f"✓ Có {len(existing_lower)} entities trong đồ thị")
 
@@ -340,16 +417,23 @@ except Exception:
 # =====================================================
 # HÀM KIỂM TRA CONTEXT K-POP
 # =====================================================
-def has_kpop_context(source_nodes):
-    """Kiểm tra entity có trong context K-pop không (>=3 từ khóa)"""
+def has_kpop_context(source_nodes, min_keywords=3):
+    """
+    Kiểm tra entity có trong context K-pop không
+    
+    Args:
+        source_nodes: Danh sách node IDs nguồn
+        min_keywords: Số từ khóa K-pop tối thiểu (mặc định 3)
+    """
     if isinstance(source_nodes, str):
         source_nodes = [source_nodes]
     
     for source in source_nodes:
         text = node_texts.get(source, '')
         if text:
-            kpop_count = sum(1 for kw in KPOP_KEYWORDS if kw in text)
-            if kpop_count >= 3:
+            text_lower = text.lower()
+            kpop_count = sum(1 for kw in KPOP_KEYWORDS if kw.lower() in text_lower)
+            if kpop_count >= min_keywords:
                 return True
     return False
 
@@ -403,7 +487,7 @@ def is_music_artist(entity_text, source_nodes):
     
     return False  # Mặc định không phải nghệ sĩ nếu không có context rõ ràng
 
-def is_related_to_existing_nodes(entity_text, source_nodes, existing_names):
+def is_related_to_existing_nodes(entity_text, source_nodes, existing_names, min_mentioned=2):
     """
     Kiểm tra entity có liên quan đến các node hiện có trong mạng không
     - Xuất hiện cùng với các nghệ sĩ/nhóm nhạc đã có
@@ -422,29 +506,10 @@ def is_related_to_existing_nodes(entity_text, source_nodes, existing_names):
         
         # Kiểm tra có nhắc đến các node hiện có không
         mentioned_count = sum(1 for name in existing_names if name in full_text)
-        if mentioned_count >= 2:  # Phải nhắc đến ít nhất 2 node hiện có
+        if mentioned_count >= min_mentioned:  # Phải nhắc đến ít nhất min_mentioned node hiện có
             return True
     
     return False
-
-def clean_text(text):
-    """Làm sạch text và loại bỏ từ thừa ở cuối"""
-    text = text.strip()
-    # Chuẩn hóa khoảng trắng
-    text = re.sub(r'\s+', ' ', text)
-    # Chuẩn hóa dấu gạch nối giữa chữ cái thành khoảng trắng (Ahn Ji-young -> Ahn Ji young)
-    text = re.sub(r'(?<=\w)-(?!\s)(?=\w)', ' ', text)
-    # Loại bỏ ký tự thừa ở đầu/cuối
-    text = text.strip('.,;:!?"\'-()[]{}')
-    
-    # Loại bỏ từ thừa ở cuối tên (như "rapping", "singing", "dancing")
-    words = text.split()
-    if len(words) > 1:
-        last_word = words[-1].lower()
-        if last_word in SUFFIX_WORDS_TO_REMOVE:
-            text = ' '.join(words[:-1])
-    
-    return text
 
 def is_valid_entity(text, entity_type):
     """Kiểm tra entity có hợp lệ không"""
@@ -532,6 +597,19 @@ def is_valid_entity(text, entity_type):
             return False
         # Kiểm tra từng từ có phải thể loại nhạc không
         if any(w in MUSIC_GENRES for w in words):
+            return False
+    
+    # ============================================
+    # LOẠI BỎ TỪ TỔNG QUÁT VỀ MEDIA/TECHNOLOGY (KHÔNG PHẢI NGHỆ SĨ)
+    # ============================================
+    if entity_type == 'Artist':
+        generic_media_words = {
+            'video', 'audio', 'music', 'clip', 'film', 'movie', 'photo', 'picture',
+            'image', 'graphic', 'media', 'content', 'file', 'download', 'stream',
+            'playback', 'recording', 'broadcast', 'television', 'tv', 'radio',
+            'track', 'album', 'single', 'ep', 'mv', 'teaser', 'trailer',
+        }
+        if text_lower in generic_media_words:
             return False
     
     # ============================================
@@ -642,12 +720,15 @@ def is_valid_entity(text, entity_type):
     # ============================================
     if entity_type == 'Artist':
         # Kiểm tra xem có phải tên bị cắt cụt không (ví dụ: "Shin Hye" vs "Park Shin-hye")
+        # CHUẨN HÓA entity text trước khi check
+        normalized_entity = clean_text(text)
+        normalized_entity_lower = normalized_entity.lower()
         # Nếu entity là phần cuối của một node hiện có -> loại bỏ
         for existing_name in existing_lower:
             # Nếu entity là phần cuối của tên hiện có (ít nhất 3 ký tự)
-            if len(text_lower) >= 3 and existing_name.endswith(text_lower):
+            if len(normalized_entity_lower) >= 3 and existing_name.endswith(normalized_entity_lower):
                 # Kiểm tra xem có phải tên bị cắt cụt không (không phải trùng hoàn toàn)
-                if existing_name != text_lower and len(existing_name) > len(text_lower):
+                if existing_name != normalized_entity_lower and len(existing_name) > len(normalized_entity_lower):
                     # Có thể là tên bị cắt cụt -> loại bỏ
                     return False
     
@@ -706,6 +787,30 @@ def is_valid_entity(text, entity_type):
             return False
             
     elif entity_type == 'Group':
+        # Loại bỏ prefix là thể loại nhạc đứng trước tên nhóm (ví dụ: "Indie OKDAL", "K-pop Big Bang")
+        # Dùng MUSIC_GENRES để cắt bỏ 1 hoặc nhiều thể loại ở đầu, miễn là còn lại >= 1 từ
+        original_text = text
+        while True:
+            lowered = text.lower()
+            stripped = lowered.lstrip()
+            if stripped != lowered:
+                # Đồng bộ lại text nếu có khoảng trắng đầu
+                text = text[len(text) - len(stripped):]
+                lowered = stripped
+            # Tìm genre prefix dài nhất khớp ở đầu
+            genre_prefix = None
+            for genre in sorted(MUSIC_GENRES, key=lambda g: -len(g)):
+                if lowered.startswith(genre + ' ') and len(text.split()) > len(genre.split()):
+                    genre_prefix = genre
+                    break
+            if not genre_prefix:
+                break
+            # Cắt bỏ genre prefix + khoảng trắng
+            cut_len = len(genre_prefix)
+            text = text[cut_len:].lstrip()
+        text_lower = text.lower()
+        words = text_lower.split()
+
         if len(text) > 30 or text.count(' ') > 5:
             return False
         # Tên nhóm thường có ít nhất 3 ký tự
@@ -755,6 +860,11 @@ def is_valid_entity(text, entity_type):
         first_word = words[0] if words else ''
         if first_word in sentence_verbs:
             return False
+
+        # Loại bỏ cụm từ tiếng Việt thông dụng (không phải tên riêng), ví dụ: "Sau khi", "Trước khi"
+        # Nếu tất cả các từ đều nằm trong INVALID_WORDS (từ chức năng) thì không phải tên nhóm
+        if len(words) >= 2 and all(w in INVALID_WORDS for w in words):
+            return False
         
         # ============================================
         # LOẠI BỎ CÂU CÓ DẤU NHÁY MỞ KHÔNG ĐÓNG
@@ -801,6 +911,7 @@ def is_valid_entity(text, entity_type):
             # Nhóm nước ngoài / J-pop / non K-pop hoặc câu văn
             'a.k.b. forty-eight', 'akb48 breezes through d',
             'beatles', 'being in hiatus right now',
+            'girl next door', 'girl next',
             'daisokaku matsuri', 'declares debut in 2025',
             'doping panda', 'drippin on first full album',
             'exo-cbx hits no', 'garfunkel. sg wannabe',
@@ -841,8 +952,24 @@ def is_valid_entity(text, entity_type):
             'boram . t ara', 'boram . t-ara',
             # Soloist / nghệ sĩ không phải nhóm
             'g-dragon', 'g dragon',
+            # Mảnh tên nhóm bị cắt cụt
+            'f ve',  # từ "F-ve Dolls" nhưng chỉ còn "F ve"
+            # Các thực thể không phải group trong đồ thị của bạn
+            'indie okdal y', 'indie okdal',  # cụm "Indie OKDAL (Y.BIRD from Jellyfish...)"
+            'jewelry 2001',                  # tên nhóm kèm năm debut -> không phải tên group riêng
+            'produce 101', 'produce 48',     # show tuyển chọn, không phải nhóm nhạc
+            'unchanging',                    # album "Unchanging", không phải nhóm
         }
         if text_lower.strip() in bad_group_texts:
+            return False
+        
+        # Loại bỏ tên group có đính kèm năm 19xx/20xx (Jewelry 2001, Fin.K.L 1998, ...)
+        # Trong mạng lưới của bạn, năm debut không phải một phần của tên node group
+        if re.search(r'\b(19|20)\d{2}\b', text_lower):
+            return False
+        
+        # Loại bỏ cụm có từ khóa mang tính mô tả, không phải tên riêng group
+        if any(kw in text_lower for kw in ['indie okdal', ' y.bird', ' y bird ']):
             return False
         
         # ============================================
@@ -1006,6 +1133,17 @@ def is_valid_entity(text, entity_type):
         # Loại bỏ tên có cả "miak" và "kpop/k-pop/k pop" (MIAK K-pop chart)
         if 'miak' in text_lower and ('k pop' in text_lower or 'k-pop' in text_lower or 'kpop' in text_lower):
             return False
+
+        # Loại bỏ các album tổng hợp/best-of chung chung (Best of, Best Selection, Best Album, Compilation)
+        # ví dụ: "BEST OF CNBLUE", "Best Selection 2010", "Best of Album"
+        compilation_phrases = [
+            'best of ', ' best of', 'best selection', 'greatest hits',
+            'best album', 'best single', 'best collection',
+        ]
+        if any(phrase in text_lower for phrase in compilation_phrases):
+            # Tuy nhiên vẫn cho qua nếu tên quá cụ thể (có tên nhóm rõ ràng và bạn muốn giữ)
+            # Ở đây ưu tiên an toàn: loại bỏ để tránh nhầm với danh mục/playlist/giải thưởng
+            return False
         
         # Loại bỏ tên bị cắt cụt kiểu "U KISS cho" (cụm tiếng Việt "cho" ở cuối)
         if text_lower.endswith(' cho'):
@@ -1019,20 +1157,44 @@ def is_valid_entity(text, entity_type):
         # ============================================
         # LOẠI BỎ TỪ ĐƠN CHUNG CHUNG (KHÔNG ĐỦ ĐẶC TRƯNG ĐỂ LÀ TÊN ALBUM)
         # ============================================
+        # CHÚ Ý: Một số từ như "Tonight", "Always", "Alive", "Blue" là tên album K-pop thật
+        # Chúng đã được lọc bởi pattern matching context-aware, nên bỏ khỏi blacklist
         generic_single_words = {
             'act', 'again', 'chain', 'cover', 'dreaming', 'sorry', 'love', 'heart',
             'step', 'dance', 'night', 'day', 'fire', 'water', 'star', 'moon', 'sun',
-            'world', 'life', 'time', 'dream', 'hope', 'light', 'dark', 'blue', 'red',
-            'black', 'white', 'pink', 'gold', 'silver', 'sweet', 'crazy', 'happy',
-            'sad', 'bad', 'good', 'new', 'old', 'young', 'wild', 'free', 'alive',
-            'forever', 'never', 'always', 'maybe', 'baby', 'honey', 'angel', 'devil',
+            'world', 'life', 'time', 'dream', 'hope', 'light', 'dark',  # Bỏ: blue, red, black, white, pink
+            'gold', 'silver', 'sweet', 'crazy', 'happy',
+            'sad', 'bad', 'good', 'new', 'old', 'young', 'wild', 'free',  # Bỏ: alive
+            'forever', 'never', 'maybe', 'baby', 'honey', 'angel', 'devil',  # Bỏ: always
             'hero', 'power', 'magic', 'fantasy', 'miracle', 'secret', 'mystery',
             'story', 'memory', 'moment', 'feeling', 'emotion', 'passion', 'desire',
             'title', 'song', 'track', 'album', 'single', 'debut', 'comeback',
-            'returns', 'tonight', 'youth', 'access', 'solar', 'wings',
+            'returns', 'youth', 'access', 'wings',  # Bỏ: tonight, solar
+            'solo', 'champion', 'crown',  # Các từ đã thêm trước đó
         }
         if text_lower in generic_single_words:
             return False
+        
+        # ============================================
+        # CHO PHÉP CÁC TÊN ALBUM/SONG K-POP ĐÃ BIẾT (1 TỪ)
+        # ============================================
+        # Những tên album/bài hát K-pop nổi tiếng chỉ có 1 từ
+        known_kpop_album_song_names = {
+            # Big Bang albums
+            'tonight', 'alive', 'always', 'remember', 'made',
+            # BTS albums
+            'wings', 'proof',
+            # BLACKPINK songs/albums
+            'pink', 'born',
+            # Other common K-pop album/song names (1 word, viết hoa)
+            'blue', 'red', 'noir', 'neon', 'fever', 'bloom', 
+            'lilac', 'palette', 'yellow', 'violet',
+            # Thêm các tên đặc biệt
+            'solar',  # MAMAMOO member nhưng cũng là album name pattern
+        }
+        # Nếu là tên đã biết của K-pop, CHO PHÉP
+        if text_lower in known_kpop_album_song_names:
+            return True  # Bypass các filter còn lại
         
         # ============================================
         # LOẠI BỎ TÊN NGHỆ SĨ BỊ NHẦM LÀ ALBUM
@@ -1368,26 +1530,151 @@ def is_valid_entity(text, entity_type):
     return True
 
 # =====================================================
-# PATTERNS NER
+# PATTERNS NER (MỞ RỘNG ĐỂ BẮT NHIỀU THỰC THỂ HƠN)
 # =====================================================
 patterns = {
     'Artist': [
+        # Pattern cơ bản
         r'(?:ca sĩ|nghệ sĩ|rapper|idol|thần tượng|thành viên)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s+(?:là|sinh|đã|được|có)|\,|\.|$)',
         r'([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s+(?:là một|là)\s+(?:ca sĩ|nghệ sĩ|rapper|idol)',
+        # Thành viên nhóm: "thành viên G-Dragon và T.O.P"
+        r'thành viên\s+([A-Z][a-zA-Z0-9\-\.]+)(?:\s+và|\s*,)',
+        # Solo artist: "G-Dragon phát hành album solo"
+        r'([A-Z][a-zA-Z0-9\-\.]+)\s+phát hành\s+(?:album|EP|single)\s+solo',
+        # "do X viết lời" - nhạc sĩ
+        r'do\s+(?:chính\s+)?([A-Z][a-zA-Z0-9\-\.]+)\s+(?:viết|sáng tác|sản xuất)',
+        # "X tham gia" - nghệ sĩ
+        r'([A-Z][a-zA-Z0-9\-\.]+)\s+(?:tham gia|hợp tác|góp mặt|viết lời)',
+        # "thành viên Verbal của M-Flo" pattern
+        r'thành viên\s+([A-Z][a-zA-Z0-9\-\.]+)\s+của',
     ],
     'Group': [
         r'(?:nhóm nhạc|ban nhạc|group|boyband|girlgroup)\s+([A-Z][a-zA-Z0-9\s\-\'\.()]+?)(?:\s+(?:là|gồm|có|được|ra mắt)|\,|\.|$)',
         r'([A-Z][a-zA-Z0-9\s\-\'\.()]+?)\s+(?:là một|là)\s+(?:nhóm nhạc|ban nhạc)',
+        # "nhóm X trở lại", "nhóm X phát hành"
+        r'nhóm\s+([A-Z][a-zA-Z0-9\s\-\'\.()]+?)\s+(?:trở lại|phát hành|ra mắt|biểu diễn)',
+        # "của nhóm nhạc nam Hàn Quốc Big Bang" - rất phổ biến trong Wikipedia
+        r'của\s+nhóm\s+nhạc\s+(?:nam|nữ)?\s*(?:Hàn\s+Quốc|Hàn–Trung\s+Quốc)?\s*([A-Z][a-zA-Z0-9\s\-\'\.()]+?)(?:\s*[,\.]|\s+(?:được|do|là|bao gồm))',
+        # "của ban nhạc Hàn Quốc Big Bang"
+        r'của\s+ban\s+nhạc\s+(?:Hàn\s+Quốc)?\s*([A-Z][a-zA-Z0-9\s\-\'\.()]+?)(?:\s*[,\.]|\s+(?:được|do|là))',
+        # "nhóm nhạc nam Hàn Quốc X" - ngay sau định nghĩa
+        r'nhóm\s+nhạc\s+(?:nam|nữ)?\s*(?:Hàn\s+Quốc|Hàn–Trung\s+Quốc)?\s+([A-Z][a-zA-Z0-9\s\-\'\.()]+?)(?:\s*[,\.]|\s+(?:được|do|là|gồm|bao gồm|thành lập))',
+        # "nhóm nhỏ X của" - subgroup
+        r'nhóm\s+nhỏ\s+(?:chính\s+thức)?\s*([A-Z][a-zA-Z0-9\s\-\'\.()]+?)\s+của',
+        # "bộ đôi X" - duo group
+        r'bộ\s+đôi\s+([A-Z][a-zA-Z0-9\s\-\'\.()]+?)(?:\s*[,\.]|\s+(?:được|do|là|gồm))',
     ],
     'Album': [
+        # === PATTERNS CƠ BẢN ===
         r'(?:album|mini[- ]?album|EP)\s+["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?(?:\s+(?:là|được|phát hành)|\,|\.|$)',
+        # Album với dấu ngoặc kép đặc biệt (Wikipedia thường dùng)
+        r'(?:album|mini[- ]?album|EP)\s+["""]([A-Z][a-zA-Z0-9\s\-\'\.]+?)["""]',
+        
+        # === PATTERNS THEO NGỮ CẢNH TIẾNG VIỆT ===
+        # "EP Always được phát hành vào năm 2007"
+        r'EP\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s+(?:được phát hành|ra mắt|bán được)',
+        # "mini album đầu tiên Always"
+        r'mini album\s+(?:đầu tiên|thứ \w+|tiếp theo|mới)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:được|bán|ra|đạt|giành))',
+        # "album đầu tay Since 2007"
+        r'album\s+(?:đầu tay|đầu tiên|thứ \w+|tiếp theo|mới nhất|phiên bản đặc biệt)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:được|bán|ra|tổng hợp))',
+        # "phát hành album Tonight"
+        r'phát hành\s+(?:album|EP|mini album)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:vào|với|bao gồm))',
+        # "ra mắt album Alive"
+        r'ra mắt\s+(?:album|EP|mini album)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:vào|với|dưới))',
+        # "trở lại với album Tonight"
+        r'trở lại\s+(?:với|bằng|cùng)\s+(?:album|EP)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:vào|với))',
+        # "album thành công nhất của mình, Alive"
+        r'album\s+(?:thành công nhất|nổi tiếng nhất|hay nhất)[^,]*,\s*([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:được|là))',
+        
+        # === PATTERNS TIẾNG ANH (PHỔ BIẾN TRONG WIKIPEDIA TIẾNG VIỆT) ===
+        # "album tiếng Nhật đầu tiên mang tên Big Bang"
+        r'album\s+(?:tiếng\s+\w+)?\s*(?:đầu tiên|thứ \w+)?\s*(?:mang tên|có tên|tên là)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.])',
+        # "album Remember, với ca khúc"
+        r'album\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s*,\s*với\s+(?:ca khúc|bài hát)',
+        # "EP Stand Up - kết hợp với"
+        r'(?:EP|album)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s*-\s*(?:kết hợp|bao gồm|với)',
+        
+        # === PATTERNS MỚI - PHỔ BIẾN TRONG WIKIPEDIA ===
+        # "là album phòng thu đầu tay của X" - bắt album từ đầu câu
+        r'([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s+là\s+(?:album|mini-album|EP)\s+(?:phòng thu|studio)?\s*(?:đầu tay|đầu tiên|thứ \w+)',
+        # "album X được phát hành" - album + tên + động từ
+        r'album\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s+(?:được phát hành|ra mắt|phát hành|bán được)',
+        # "từ album X" - trích từ album
+        r'từ\s+(?:album|EP)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:phát hành|của))',
+        # "trong album X" - bài hát trong album
+        r'(?:trong|nằm trong)\s+(?:album|EP)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:phát hành|của))',
+        # "phiên bản tiếng Nhật của X"
+        r'phiên bản\s+tiếng\s+\w+\s+của\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.])',
+        # "đĩa đơn trích từ album X"
+        r'trích\s+từ\s+album\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)(?:\s*[,\.]|\s+(?:phát hành))',
     ],
     'Song': [
-        r'(?:bài hát|ca khúc|single)\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        # === PATTERNS CƠ BẢN ===
+        # Dạng có dấu ngoặc kép chuẩn
+        r'(?:bài hát|ca khúc|single|đĩa đơn)\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        # Dạng có dấu ngoặc kép đặc biệt (Wikipedia)
+        r'(?:bài hát|ca khúc|single|đĩa đơn)\s+["""]([A-Z][a-zA-Z0-9\s\-\'\.]+?)["""]',
+        # Ca khúc chủ đề
         r'ca khúc chủ đề\s+["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?',
+        # Dạng không dấu ngoặc kép + động từ
+        r'(?:bài hát|ca khúc|single|đĩa đơn)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s+(?:được|do|của|ra mắt|phát hành|trong|là|đứng đầu|giành|trở thành)\b',
+        # Dạng "có tên"/"mang tên"
+        r'(?:bài hát|ca khúc|single|đĩa đơn)\s+(?:có tên|mang tên)\s+["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?',
+        
+        # === PATTERNS THEO NGỮ CẢNH TIẾNG VIỆT ===
+        # "đĩa đơn số một của họ là \"Lies\""
+        r'đĩa đơn\s+(?:số một|đầu tiên|thứ \w+)[^"]*["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        # "ca khúc hit đột phá đầu tiên của nhóm" - thường theo sau là tên bài
+        r'ca khúc\s+(?:hit|nổi tiếng|đột phá)[^,]*,?\s*["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?(?:\s*[,\.]|\s+(?:trở thành|đứng đầu|giành))',
+        # "single tiếng Nhật đầu tiên \"My Heaven\""
+        r'single\s+(?:tiếng\s+\w+)?\s*(?:đầu tiên|thứ \w+|mới)?\s*["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        # "bài hát chủ đề \"Monster\""
+        r'bài hát\s+chủ đề\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        # "ca khúc \"Lies\" (Tiếng Triều Tiên: ...)"
+        r'ca khúc\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\'](?:\s*\()',
+        # "Bài hát \" Flower Road \" được phát hành" (có khoảng trắng trong ngoặc kép)
+        r'[Bb]ài hát\s+["\"]\s*([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s*["\"]\s+(?:được|do|là|đứng)',
+        
+        # === PATTERNS DANH SÁCH CA KHÚC ===
+        # "các ca khúc \"Lies\", \"Last Farewell\""
+        r'(?:các\s+)?ca khúc\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\'](?:\s*,|\s+và)',
+        # "bao gồm các ca khúc \"We Belong Together\""
+        r'bao gồm\s+(?:các\s+)?ca khúc\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        
+        # === PATTERNS CHO HIT/SINGLE PHỔ BIẾN ===
+        # "hit X của nhóm"
+        r'hit\s+["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?\s+(?:của|giúp|đưa)',
+        # "single X đạt được"
+        r'single\s+["\']?([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']?\s+(?:đạt được|đứng|vươn)',
+        # "Cú hít \"Lies\" đã đưa Big Bang"
+        r'[Cc]ú hít\s+["\']([A-Z][a-zA-Z0-9\s\-\'\.]+?)["\']',
+        
+        # === PATTERNS MỚI - ESCAPED QUOTES TRONG JSON ===
+        # Pattern cho dấu ngoặc kép escaped: \"X\"
+        r'(?:bài hát|ca khúc|single|đĩa đơn)\s+\\"([A-Z][a-zA-Z0-9\s\-\'\.]+?)\\"',
+        # "đĩa đơn \"Blue\", \"Fantastic Baby\""
+        r'đĩa đơn\s*,?\s*\\"([A-Z][a-zA-Z0-9\s\-\'\.]+?)\\"',
+        # "với ca khúc \"X\""
+        r'với\s+ca\s+khúc\s+\\"([A-Z][a-zA-Z0-9\s\-\'\.]+?)\\"',
+        # "bài hát \"X\" của"
+        r'bài\s+hát\s+\\"([A-Z][a-zA-Z0-9\s\-\'\.]+?)\\"\s+(?:của|trong|là)',
+        # Pattern cho đĩa đơn chính
+        r'đĩa\s+đơn\s+(?:chính|mới)?\s*(?:mang tên)?\s*\\"([A-Z][a-zA-Z0-9\s\-\'\.]+?)\\"',
+        # "\" X \"là" pattern - tên bài ở đầu đoạn text
+        r'\\"\s*([A-Z][a-zA-Z0-9\s\-\'\.]+?)\s*\\"\s*(?:là đĩa đơn|là ca khúc|là bài hát)',
     ],
     'Company': [
         r'(?:công ty|agency|label)\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media)?)',
+        # "được thành lập bởi YG Entertainment"
+        r'(?:được thành lập|thuộc|quản lý)\s+bởi\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media))',
+        # "dưới sự dẫn dắt của YG Entertainment"
+        r'(?:dưới sự|thuộc)\s+(?:dẫn dắt|quản lý)\s+(?:của\s+)?([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media))',
+        # "thông qua hãng thu âm X Entertainment"
+        r'(?:thông qua|bởi)\s+(?:hãng\s+thu\s+âm|công ty)?\s*([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media))',
+        # "được X Entertainment phát hành"
+        r'được\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media))\s+(?:phát hành|phân phối)',
+        # "ký hợp đồng với X Entertainment"
+        r'ký\s+hợp\s+đồng\s+với\s+([A-Z][a-zA-Z0-9\s\-\'\.]+?(?:Entertainment|Music|Media))',
     ],
 }
 
@@ -1407,7 +1694,11 @@ def extract_entities(text, entity_type, pattern_list):
                 
                 if not entity_text or entity_text.lower() in seen:
                     continue
-                if entity_text.lower() in existing_lower:
+                # CHUẨN HÓA entity text trước khi check với existing_lower
+                normalized_entity = clean_text(entity_text)
+                # Loại bỏ khoảng trắng để so sánh với existing_lower (đã loại bỏ khoảng trắng)
+                entity_key = normalized_entity.lower().replace(' ', '')
+                if entity_key in existing_lower:
                     continue
                 if not is_valid_entity(entity_text, entity_type):
                     continue
@@ -1560,8 +1851,11 @@ def extract_members_from_list(text):
                         continue
                     
                     # Bỏ qua nếu đã tồn tại trong graph gốc (existing_lower)
-                    # NHƯNG vẫn cho phép nếu chưa có trong seen (để tránh trùng trong cùng 1 lần chạy)
-                    if member.lower() in existing_lower:
+                    # CHUẨN HÓA member trước khi check
+                    normalized_member = clean_text(member)
+                    # Loại bỏ khoảng trắng để so sánh với existing_lower
+                    member_key = normalized_member.lower().replace(' ', '')
+                    if member_key in existing_lower:
                         continue
                     
                     if member.lower() in seen:
@@ -1682,14 +1976,17 @@ def extract_groups_from_list(text):
                         continue
                     
                     # Bỏ qua nếu đã có trong graph hoặc đã thấy
-                    if low in existing_lower or low in seen:
+                    # CHUẨN HÓA group name trước khi check (grp đã được clean_text ở trên)
+                    # Loại bỏ khoảng trắng để so sánh với existing_lower
+                    group_key = grp.lower().replace(' ', '')
+                    if group_key in existing_lower or group_key in seen:
                         continue
                     
                     # Phải qua kiểm tra group hợp lệ
                     if not is_valid_entity(grp, 'Group'):
                         continue
                     
-                    seen.add(low)
+                    seen.add(group_key)
                     entities.append({
                         'text': grp,
                         'type': 'Group',
@@ -1771,14 +2068,18 @@ def extract_companies_from_list(text):
                         continue
                     
                     # Bỏ qua nếu đã có trong graph hoặc đã thấy
-                    if low in existing_lower or low in seen:
+                    # CHUẨN HÓA company name trước khi check
+                    normalized_company = clean_text(comp)
+                    # Loại bỏ khoảng trắng để so sánh với existing_lower
+                    company_key = normalized_company.lower().replace(' ', '')
+                    if company_key in existing_lower or company_key in seen:
                         continue
                     
                     # Phải qua kiểm tra company hợp lệ
                     if not is_valid_entity(comp, 'Company'):
                         continue
                     
-                    seen.add(low)
+                    seen.add(normalized_company.lower())
                     entities.append({
                         'text': comp,
                         'type': 'Company',
@@ -1795,7 +2096,7 @@ def extract_artists_from_infobox_groups():
     """
     Tạo các node Artist mới từ infobox members của các Group gốc.
     - Dùng dữ liệu đã crawl trong 'infobox_members.json' (INFOBOX_MEMBERS['groups'])
-    - Các trường sử dụng: 'Current members', 'Thành viên', 'Thành viên hiện tại'
+    - Các trường sử dụng: 'Current members', 'Past members', 'Thành viên', 'Cựu thành viên', etc.
     - Không trùng với node gốc (existing_lower) và các node mới khác
     """
     entities = []
@@ -1807,9 +2108,19 @@ def extract_artists_from_infobox_groups():
 
     member_keys = [
         'Current members',
+        'Past members',
         'Thành viên',
+        'Cựu thành viên',
         'Thành viên hiện tại',
+        'Thành viên cũ',
+        'Former members',
     ]
+    
+    # Các từ chung chung cần loại bỏ (không phải tên thành viên)
+    GENERIC_MEMBER_TERMS = {
+        'thành viên', 'members', 'member', 'cựu thành viên', 'former members',
+        'past members', 'current members', 'thành viên hiện tại', 'thành viên cũ',
+    }
 
     for group_name, data in groups.items():
         info = data.get('infobox') or {}
@@ -1829,12 +2140,24 @@ def extract_artists_from_infobox_groups():
                     continue
 
                 low = member.lower()
+                
+                # Loại bỏ các từ chung chung (không phải tên thành viên)
+                if low in GENERIC_MEMBER_TERMS:
+                    continue
+                
+                # Loại bỏ nếu chỉ là một từ chung chung (không phải tên người)
+                if low in ['thành viên', 'members', 'member', 'cựu', 'former', 'past', 'current']:
+                    continue
 
                 # Không trùng node gốc
-                if low in existing_lower:
+                # CHUẨN HÓA member trước khi check
+                normalized_member = clean_text(member)
+                # Loại bỏ khoảng trắng để so sánh với existing_lower
+                member_key = normalized_member.lower().replace(' ', '')
+                if member_key in existing_lower:
                     continue
                 # Không trùng trong danh sách infobox đã thêm
-                if low in seen:
+                if member_key in seen:
                     continue
 
                 # Độ dài hợp lý cho Artist
@@ -1853,7 +2176,7 @@ def extract_artists_from_infobox_groups():
                 if not is_valid_entity(member, 'Artist'):
                     continue
 
-                seen.add(low)
+                seen.add(normalized_member.lower())
                 entities.append({
                     'text': member,
                     'type': 'Artist',
@@ -1870,7 +2193,11 @@ def extract_known_companies(text):
     entities = []
     text_lower = text.lower()
     for company in KNOWN_COMPANIES:
-        if company.lower() in text_lower and company.lower() not in existing_lower:
+        # CHUẨN HÓA company name trước khi check
+        normalized_company = clean_text(company)
+        # Loại bỏ khoảng trắng để so sánh với existing_lower
+        company_key = normalized_company.lower().replace(' ', '')
+        if company.lower() in text_lower and company_key not in existing_lower:
             entities.append({
                 'text': company,
                 'type': 'Company',
@@ -1883,7 +2210,8 @@ def extract_known_companies(text):
 # XỬ LÝ CHÍNH
 # =====================================================
 print("\n📊 Bước 1: Nhận dạng thực thể...")
-all_entities = []
+all_entities = []  # Rule-based entities
+ml_all_entities = []  # ML-based entities (riêng biệt)
 
 # Trích xuất Artist mới từ infobox members của Group gốc (nếu có file)
 infobox_artists = extract_artists_from_infobox_groups()
@@ -1898,7 +2226,7 @@ for i, record in enumerate(records, 1):
     text = record.get('text', '')
     node_id = record.get('node_id', '')
     
-    # Trích xuất theo từng loại
+    # Trích xuất theo từng loại (RULE-BASED)
     for entity_type, pattern_list in patterns.items():
         found = extract_entities(text, entity_type, pattern_list)
         for ent in found:
@@ -1924,63 +2252,143 @@ for i, record in enumerate(records, 1):
     for ent in extract_groups_from_list(text):
         ent['source_node'] = node_id
         all_entities.append(ent)
+    
+    # Trích xuất bằng ML model (ML-BASED) - LƯU RIÊNG
+    if ML_NER_AVAILABLE:
+        try:
+            ml_entities = extract_ml_entities(text, node_id)
+            if ml_entities:
+                for ent in ml_entities:
+                    # ÁP DỤNG is_valid_entity CHO ML ENTITIES (giống rule-based)
+                    entity_text = ent.get('text', '')
+                    entity_type = ent.get('type', '')
+                    if not is_valid_entity(entity_text, entity_type):
+                        # Bỏ qua entity không hợp lệ
+                        continue
+                    
+                    # CHECK TRÙNG VỚI GRAPH GỐC (giống rule-based)
+                    normalized_entity = clean_text(entity_text)
+                    entity_key = normalized_entity.lower().replace(' ', '')
+                    if entity_key in existing_lower:
+                        # Entity đã tồn tại trong graph gốc -> bỏ qua
+                        continue
+                    
+                    # KHÔNG CHECK TRÙNG VỚI RULE-BASED (sẽ lưu riêng)
+                    ml_all_entities.append(ent)
+        except Exception as e:
+            # Chỉ in lỗi nếu debug (để tránh spam)
+            # Nếu có lỗi, bỏ qua và tiếp tục với rule-based
+            if i <= 5:  # Chỉ in lỗi cho 5 records đầu để debug
+                print(f"  ⚠️  Lỗi ML NER ở record {i}: {type(e).__name__}")
+            pass
 
-print(f"  ✓ Nhận dạng được {len(all_entities)} entities thô")
+rule_based_count = len(all_entities)
+print(f"  ✓ Nhận dạng được {rule_based_count} entities thô (rule-based)")
+if ML_NER_AVAILABLE:
+    ml_count = len(ml_all_entities)
+    print(f"  ✓ Nhận dạng được {ml_count} entities thô (ML-based)")
 
 # =====================================================
-# GỘP VÀ LOẠI BỎ TRÙNG LẶP
+# GỘP VÀ LOẠI BỎ TRÙNG LẶP (RULE-BASED)
 # =====================================================
-print("\n📊 Bước 2: Gộp và loại bỏ trùng lặp...")
-unique = {}
+print("\n📊 Bước 2a: Gộp và loại bỏ trùng lặp (Rule-based)...")
+unique_rule = {}
+
 for ent in all_entities:
     # Chuẩn hóa text để tránh trùng do khác khoảng trắng / hoa thường
     normalized_text = clean_text(ent['text'])
     ent['text'] = normalized_text
-    key = (normalized_text.lower(), ent['type'])
-    if key not in unique:
-        unique[key] = {**ent, 'sources': [ent['source_node']]}
+    
+    # Tạo key để gộp: CHỈ merge các entity hoàn toàn giống nhau (sau khi normalize)
+    normalized_lower = normalized_text.lower()
+    key = (normalized_lower, ent['type'])
+    
+    if key not in unique_rule:
+        unique_rule[key] = {**ent, 'sources': [ent.get('source_node', '')]}
     else:
-        unique[key]['sources'].append(ent['source_node'])
+        # Gộp sources - chỉ merge nếu text hoàn toàn giống nhau (sau normalize)
+        existing = unique_rule[key]
+        source_node = ent.get('source_node', '')
+        if source_node and source_node not in existing.get('sources', []):
+            existing['sources'].append(source_node)
+        # Giữ confidence cao nhất
+        existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
 
-merged_entities = list(unique.values())
-print(f"  ✓ Còn {len(merged_entities)} entities sau khi gộp")
+merged_rule_entities = list(unique_rule.values())
+print(f"  ✓ Còn {len(merged_rule_entities)} entities (rule-based) sau khi gộp")
 
 # =====================================================
-# LỌC THEO CONTEXT K-POP VÀ PHÙ HỢP VỚI MẠNG LƯỚI
+# GỘP VÀ LOẠI BỎ TRÙNG LẶP (ML-BASED)
 # =====================================================
-print("\n📊 Bước 3: Lọc theo context K-pop và phù hợp mạng lưới...")
-filtered_entities = []
-removed_count = defaultdict(int)
-removed_reason = defaultdict(lambda: defaultdict(int))
+merged_ml_entities = []
+if ML_NER_AVAILABLE and ml_all_entities:
+    print("\n📊 Bước 2b: Gộp và loại bỏ trùng lặp (ML-based)...")
+    unique_ml = {}
+    
+    for ent in ml_all_entities:
+        # Chuẩn hóa text để tránh trùng do khác khoảng trắng / hoa thường
+        normalized_text = clean_text(ent['text'])
+        ent['text'] = normalized_text
+        
+        # Tạo key để gộp: CHỈ merge các entity hoàn toàn giống nhau (sau khi normalize)
+        normalized_lower = normalized_text.lower()
+        key = (normalized_lower, ent['type'])
+        
+        if key not in unique_ml:
+            unique_ml[key] = {**ent, 'sources': [ent.get('source_node', '')]}
+        else:
+            # Gộp sources - chỉ merge nếu text hoàn toàn giống nhau (sau normalize)
+            existing = unique_ml[key]
+            source_node = ent.get('source_node', '')
+            if source_node and source_node not in existing.get('sources', []):
+                existing['sources'].append(source_node)
+            # Giữ confidence cao nhất
+            existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
+    
+    merged_ml_entities = list(unique_ml.values())
+    print(f"  ✓ Còn {len(merged_ml_entities)} entities (ML-based) sau khi gộp")
 
-for ent in merged_entities:
+# =====================================================
+# LỌC THEO CONTEXT K-POP VÀ PHÙ HỢP VỚI MẠNG LƯỚI (RULE-BASED)
+# =====================================================
+print("\n📊 Bước 3a: Lọc theo context K-pop và phù hợp mạng lưới (Rule-based)...")
+filtered_rule_entities = []
+removed_count_rule = defaultdict(int)
+removed_reason_rule = defaultdict(lambda: defaultdict(int))
+
+for ent in merged_rule_entities:
     sources = ent.get('sources', [ent.get('source_node', '')])
     entity_type = ent['type']
     entity_text = ent['text']
     
+    # Safety filter bổ sung cho Group để loại bỏ các mảnh tên sai còn sót như "Indie OKDAL Y"
+    if entity_type == 'Group':
+        low = entity_text.lower()
+        if any(kw in low for kw in ['indie okdal', 'f ve', 'girl next door', 'girl next']):
+            removed_count_rule[entity_type] += 1
+            removed_reason_rule[entity_type]['post_filter_bad_group'] += 1
+            continue
+    
     # Known list (công ty đã biết) -> luôn giữ
     if ent.get('method') == 'known_list':
-        filtered_entities.append(ent)
+        filtered_rule_entities.append(ent)
         continue
     
     # Kiểm tra 1: Phải có context K-pop
     if not has_kpop_context(sources):
-        removed_count[entity_type] += 1
-        removed_reason[entity_type]['no_kpop_context'] += 1
+        removed_count_rule[entity_type] += 1
+        removed_reason_rule[entity_type]['no_kpop_context'] += 1
         continue
     
     # Kiểm tra 2a: Nếu entity được nhận dạng là Artist nhưng có "album thành viên" trong context -> loại bỏ (vì là album)
     if entity_type == 'Artist':
-        # Kiểm tra context xem có "album thành viên" không
         is_album_context = False
         for source in sources:
             full_text = node_texts.get(source, '')
             if full_text and ('album thành viên' in full_text or 'album của thành viên' in full_text):
-                # Tìm vị trí entity trong text
                 entity_lower = entity_text.lower()
                 idx = full_text.find(entity_lower)
                 if idx != -1:
-                    # Lấy context xung quanh
                     start = max(0, idx - 50)
                     end = min(len(full_text), idx + len(entity_text) + 50)
                     context = full_text[start:end]
@@ -1988,21 +2396,21 @@ for ent in merged_entities:
                         is_album_context = True
                         break
         if is_album_context:
-            removed_count[entity_type] += 1
-            removed_reason[entity_type]['is_album_not_artist'] += 1
+            removed_count_rule[entity_type] += 1
+            removed_reason_rule[entity_type]['is_album_not_artist'] += 1
             continue
     
     # Kiểm tra 2b: Artist phải là nghệ sĩ âm nhạc (không phải diễn viên, MC...)
     if entity_type == 'Artist':
         if not is_music_artist(entity_text, sources):
-            removed_count[entity_type] += 1
-            removed_reason[entity_type]['not_music_artist'] += 1
+            removed_count_rule[entity_type] += 1
+            removed_reason_rule[entity_type]['not_music_artist'] += 1
             continue
     
     # Kiểm tra 3: Phải liên quan đến mạng lưới hiện có
     if not is_related_to_existing_nodes(entity_text, sources, existing_lower):
-        removed_count[entity_type] += 1
-        removed_reason[entity_type]['not_related_to_network'] += 1
+        removed_count_rule[entity_type] += 1
+        removed_reason_rule[entity_type]['not_related_to_network'] += 1
         continue
     
     # Tính confidence dựa trên số nguồn
@@ -2014,50 +2422,133 @@ for ent in merged_entities:
     elif num_sources >= 2:
         ent['confidence'] = min(0.85, ent['confidence'] + 0.1)
     
-    filtered_entities.append(ent)
+    filtered_rule_entities.append(ent)
 
 # =====================================================
-# BƯỚC 4: CHUẨN HÓA & GỘP LẠI LẦN CUỐI (LOẠI KHOẢNG TRẮNG CUỐI, TRÙNG TEXT)
+# LỌC THEO CONTEXT K-POP VÀ PHÙ HỢP VỚI MẠNG LƯỚI (ML-BASED)
 # =====================================================
-final_unique = {}
-for ent in filtered_entities:
+filtered_ml_entities = []
+removed_count_ml = defaultdict(int)
+removed_reason_ml = defaultdict(lambda: defaultdict(int))
+
+if ML_NER_AVAILABLE and merged_ml_entities:
+    print("\n📊 Bước 3b: Lọc theo context K-pop và phù hợp mạng lưới (ML-based)...")
+    
+    for ent in merged_ml_entities:
+        sources = ent.get('sources', [ent.get('source_node', '')])
+        entity_type = ent['type']
+        entity_text = ent['text']
+        
+        # Kiểm tra 1: Phải có context K-pop
+        if not has_kpop_context(sources):
+            removed_count_ml[entity_type] += 1
+            removed_reason_ml[entity_type]['no_kpop_context'] += 1
+            continue
+        
+        # Kiểm tra 2: Artist phải là nghệ sĩ âm nhạc
+        if entity_type == 'Artist':
+            if not is_music_artist(entity_text, sources):
+                removed_count_ml[entity_type] += 1
+                removed_reason_ml[entity_type]['not_music_artist'] += 1
+                continue
+        
+        # Kiểm tra 3: Phải liên quan đến mạng lưới hiện có
+        if not is_related_to_existing_nodes(entity_text, sources, existing_lower):
+            removed_count_ml[entity_type] += 1
+            removed_reason_ml[entity_type]['not_related_to_network'] += 1
+            continue
+        
+        # Kiểm tra 4: Loại bỏ entities có confidence quá thấp (< 0.65)
+        if ent.get('confidence', 0) < 0.65:
+            removed_count_ml[entity_type] += 1
+            removed_reason_ml[entity_type]['ml_low_confidence'] += 1
+            continue
+        
+        # Tính confidence dựa trên số nguồn
+        num_sources = len(set(sources))
+        if num_sources >= 5:
+            ent['confidence'] = min(0.95, ent['confidence'] + 0.2)
+        elif num_sources >= 3:
+            ent['confidence'] = min(0.9, ent['confidence'] + 0.15)
+        elif num_sources >= 2:
+            ent['confidence'] = min(0.85, ent['confidence'] + 0.1)
+        
+        filtered_ml_entities.append(ent)
+
+# =====================================================
+# BƯỚC 4: CHUẨN HÓA & GỘP LẠI LẦN CUỐI (RULE-BASED)
+# =====================================================
+final_unique_rule = {}
+for ent in filtered_rule_entities:
     norm_text = clean_text(ent['text'])
     ent['text'] = norm_text
-    key = (norm_text.lower(), ent['type'])
-    if key not in final_unique:
-        final_unique[key] = {**ent}
+    
+    normalized_lower = norm_text.lower()
+    key = (normalized_lower, ent['type'])
+    
+    if key not in final_unique_rule:
+        final_unique_rule[key] = {**ent}
     else:
-        # Gộp sources và lấy confidence cao nhất
-        existing = final_unique[key]
+        existing = final_unique_rule[key]
         existing_sources = set(existing.get('sources', []))
         new_sources = set(ent.get('sources', []))
         existing['sources'] = list(existing_sources | new_sources)
         existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
 
-filtered_entities = list(final_unique.values())
+filtered_rule_entities = list(final_unique_rule.values())
+print(f"  ✓ Còn {len(filtered_rule_entities)} entities (rule-based) sau khi lọc")
 
-print(f"  ✓ Còn {len(filtered_entities)} entities sau khi lọc")
+# =====================================================
+# BƯỚC 4: CHUẨN HÓA & GỘP LẠI LẦN CUỐI (ML-BASED)
+# =====================================================
+final_unique_ml = {}
+for ent in filtered_ml_entities:
+    norm_text = clean_text(ent['text'])
+    ent['text'] = norm_text
+    
+    normalized_lower = norm_text.lower()
+    key = (normalized_lower, ent['type'])
+    
+    if key not in final_unique_ml:
+        final_unique_ml[key] = {**ent}
+    else:
+        existing = final_unique_ml[key]
+        existing_sources = set(existing.get('sources', []))
+        new_sources = set(ent.get('sources', []))
+        existing['sources'] = list(existing_sources | new_sources)
+        existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
+
+filtered_ml_entities = list(final_unique_ml.values())
+if ML_NER_AVAILABLE:
+    print(f"  ✓ Còn {len(filtered_ml_entities)} entities (ML-based) sau khi lọc")
 
 # Sắp xếp theo confidence giảm dần
-filtered_entities.sort(key=lambda x: (-x['confidence'], x['type'], x['text']))
+filtered_rule_entities.sort(key=lambda x: (-x['confidence'], x['type'], x['text']))
+if ML_NER_AVAILABLE:
+    filtered_ml_entities.sort(key=lambda x: (-x['confidence'], x['type'], x['text']))
 
 # Đếm theo type
-counts = defaultdict(int)
-for ent in filtered_entities:
-    counts[ent['type']] += 1
+counts_rule = defaultdict(int)
+for ent in filtered_rule_entities:
+    counts_rule[ent['type']] += 1
+
+counts_ml = defaultdict(int)
+if ML_NER_AVAILABLE:
+    for ent in filtered_ml_entities:
+        counts_ml[ent['type']] += 1
 
 # =====================================================
-# LƯU KẾT QUẢ
+# LƯU KẾT QUẢ (RULE-BASED)
 # =====================================================
-output = {
+output_rule = {
     'metadata': {
-        'description': 'Thực thể K-pop được nhận dạng và lọc',
+        'description': 'Thực thể K-pop được nhận dạng và lọc (Rule-based)',
         'processed_at': datetime.now().isoformat(),
         'total_records': len(records),
         'raw_entities': len(all_entities),
-        'merged_entities': len(merged_entities),
-        'final_entities': len(filtered_entities),
-        'entities_by_type': dict(counts),
+        'merged_entities': len(merged_rule_entities),
+        'final_entities': len(filtered_rule_entities),
+        'entities_by_type': dict(counts_rule),
         'filter_criteria': [
             'Phải có context K-pop (>=3 từ khóa K-pop trong văn bản nguồn)',
             'Artist: Phải có từ khóa vai trò âm nhạc (ca sĩ, rapper, thành viên...)',
@@ -2067,11 +2558,41 @@ output = {
             'Không chứa từ chung chung'
         ]
     },
-    'entities': filtered_entities
+    'entities': filtered_rule_entities
 }
 
 with open('kpop_ner_result.json', 'w', encoding='utf-8') as f:
-    json.dump(output, f, ensure_ascii=False, indent=2)
+    json.dump(output_rule, f, ensure_ascii=False, indent=2)
+
+# =====================================================
+# LƯU KẾT QUẢ (ML-BASED)
+# =====================================================
+if ML_NER_AVAILABLE:
+    output_ml = {
+        'metadata': {
+            'description': 'Thực thể K-pop được nhận dạng và lọc (ML-based)',
+            'processed_at': datetime.now().isoformat(),
+            'total_records': len(records),
+            'raw_entities': len(ml_all_entities),
+            'merged_entities': len(merged_ml_entities),
+            'final_entities': len(filtered_ml_entities),
+            'entities_by_type': dict(counts_ml),
+            'ml_model': 'NlpHUST/ner-vietnamese-electra-base',
+            'filter_criteria': [
+                'Phải có context K-pop (>=3 từ khóa K-pop trong văn bản nguồn)',
+                'Artist: Phải có từ khóa vai trò âm nhạc (ca sĩ, rapper, thành viên...)',
+                'Artist: Loại trừ diễn viên, MC, vận động viên, nhà văn...',
+                'Phải liên quan đến ít nhất 1 node hiện có trong mạng lưới',
+                'Confidence >= 0.65',
+                'Tên phải bắt đầu bằng chữ in hoa hoặc số',
+                'Không chứa từ chung chung'
+            ]
+        },
+        'entities': filtered_ml_entities
+    }
+    
+    with open('kpop_ner_ml_result.json', 'w', encoding='utf-8') as f:
+        json.dump(output_ml, f, ensure_ascii=False, indent=2)
 
 # =====================================================
 # IN KẾT QUẢ
@@ -2079,23 +2600,25 @@ with open('kpop_ner_result.json', 'w', encoding='utf-8') as f:
 print("\n" + "=" * 70)
 print("KẾT QUẢ NHẬN DẠNG THỰC THỂ K-POP")
 print("=" * 70)
-print(f"✓ Đã lưu: kpop_ner_result.json")
+print(f"✓ Đã lưu: kpop_ner_result.json (Rule-based)")
+if ML_NER_AVAILABLE:
+    print(f"✓ Đã lưu: kpop_ner_ml_result.json (ML-based)")
 
-print(f"\n📊 THỐNG KÊ:")
+print(f"\n📊 THỐNG KÊ RULE-BASED:")
 print(f"   Records xử lý: {len(records)}")
 print(f"   Entities thô: {len(all_entities)}")
-print(f"   Sau khi gộp: {len(merged_entities)}")
-print(f"   Sau khi lọc K-pop: {len(filtered_entities)}")
+print(f"   Sau khi gộp: {len(merged_rule_entities)}")
+print(f"   Sau khi lọc K-pop: {len(filtered_rule_entities)}")
 
-print(f"\n   Phân loại cuối cùng:")
+print(f"\n   Phân loại cuối cùng (Rule-based):")
 for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
-    print(f"     - {t}: {counts.get(t, 0)}")
+    print(f"     - {t}: {counts_rule.get(t, 0)}")
 
-print(f"\n   Số entities bị loại:")
+print(f"\n   Số entities bị loại (Rule-based):")
 for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
-    total_removed = removed_count.get(t, 0)
+    total_removed = removed_count_rule.get(t, 0)
     if total_removed > 0:
-        reasons = removed_reason.get(t, {})
+        reasons = removed_reason_rule.get(t, {})
         print(f"     - {t}: {total_removed}")
         for reason, count in reasons.items():
             reason_text = {
@@ -2105,14 +2628,49 @@ for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
             }.get(reason, reason)
             print(f"         + {reason_text}: {count}")
 
+if ML_NER_AVAILABLE:
+    print(f"\n📊 THỐNG KÊ ML-BASED:")
+    print(f"   Entities thô: {len(ml_all_entities)}")
+    print(f"   Sau khi gộp: {len(merged_ml_entities)}")
+    print(f"   Sau khi lọc K-pop: {len(filtered_ml_entities)}")
+    
+    print(f"\n   Phân loại cuối cùng (ML-based):")
+    for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
+        print(f"     - {t}: {counts_ml.get(t, 0)}")
+    
+    print(f"\n   Số entities bị loại (ML-based):")
+    for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
+        total_removed = removed_count_ml.get(t, 0)
+        if total_removed > 0:
+            reasons = removed_reason_ml.get(t, {})
+            print(f"     - {t}: {total_removed}")
+            for reason, count in reasons.items():
+                reason_text = {
+                    'no_kpop_context': 'Thiếu context K-pop',
+                    'not_music_artist': 'Không phải nghệ sĩ âm nhạc',
+                    'not_related_to_network': 'Không liên quan mạng lưới',
+                    'ml_low_confidence': 'Confidence < 0.65'
+                }.get(reason, reason)
+                print(f"         + {reason_text}: {count}")
+
 # Hiển thị top entities
-print(f"\n📝 TOP ENTITIES THEO ĐỘ TIN CẬY:")
+print(f"\n📝 TOP ENTITIES THEO ĐỘ TIN CẬY (Rule-based):")
 for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
-    items = [e for e in filtered_entities if e['type'] == t][:10]
+    items = [e for e in filtered_rule_entities if e['type'] == t][:10]
     if items:
         print(f"\n   {t} (top 10):")
         for i, e in enumerate(items, 1):
             src = len(set(e.get('sources', [])))
             print(f"     {i}. {e['text']} (conf: {e['confidence']:.2f}, {src} nguồn)")
+
+if ML_NER_AVAILABLE and filtered_ml_entities:
+    print(f"\n📝 TOP ENTITIES THEO ĐỘ TIN CẬY (ML-based):")
+    for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
+        items = [e for e in filtered_ml_entities if e['type'] == t][:10]
+        if items:
+            print(f"\n   {t} (top 10):")
+            for i, e in enumerate(items, 1):
+                src = len(set(e.get('sources', [])))
+                print(f"     {i}. {e['text']} (conf: {e['confidence']:.2f}, {src} nguồn)")
 
 print("\n✅ HOÀN TẤT!")

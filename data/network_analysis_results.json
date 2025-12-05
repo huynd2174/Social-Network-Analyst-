@@ -1,0 +1,73 @@
+{
+  "analysis_time": "2025-12-05T21:49:28.810203",
+  "graph_info": {
+    "total_nodes": 4373,
+    "total_edges": 5419,
+    "average_degree": 4.362677484787018
+  },
+  "small_world": {
+    "average_path_length": 4.392180461526303,
+    "clustering_coefficient": 0.05600110185790369,
+    "diameter": 12,
+    "is_small_world": true
+  },
+  "pagerank": {
+    "top_10": [
+      {
+        "node": "Occupation_Diễn viên",
+        "score": 0.014254675149158553,
+        "label": "Occupation"
+      },
+      {
+        "node": "Genre_R&B",
+        "score": 0.012407213417138865,
+        "label": "Genre"
+      },
+      {
+        "node": "Genre_Dance-pop",
+        "score": 0.0078780624504353,
+        "label": "Genre"
+      },
+      {
+        "node": "Genre_Hip hop",
+        "score": 0.007499408911525134,
+        "label": "Genre"
+      },
+      {
+        "node": "Occupation_Nhạc sĩ",
+        "score": 0.0063795604501340475,
+        "label": "Occupation"
+      },
+      {
+        "node": "BTS",
+        "score": 0.006266262155992922,
+        "label": "Group"
+      },
+      {
+        "node": "Genre_Pop",
+        "score": 0.006147922502784653,
+        "label": "Genre"
+      },
+      {
+        "node": "Girls' Generation",
+        "score": 0.005674608906556237,
+        "label": "Group"
+      },
+      {
+        "node": "T-ara",
+        "score": 0.004950413816427447,
+        "label": "Group"
+      },
+      {
+        "node": "EXO",
+        "score": 0.004915820653136882,
+        "label": "Group"
+      }
+    ]
+  },
+  "communities": {
+    "total_communities": 1899,
+    "modularity": 0.6128828085388868,
+    "largest_community_size": 376
+  }
+}

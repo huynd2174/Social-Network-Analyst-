@@ -1,3 +1,45 @@
-﻿__pycache__/
-*.pyc
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
 *.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (tùy chọn - có thể giữ lại nếu muốn commit)
+# data/*.json
+
+# Outputs
+outputs/*.png
+outputs/*.json
+
+# Logs
+*.log
+
+# Neo4j
+neo4j/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
