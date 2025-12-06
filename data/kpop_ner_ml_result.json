@@ -1,15 +1,15 @@
 {
   "metadata": {
     "description": "Thực thể K-pop được nhận dạng và lọc (ML-based)",
-    "processed_at": "2025-12-05T14:19:19.000114",
+    "processed_at": "2025-12-06T01:16:59.755793",
     "total_records": 1260,
-    "raw_entities": 13284,
-    "merged_entities": 5866,
-    "final_entities": 3122,
+    "raw_entities": 13026,
+    "merged_entities": 5746,
+    "final_entities": 3108,
     "entities_by_type": {
-      "Artist": 1281,
-      "Company": 290,
-      "Group": 1492,
+      "Artist": 1251,
+      "Company": 280,
+      "Group": 1518,
       "Song": 34,
       "Album": 25
     },
@@ -83,6 +83,31 @@
         "Rise as God",
         "Save Me (bài hát của BTS)",
         "Season of Glass (EP)"
+      ]
+    },
+    {
+      "text": "Big Bang",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.95,
+      "source_node": "Always (EP)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Always (EP)",
+        "Big Bang (nhóm nhạc)",
+        "Crush (album của 2NE1)",
+        "Daesung",
+        "E (album của Big Bang)",
+        "G-Dragon",
+        "GD X Taeyang",
+        "Jennie (ca sĩ)",
+        "Loser (bài hát của Big Bang)",
+        "Remember (album của Big Bang)",
+        "Seven (ca sĩ Hàn Quốc)",
+        "Super Junior",
+        "Taeyeon",
+        "With U (EP)",
+        "YG Family"
       ]
     },
     {
@@ -249,21 +274,6 @@
         "Seohyun",
         "Super Girl (EP)",
         "The Boys (album của Girls' Generation)"
-      ]
-    },
-    {
-      "text": "Kim So - hee",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.95,
-      "source_node": "Han Hye-ri",
-      "ml_label": "PERSON",
-      "sources": [
-        "Han Hye-ri",
-        "I.B.I (nhóm nhạc)",
-        "Kim So-hee",
-        "Company_The Music Works",
-        "Yoon Chae-kyung"
       ]
     },
     {
@@ -578,6 +588,21 @@
       ]
     },
     {
+      "text": "Winner",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.95,
+      "source_node": "CL (ca sĩ)",
+      "ml_label": "PERSON",
+      "sources": [
+        "CL (ca sĩ)",
+        "Son Na-eun",
+        "WINNER",
+        "Company_YG Entertainment",
+        "Company_YG Plus"
+      ]
+    },
+    {
       "text": "Yoo",
       "type": "Artist",
       "method": "ml-based",
@@ -591,23 +616,6 @@
         "Time Slip (album của Super Junior)",
         "Yoo Ara",
         "Yoo Se-yoon"
-      ]
-    },
-    {
-      "text": "Yoo Young - jin",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.95,
-      "source_node": "Black Mamba (bài hát)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Black Mamba (bài hát)",
-        "Girls' Generation",
-        "I Got a Boy (bài hát)",
-        "Psycho (bài hát của Red Velvet)",
-        "Red Velvet (nhóm nhạc)",
-        "Sexy, Free & Single (bài hát)",
-        "Twins (Knock Out)"
       ]
     },
     {
@@ -1356,6 +1364,22 @@
       ]
     },
     {
+      "text": "Avex Trax",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.95,
+      "source_node": "Countdown (album của EXO)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Countdown (album của EXO)",
+        "Love Me Right (bài hát)",
+        "NCT (nhóm nhạc)",
+        "Perfection (EP)",
+        "The Grace (nhóm nhạc)",
+        "Yunho"
+      ]
+    },
+    {
       "text": "BBC",
       "type": "Group",
       "method": "ml-based",
@@ -1646,6 +1670,26 @@
         "Im Do-hwa",
         "Park Cho-a",
         "Seo Yu Na"
+      ]
+    },
+    {
+      "text": "Fantagio",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.95,
+      "source_node": "5urprise",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "5urprise",
+        "Astro (nhóm nhạc)",
+        "Choi Yoo-jung",
+        "ITZY",
+        "Kang Tae Oh",
+        "Kwon Nara",
+        "Ong Seong-wu",
+        "Company_Pledis Entertainment",
+        "Wanna One",
+        "Yoo Ara"
       ]
     },
     {
@@ -3332,6 +3376,24 @@
       ]
     },
     {
+      "text": "Sony",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.95,
+      "source_node": "Permission to Dance",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Permission to Dance",
+        "Company_RCA Records",
+        "Company_Sony",
+        "Company_Sony Music",
+        "Company_Sony Music Taiwan",
+        "Company_Universal Music",
+        "Company_Universal Music Group",
+        "Company_Universal Music Japan"
+      ]
+    },
+    {
       "text": "Soompi",
       "type": "Group",
       "method": "ml-based",
@@ -3502,21 +3564,6 @@
         "Twins (Knock Out)",
         "U (bài hát của Super Junior)",
         "Yunho"
-      ]
-    },
-    {
-      "text": "Super _ Junior",
-      "type": "Group",
-      "method": "ml-based",
-      "confidence": 0.95,
-      "source_node": "House Party (bài hát của Super Junior)",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "House Party (bài hát của Super Junior)",
-        "Play (album của Super Junior)",
-        "Show Me Your Love (bài hát của TVXQ và Super Junior)",
-        "The Renaissance (album của Super Junior)",
-        "Time Slip (album của Super Junior)"
       ]
     },
     {
@@ -3951,6 +3998,20 @@
       ]
     },
     {
+      "text": "A Pink",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Ahn Daniel",
+      "ml_label": "PERSON",
+      "sources": [
+        "Ahn Daniel",
+        "Apink BnN",
+        "Kwon Nara",
+        "Yoon Bo Mi"
+      ]
+    },
+    {
       "text": "Andy",
       "type": "Artist",
       "method": "ml-based",
@@ -4056,6 +4117,20 @@
         "Bobby (IKON)",
         "WINNER",
         "iKON"
+      ]
+    },
+    {
+      "text": "CLC",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "CLC (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "CLC (nhóm nhạc)",
+        "Kim Nam-joo (ca sĩ)",
+        "Kwon Eun-bin",
+        "Sorn (ca sĩ)"
       ]
     },
     {
@@ -4258,6 +4333,20 @@
       ]
     },
     {
+      "text": "Fin. K. L",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Fin.K.L",
+      "ml_label": "PERSON",
+      "sources": [
+        "Fin.K.L",
+        "Shinhwa",
+        "Sung Yu-ri",
+        "Wonder Girls"
+      ]
+    },
+    {
       "text": "Guy",
       "type": "Artist",
       "method": "ml-based",
@@ -4268,6 +4357,20 @@
         "B.I (rapper)",
         "SS501",
         "iKON"
+      ]
+    },
+    {
+      "text": "H. O. T",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Girls' Generation",
+      "ml_label": "PERSON",
+      "sources": [
+        "Girls' Generation",
+        "Kangta",
+        "Lai Kuan-lin",
+        "Shinhwa"
       ]
     },
     {
@@ -4524,20 +4627,6 @@
       ]
     },
     {
-      "text": "Park Ji - yoon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.9,
-      "source_node": "Indigo (album của RM)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Indigo (album của RM)",
-        "Company_JYP Entertainment",
-        "Park Ji-yoon",
-        "Sunny (ca sĩ)"
-      ]
-    },
-    {
       "text": "Ravi",
       "type": "Artist",
       "method": "ml-based",
@@ -4620,6 +4709,19 @@
       ]
     },
     {
+      "text": "SuperM",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Hoàng Húc Hi",
+      "ml_label": "PERSON",
+      "sources": [
+        "Hoàng Húc Hi",
+        "SuperM",
+        "Taeyong"
+      ]
+    },
+    {
       "text": "Thành Long",
       "type": "Artist",
       "method": "ml-based",
@@ -4670,19 +4772,6 @@
         "Hani (ca sĩ)",
         "Kim Nam-joo (ca sĩ)",
         "Rocky (ca sĩ Hàn Quốc)"
-      ]
-    },
-    {
-      "text": "Yoon Ji - sung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.9,
-      "source_node": "Company_Mnet Media",
-      "ml_label": "PERSON",
-      "sources": [
-        "Company_Mnet Media",
-        "Park Woo-jin",
-        "Yoon Ji-sung"
       ]
     },
     {
@@ -5040,19 +5129,6 @@
       ]
     },
     {
-      "text": "Warner _ Music _ Group",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.9,
-      "source_node": "Company_Warner Music",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Warner Music",
-        "Company_Warner Music Group",
-        "Company_Warner Music Japan"
-      ]
-    },
-    {
       "text": "AFP",
       "type": "Group",
       "method": "ml-based",
@@ -5148,6 +5224,20 @@
       ]
     },
     {
+      "text": "Banana Culture",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Company_Banana Culture",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Banana Culture",
+        "Kim Junsu",
+        "Park Jeong-hwa",
+        "Company_Yedang Entertainment"
+      ]
+    },
+    {
       "text": "Bank",
       "type": "Group",
       "method": "ml-based",
@@ -5175,19 +5265,6 @@
       ]
     },
     {
-      "text": "Big _ Bang",
-      "type": "Group",
-      "method": "ml-based",
-      "confidence": 0.9,
-      "source_node": "Alive (EP)",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Alive (EP)",
-        "My Heaven (bài hát của Big Bang)",
-        "Sober (bài hát của Big Bang)"
-      ]
-    },
-    {
       "text": "Bugs",
       "type": "Group",
       "method": "ml-based",
@@ -5211,6 +5288,20 @@
         "Kris Wu",
         "NewJeans",
         "Super Junior"
+      ]
+    },
+    {
+      "text": "Capitol",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Company_Capitol Records",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Capitol Records",
+        "Hoàng Húc Hi",
+        "Company_Universal Music",
+        "Company_Universal Music Group"
       ]
     },
     {
@@ -5965,6 +6056,47 @@
       ]
     },
     {
+      "text": "Polydor",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Company_Polydor",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Polydor",
+        "Company_Polydor Records",
+        "Company_Universal Music",
+        "Company_Universal Music Group"
+      ]
+    },
+    {
+      "text": "Polydor Records",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "BLACKPINK",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "BLACKPINK",
+        "Girls' Generation",
+        "Company_Polydor",
+        "Company_Polydor Records"
+      ]
+    },
+    {
+      "text": "Pony Canyon",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Jang Keun-suk",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Jang Keun-suk",
+        "Company_Pony Canyon",
+        "Company_WM Entertainment"
+      ]
+    },
+    {
       "text": "Pristin",
       "type": "Group",
       "method": "ml-based",
@@ -6238,6 +6370,20 @@
       "sources": [
         "Company_JYP Entertainment",
         "Company_Star Empire Entertainment",
+        "Company_YG Entertainment",
+        "Company_YG Plus"
+      ]
+    },
+    {
+      "text": "T. O. P",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.9,
+      "source_node": "Big Bang (nhóm nhạc)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Big Bang (nhóm nhạc)",
+        "G-Dragon",
         "Company_YG Entertainment",
         "Company_YG Plus"
       ]
@@ -7652,17 +7798,6 @@
       ]
     },
     {
-      "text": "Kim Ryeo - wook",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8995740652084351,
-      "source_node": "Kim Ryeo-wook",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kim Ryeo-wook"
-      ]
-    },
-    {
       "text": "Lee Sooman",
       "type": "Artist",
       "method": "ml-based",
@@ -8664,17 +8799,6 @@
       ]
     },
     {
-      "text": "Kim Nam - joo",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8995419323444367,
-      "source_node": "Kim Nam-joo (ca sĩ)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kim Nam-joo (ca sĩ)"
-      ]
-    },
-    {
       "text": "Trường Đại học Taekyung",
       "type": "Group",
       "method": "ml-based",
@@ -9434,6 +9558,17 @@
       ]
     },
     {
+      "text": "Weeekly",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8995158612728119,
+      "source_node": "Weeekly",
+      "ml_label": "PERSON",
+      "sources": [
+        "Weeekly"
+      ]
+    },
+    {
       "text": "Lâm Na Vinh",
       "type": "Artist",
       "method": "ml-based",
@@ -9775,17 +9910,6 @@
       ]
     },
     {
-      "text": "Seo Eun - kwang",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.899498587846756,
-      "source_node": "Lee Min-hyuk",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Min-hyuk"
-      ]
-    },
-    {
       "text": "Trịnh Đại Hiền",
       "type": "Artist",
       "method": "ml-based",
@@ -9805,17 +9929,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Rainbow (nhóm nhạc Hàn Quốc)"
-      ]
-    },
-    {
-      "text": "Hwang Chan - sung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.899497139453888,
-      "source_node": "Hwang Chan-sung",
-      "ml_label": "PERSON",
-      "sources": [
-        "Hwang Chan-sung"
       ]
     },
     {
@@ -10303,17 +10416,6 @@
       ]
     },
     {
-      "text": "Ryu Hwa - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8994776129722596,
-      "source_node": "Ryu Hyo-young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Ryu Hyo-young"
-      ]
-    },
-    {
       "text": "Biện Bạch Hiền",
       "type": "Artist",
       "method": "ml-based",
@@ -10611,17 +10713,6 @@
       ]
     },
     {
-      "text": "Nam Ji - hyun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8994632363319397,
-      "source_node": "Nam Ji-hyun",
-      "ml_label": "PERSON",
-      "sources": [
-        "Nam Ji-hyun"
-      ]
-    },
-    {
       "text": "Lim Jeong Hee",
       "type": "Artist",
       "method": "ml-based",
@@ -10732,17 +10823,6 @@
       ]
     },
     {
-      "text": "Choi Jung - hoon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8994601249694825,
-      "source_node": "Choi Jung-hoon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Choi Jung-hoon"
-      ]
-    },
-    {
       "text": "Benny _ Blanco",
       "type": "Artist",
       "method": "ml-based",
@@ -10806,17 +10886,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Daesung"
-      ]
-    },
-    {
-      "text": "Son Chae - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8994542241096497,
-      "source_node": "Son Chae-young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Son Chae-young"
       ]
     },
     {
@@ -11004,17 +11073,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Why (bài hát của Taeyeon)"
-      ]
-    },
-    {
-      "text": "Lim Young - woong",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8994381308555603,
-      "source_node": "STAYC",
-      "ml_label": "PERSON",
-      "sources": [
-        "STAYC"
       ]
     },
     {
@@ -11788,17 +11846,6 @@
       ]
     },
     {
-      "text": "Lee Han - gyul",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8993771374225616,
-      "source_node": "Lee Han-gyul",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Han-gyul"
-      ]
-    },
-    {
       "text": "Woolim Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -12173,17 +12220,6 @@
       ]
     },
     {
-      "text": "Kim Da - som",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8993457019329071,
-      "source_node": "Kim Da-som",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kim Da-som"
-      ]
-    },
-    {
       "text": "Caitlin Kelley",
       "type": "Artist",
       "method": "ml-based",
@@ -12382,17 +12418,6 @@
       ]
     },
     {
-      "text": "Park Ji - hyo",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8993295013904572,
-      "source_node": "Park Ji-hyo",
-      "ml_label": "PERSON",
-      "sources": [
-        "Park Ji-hyo"
-      ]
-    },
-    {
       "text": "Gabriela Geneva",
       "type": "Artist",
       "method": "ml-based",
@@ -12445,6 +12470,17 @@
       "ml_label": "PERSON",
       "sources": [
         "Stellar"
+      ]
+    },
+    {
+      "text": "SM Culture & Contents",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8993213474750519,
+      "source_node": "Bang Min-ah",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Bang Min-ah"
       ]
     },
     {
@@ -12547,6 +12583,17 @@
       ]
     },
     {
+      "text": "Astro",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8993078827857971,
+      "source_node": "Astro (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Astro (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Hins Cheung",
       "type": "Artist",
       "method": "ml-based",
@@ -12643,6 +12690,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "What Do I Call You"
+      ]
+    },
+    {
+      "text": "GD X Taeyang",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8992915213108063,
+      "source_node": "GD X Taeyang",
+      "ml_label": "PERSON",
+      "sources": [
+        "GD X Taeyang"
       ]
     },
     {
@@ -13053,6 +13111,17 @@
       ]
     },
     {
+      "text": "Fantagio",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8992356777191163,
+      "source_node": "Astro (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Astro (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Kokoro",
       "type": "Artist",
       "method": "ml-based",
@@ -13449,17 +13518,6 @@
       ]
     },
     {
-      "text": "Choi Jong - hoon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8991990923881531,
-      "source_node": "Choi Jong-hoon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Choi Jong-hoon"
-      ]
-    },
-    {
       "text": "Simon & Garfunkel",
       "type": "Artist",
       "method": "ml-based",
@@ -13801,17 +13859,6 @@
       ]
     },
     {
-      "text": "Choi Young - jae",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8991581082344056,
-      "source_node": "Choi Young-jae",
-      "ml_label": "PERSON",
-      "sources": [
-        "Choi Young-jae"
-      ]
-    },
-    {
       "text": "Ayushy",
       "type": "Artist",
       "method": "ml-based",
@@ -14010,17 +14057,6 @@
       ]
     },
     {
-      "text": "Oh Ha - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8991354167461395,
-      "source_node": "Oh Ha Young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Oh Ha Young"
-      ]
-    },
-    {
       "text": "Yang Da Il",
       "type": "Artist",
       "method": "ml-based",
@@ -14186,17 +14222,6 @@
       ]
     },
     {
-      "text": "Jeong Se - woon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8991166412830353,
-      "source_node": "Company_Starship Entertainment",
-      "ml_label": "PERSON",
-      "sources": [
-        "Company_Starship Entertainment"
-      ]
-    },
-    {
       "text": "ACE Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -14238,17 +14263,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Company_Wake One"
-      ]
-    },
-    {
-      "text": "Lee _ Hyun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8991080582141876,
-      "source_node": "Lee Hyun",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Hyun"
       ]
     },
     {
@@ -15110,6 +15124,17 @@
       ]
     },
     {
+      "text": "Haru Haru",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8989858031272888,
+      "source_node": "Haru Haru",
+      "ml_label": "PERSON",
+      "sources": [
+        "Haru Haru"
+      ]
+    },
+    {
       "text": "Tòa án Tối cao",
       "type": "Group",
       "method": "ml-based",
@@ -15129,17 +15154,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Kang Daniel"
-      ]
-    },
-    {
-      "text": "Yong Jun - hyung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8989777565002441,
-      "source_node": "Yoon Doo Joon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Yoon Doo Joon"
       ]
     },
     {
@@ -15605,17 +15619,6 @@
       ]
     },
     {
-      "text": "Yang Ji - won",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8988793194293976,
-      "source_node": "Yang Jiwon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Yang Jiwon"
-      ]
-    },
-    {
       "text": "J. Tune Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -15646,17 +15649,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Company_Empire"
-      ]
-    },
-    {
-      "text": "Kwon So - hyun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8988750278949738,
-      "source_node": "Kwon So-hyun",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kwon So-hyun"
       ]
     },
     {
@@ -16078,6 +16070,17 @@
       ]
     },
     {
+      "text": "Dal Shabet",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8987926304340362,
+      "source_node": "DIA (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "DIA (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Trường Đại học Inha",
       "type": "Group",
       "method": "ml-based",
@@ -16251,17 +16254,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Babymonster"
-      ]
-    },
-    {
-      "text": "Jang Hyun - seung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8987408638000488,
-      "source_node": "Jang Hyun Seung",
-      "ml_label": "PERSON",
-      "sources": [
-        "Jang Hyun Seung"
       ]
     },
     {
@@ -18058,17 +18050,6 @@
       ]
     },
     {
-      "text": "Kim Da - hyun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8980992794036865,
-      "source_node": "Kim Da-hyun",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kim Da-hyun"
-      ]
-    },
-    {
       "text": "EEG",
       "type": "Group",
       "method": "ml-based",
@@ -18190,17 +18171,6 @@
       ]
     },
     {
-      "text": "Park Cho - rong",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8980562567710877,
-      "source_node": "Park Cho-rong",
-      "ml_label": "PERSON",
-      "sources": [
-        "Park Cho-rong"
-      ]
-    },
-    {
       "text": "LA MER Korea",
       "type": "Group",
       "method": "ml-based",
@@ -18231,17 +18201,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Teen Top"
-      ]
-    },
-    {
-      "text": "Yoo Ji - ae",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8980488002300263,
-      "source_node": "Yoo Ji-ae",
-      "ml_label": "PERSON",
-      "sources": [
-        "Yoo Ji-ae"
       ]
     },
     {
@@ -18487,17 +18446,6 @@
       ]
     },
     {
-      "text": "Yoo Young - jae",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8978932857513428,
-      "source_node": "B.A.P",
-      "ml_label": "PERSON",
-      "sources": [
-        "B.A.P"
-      ]
-    },
-    {
       "text": "Ahn Ja Young",
       "type": "Artist",
       "method": "ml-based",
@@ -18729,17 +18677,6 @@
       ]
     },
     {
-      "text": "Lee _ Jin",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8977439403533936,
-      "source_node": "Lee Jin",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Jin"
-      ]
-    },
-    {
       "text": "Bon Jovi",
       "type": "Artist",
       "method": "ml-based",
@@ -18927,17 +18864,6 @@
       ]
     },
     {
-      "text": "Lee Joo - yeon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8975749611854553,
-      "source_node": "Lee Joo-yeon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Joo-yeon"
-      ]
-    },
-    {
       "text": "Pink Friday Records",
       "type": "Group",
       "method": "ml-based",
@@ -18957,6 +18883,17 @@
       "ml_label": "PERSON",
       "sources": [
         "Nayeon"
+      ]
+    },
+    {
+      "text": "Kangta",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8975715279579163,
+      "source_node": "Taeyeon",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Taeyeon"
       ]
     },
     {
@@ -19199,6 +19136,17 @@
       "ml_label": "PERSON",
       "sources": [
         "Lee Min-hyuk"
+      ]
+    },
+    {
+      "text": "Stardom",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8974212169647217,
+      "source_node": "Block B",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Block B"
       ]
     },
     {
@@ -19796,6 +19744,17 @@
       ]
     },
     {
+      "text": "April",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8969172835350037,
+      "source_node": "April (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "April (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Kyla",
       "type": "Artist",
       "method": "ml-based",
@@ -20137,17 +20096,6 @@
       ]
     },
     {
-      "text": "Han Sun - hwa",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8965719223022461,
-      "source_node": "Han Sunhwa",
-      "ml_label": "PERSON",
-      "sources": [
-        "Han Sunhwa"
-      ]
-    },
-    {
       "text": "Saramin Media Korea",
       "type": "Company",
       "method": "ml-based",
@@ -20291,17 +20239,6 @@
       ]
     },
     {
-      "text": "Jo _ Kwon",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8963674306869507,
-      "source_node": "Jo Kwon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Jo Kwon"
-      ]
-    },
-    {
       "text": "Kpop Starz",
       "type": "Group",
       "method": "ml-based",
@@ -20434,17 +20371,6 @@
       ]
     },
     {
-      "text": "Lee Sung - jong",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8961378872394562,
-      "source_node": "Lee Sung-jong",
-      "ml_label": "PERSON",
-      "sources": [
-        "Lee Sung-jong"
-      ]
-    },
-    {
       "text": "Milka Chocolate",
       "type": "Group",
       "method": "ml-based",
@@ -20486,17 +20412,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "EXO"
-      ]
-    },
-    {
-      "text": "Shannon _ Williams",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8960925042629242,
-      "source_node": "Shannon Williams",
-      "ml_label": "PERSON",
-      "sources": [
-        "Shannon Williams"
       ]
     },
     {
@@ -20882,17 +20797,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Company_Kakao Entertainment"
-      ]
-    },
-    {
-      "text": "FNC _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8954760253429414,
-      "source_node": "Company_FNC Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_FNC Entertainment"
       ]
     },
     {
@@ -21544,17 +21448,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "2PM"
-      ]
-    },
-    {
-      "text": "Bang _ Chan",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8942886650562286,
-      "source_node": "Bang Chan",
-      "ml_label": "PERSON",
-      "sources": [
-        "Bang Chan"
       ]
     },
     {
@@ -22493,6 +22386,17 @@
       ]
     },
     {
+      "text": "KAI",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8918161511421204,
+      "source_node": "Kai (EP)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Kai (EP)"
+      ]
+    },
+    {
       "text": "JYP Natty",
       "type": "Group",
       "method": "ml-based",
@@ -22941,6 +22845,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Real (EP của IU)"
+      ]
+    },
+    {
+      "text": "K. Will",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8903778970241547,
+      "source_node": "Kim Ryeo-wook",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Kim Ryeo-wook"
       ]
     },
     {
@@ -23549,6 +23464,28 @@
       ]
     },
     {
+      "text": "Empire",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8867236018180847,
+      "source_node": "Company_Empire",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Empire"
+      ]
+    },
+    {
+      "text": "Viviz",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8866962432861328,
+      "source_node": "ViviZ",
+      "ml_label": "PERSON",
+      "sources": [
+        "ViviZ"
+      ]
+    },
+    {
       "text": "The Pussycat Dolls",
       "type": "Group",
       "method": "ml-based",
@@ -23913,17 +23850,6 @@
       "ml_label": "PERSON",
       "sources": [
         "Park Yong-ha"
-      ]
-    },
-    {
-      "text": "Nicole _ Jung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8842492640018463,
-      "source_node": "Nicole Jung",
-      "ml_label": "PERSON",
-      "sources": [
-        "Nicole Jung"
       ]
     },
     {
@@ -24609,17 +24535,6 @@
       ]
     },
     {
-      "text": "Stephanie _ Kim",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8786742925643921,
-      "source_node": "Stephanie Kim",
-      "ml_label": "PERSON",
-      "sources": [
-        "Stephanie Kim"
-      ]
-    },
-    {
       "text": "Black Beat",
       "type": "Group",
       "method": "ml-based",
@@ -24972,17 +24887,6 @@
       ]
     },
     {
-      "text": "Kei _",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8755684554576874,
-      "source_node": "Kei (ca sĩ)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kei (ca sĩ)"
-      ]
-    },
-    {
       "text": "BTS Music Store",
       "type": "Company",
       "method": "ml-based",
@@ -25101,17 +25005,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Hoot (EP)"
-      ]
-    },
-    {
-      "text": "Seo Soo - jin",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8741966128349304,
-      "source_node": "Seo Soo-jin",
-      "ml_label": "PERSON",
-      "sources": [
-        "Seo Soo-jin"
       ]
     },
     {
@@ -25335,17 +25228,6 @@
       ]
     },
     {
-      "text": "Min _",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8715951919555665,
-      "source_node": "Min (ca sĩ Hàn Quốc)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Min (ca sĩ Hàn Quốc)"
-      ]
-    },
-    {
       "text": "J. ONE",
       "type": "Artist",
       "method": "ml-based",
@@ -25365,6 +25247,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Shinhwa"
+      ]
+    },
+    {
+      "text": "Sistar19",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.871378093957901,
+      "source_node": "SISTAR",
+      "ml_label": "PERSON",
+      "sources": [
+        "SISTAR"
       ]
     },
     {
@@ -25698,17 +25591,6 @@
       ]
     },
     {
-      "text": "Cube _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8663573205471039,
-      "source_node": "Company_Cube Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Cube Entertainment"
-      ]
-    },
-    {
       "text": "Bangtan Boys",
       "type": "Group",
       "method": "ml-based",
@@ -25739,17 +25621,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Sorry, Sorry"
-      ]
-    },
-    {
-      "text": "Seo _ Eunkwang",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8657335460186005,
-      "source_node": "Seo Eunkwang",
-      "ml_label": "PERSON",
-      "sources": [
-        "Seo Eunkwang"
       ]
     },
     {
@@ -25896,6 +25767,17 @@
       ]
     },
     {
+      "text": "Victon",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8638270318508149,
+      "source_node": "VICTON",
+      "ml_label": "PERSON",
+      "sources": [
+        "VICTON"
+      ]
+    },
+    {
       "text": "Music K Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -25959,6 +25841,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "U-KISS"
+      ]
+    },
+    {
+      "text": "Brave Girls",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8629804730415345,
+      "source_node": "DIA (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "DIA (nhóm nhạc)"
       ]
     },
     {
@@ -26269,17 +26162,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Choi Soo-young"
-      ]
-    },
-    {
-      "text": "Teddy _ Park",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8594838380813599,
-      "source_node": "Teddy Park",
-      "ml_label": "PERSON",
-      "sources": [
-        "Teddy Park"
       ]
     },
     {
@@ -26701,17 +26583,6 @@
       ]
     },
     {
-      "text": "SM _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8533346593379975,
-      "source_node": "Company_SM Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_SM Entertainment"
-      ]
-    },
-    {
       "text": "Hailie",
       "type": "Artist",
       "method": "ml-based",
@@ -26985,18 +26856,6 @@
       ]
     },
     {
-      "text": "Bae Jin - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Bae Jin-young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Bae Jin-young",
-        "CIX (nhóm nhạc)"
-      ]
-    },
-    {
       "text": "Baekho",
       "type": "Artist",
       "method": "ml-based",
@@ -27186,6 +27045,18 @@
       "sources": [
         "Kwon So-hyun",
         "Lee Min-hyuk"
+      ]
+    },
+    {
+      "text": "Davichi",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Davichi",
+      "ml_label": "PERSON",
+      "sources": [
+        "Davichi",
+        "Seohyun"
       ]
     },
     {
@@ -27405,15 +27276,15 @@
       ]
     },
     {
-      "text": "Hwang Kwang - hee",
+      "text": "Hyeongseop X Euiwoong",
       "type": "Artist",
       "method": "ml-based",
       "confidence": 0.85,
-      "source_node": "Eunhyuk",
+      "source_node": "Hyeongseop X Euiwoong",
       "ml_label": "PERSON",
       "sources": [
-        "Eunhyuk",
-        "Hwang Kwang-hee"
+        "Hyeongseop X Euiwoong",
+        "Jungkook"
       ]
     },
     {
@@ -27429,18 +27300,6 @@
       ]
     },
     {
-      "text": "Im Na - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Im Na-young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Im Na-young",
-        "Company_Sublime Artist Agency"
-      ]
-    },
-    {
       "text": "Infinit",
       "type": "Artist",
       "method": "ml-based",
@@ -27450,6 +27309,18 @@
       "sources": [
         "INFINITE",
         "Kwon Nara"
+      ]
+    },
+    {
+      "text": "JYJ",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Hani (ca sĩ)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Hani (ca sĩ)",
+        "TVXQ"
       ]
     },
     {
@@ -27510,18 +27381,6 @@
       "sources": [
         "DNA (bài hát của BTS)",
         "Spring Day (bài hát)"
-      ]
-    },
-    {
-      "text": "Jang Woo - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Jang Woo-young",
-      "ml_label": "PERSON",
-      "sources": [
-        "Jang Woo-young",
-        "Welcome to My World (bài hát của aespa)"
       ]
     },
     {
@@ -27693,18 +27552,6 @@
       ]
     },
     {
-      "text": "Jung Joon - young",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Choi Jong-hoon",
-      "ml_label": "PERSON",
-      "sources": [
-        "Choi Jong-hoon",
-        "Jung Joon-young"
-      ]
-    },
-    {
       "text": "Jung Min - jae",
       "type": "Artist",
       "method": "ml-based",
@@ -27873,18 +27720,6 @@
       ]
     },
     {
-      "text": "Kim Dong - Jun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Kim Dong-jun",
-      "ml_label": "PERSON",
-      "sources": [
-        "Kim Dong-jun",
-        "Park Hyung-sik"
-      ]
-    },
-    {
       "text": "Kim Jong - hyun",
       "type": "Artist",
       "method": "ml-based",
@@ -27978,18 +27813,6 @@
       "sources": [
         "Idol (bài hát của BTS)",
         "Tiền Côn"
-      ]
-    },
-    {
-      "text": "Lee Gi - kwang",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Cho Seung-youn",
-      "ml_label": "PERSON",
-      "sources": [
-        "Cho Seung-youn",
-        "Lee Gi-kwang"
       ]
     },
     {
@@ -28149,6 +27972,18 @@
       ]
     },
     {
+      "text": "Mr. Chu",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Mr. Chu",
+      "ml_label": "PERSON",
+      "sources": [
+        "Mr. Chu",
+        "Pink Blossom"
+      ]
+    },
+    {
       "text": "Ningning",
       "type": "Artist",
       "method": "ml-based",
@@ -28158,18 +27993,6 @@
       "sources": [
         "Black Mamba (bài hát)",
         "Chenle"
-      ]
-    },
-    {
-      "text": "Ock Joo - hyun",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Fin.K.L",
-      "ml_label": "PERSON",
-      "sources": [
-        "Fin.K.L",
-        "Lee Jin"
       ]
     },
     {
@@ -28480,9 +28303,9 @@
       "source_node": "Company_Fantagio",
       "ml_label": "PERSON",
       "sources": [
+        "Company_Fantagio Music",
         "Company_Fantagio",
-        "Kim So-hee",
-        "Company_Fantagio Music"
+        "Kim So-hee"
       ]
     },
     {
@@ -28654,18 +28477,6 @@
       ]
     },
     {
-      "text": "Yoo Seung - woo",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Company_Starship Entertainment",
-      "ml_label": "PERSON",
-      "sources": [
-        "Company_Starship Entertainment",
-        "Yoo Seung-woo"
-      ]
-    },
-    {
       "text": "Yoo Young - doo",
       "type": "Artist",
       "method": "ml-based",
@@ -28675,18 +28486,6 @@
       "sources": [
         "Company_DSP Media",
         "Company_Daesung Entertainment"
-      ]
-    },
-    {
-      "text": "Yoon Chae - kyung",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "I.B.I (nhóm nhạc)",
-      "ml_label": "PERSON",
-      "sources": [
-        "I.B.I (nhóm nhạc)",
-        "Yoon Chae-kyung"
       ]
     },
     {
@@ -29266,18 +29065,6 @@
       ]
     },
     {
-      "text": "Universal _ Music _ Group",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Company_Universal Music",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Universal Music",
-        "Company_Universal Music Group"
-      ]
-    },
-    {
       "text": "Viewga Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -29782,6 +29569,18 @@
       ]
     },
     {
+      "text": "Defstar Records",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Company_Defstar Records",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Defstar Records",
+        "Wonder Girls"
+      ]
+    },
+    {
       "text": "Disney Channel Hàn",
       "type": "Group",
       "method": "ml-based",
@@ -29986,6 +29785,18 @@
       ]
     },
     {
+      "text": "G. NA",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "G.NA",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "G.NA",
+        "HyunA"
+      ]
+    },
+    {
       "text": "GMM International",
       "type": "Group",
       "method": "ml-based",
@@ -30175,6 +29986,18 @@
       "sources": [
         "Lee Joon-gi",
         "Park Woo-jin"
+      ]
+    },
+    {
+      "text": "Hybe",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "BTS",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "BTS",
+        "Company_HYBE"
       ]
     },
     {
@@ -30814,6 +30637,18 @@
       ]
     },
     {
+      "text": "Psy",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "BTS",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "BTS",
+        "Rosé (ca sĩ)"
+      ]
+    },
+    {
       "text": "Puma",
       "type": "Group",
       "method": "ml-based",
@@ -30847,18 +30682,6 @@
       "sources": [
         "Lay Zhang",
         "Still Dreaming (album của TXT)"
-      ]
-    },
-    {
-      "text": "Red _ Velvet",
-      "type": "Group",
-      "method": "ml-based",
-      "confidence": 0.85,
-      "source_node": "Peek-a-Boo (bài hát của Red Velvet)",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Peek-a-Boo (bài hát của Red Velvet)",
-        "Russian Roulette (EP của Red Velvet)"
       ]
     },
     {
@@ -31102,6 +30925,18 @@
       ]
     },
     {
+      "text": "Sunny",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "SHINee",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "SHINee",
+        "Sunny (ca sĩ)"
+      ]
+    },
+    {
       "text": "Sunway Records",
       "type": "Group",
       "method": "ml-based",
@@ -31111,6 +30946,18 @@
       "sources": [
         "Kim Da-som",
         "Rosé (ca sĩ)"
+      ]
+    },
+    {
+      "text": "Swing",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Company_Swing Entertainment",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_Swing Entertainment",
+        "Wanna One"
       ]
     },
     {
@@ -31411,6 +31258,18 @@
       "sources": [
         "Babymonster",
         "The Album (album của Blackpink)"
+      ]
+    },
+    {
+      "text": "YG Plus",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.85,
+      "source_node": "Company_YG Entertainment",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_YG Entertainment",
+        "Company_YG Plus"
       ]
     },
     {
@@ -31854,17 +31713,6 @@
       ]
     },
     {
-      "text": "JYP _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8410669326782226,
-      "source_node": "Company_JYP Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_JYP Entertainment"
-      ]
-    },
-    {
       "text": "Tide",
       "type": "Group",
       "method": "ml-based",
@@ -32055,6 +31903,17 @@
       ]
     },
     {
+      "text": "The Velvet",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.8367158532142639,
+      "source_node": "Red Velvet (nhóm nhạc)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Red Velvet (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "The Star",
       "type": "Group",
       "method": "ml-based",
@@ -32229,17 +32088,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Kris Wu"
-      ]
-    },
-    {
-      "text": "Kakao _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8306741237640382,
-      "source_node": "Company_Kakao Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Kakao Entertainment"
       ]
     },
     {
@@ -32620,17 +32468,6 @@
       ]
     },
     {
-      "text": "WM _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.8219551742076874,
-      "source_node": "Company_WM Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_WM Entertainment"
-      ]
-    },
-    {
       "text": "4Minut",
       "type": "Group",
       "method": "ml-based",
@@ -32790,17 +32627,6 @@
       ]
     },
     {
-      "text": "Jin _ Jin",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.8189217031002045,
-      "source_node": "Jin Jin",
-      "ml_label": "PERSON",
-      "sources": [
-        "Jin Jin"
-      ]
-    },
-    {
       "text": "Entertainment Stone Music Entertainment",
       "type": "Company",
       "method": "ml-based",
@@ -32854,6 +32680,18 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Yoon Shi-yoon"
+      ]
+    },
+    {
+      "text": "SS501",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.8166945099830627,
+      "source_node": "Dynamic Duo (ban nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Dynamic Duo (ban nhạc)",
+        "SS501"
       ]
     },
     {
@@ -33608,6 +33446,17 @@
       ]
     },
     {
+      "text": "2YOON",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.7968386471271515,
+      "source_node": "Kwon So-hyun",
+      "ml_label": "PERSON",
+      "sources": [
+        "Kwon So-hyun"
+      ]
+    },
+    {
       "text": "Brand New",
       "type": "Group",
       "method": "ml-based",
@@ -33674,17 +33523,6 @@
       ]
     },
     {
-      "text": "Tiền _ Côn",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.7938375771045685,
-      "source_node": "Tiền Côn",
-      "ml_label": "PERSON",
-      "sources": [
-        "Tiền Côn"
-      ]
-    },
-    {
       "text": "United States",
       "type": "Group",
       "method": "ml-based",
@@ -33704,17 +33542,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Kim Ki-bum"
-      ]
-    },
-    {
-      "text": "Myoui _ Mina",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.793198835849762,
-      "source_node": "Myoui Mina",
-      "ml_label": "PERSON",
-      "sources": [
-        "Myoui Mina"
       ]
     },
     {
@@ -33748,17 +33575,6 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Company_JYP Entertainment"
-      ]
-    },
-    {
-      "text": "Dean _",
-      "type": "Artist",
-      "method": "ml-based",
-      "confidence": 0.7923527598381043,
-      "source_node": "Dean (ca sĩ Hàn Quốc)",
-      "ml_label": "PERSON",
-      "sources": [
-        "Dean (ca sĩ Hàn Quốc)"
       ]
     },
     {
@@ -34051,6 +33867,18 @@
       ]
     },
     {
+      "text": "GD & TOP",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.7848115205764771,
+      "source_node": "Big Bang (nhóm nhạc)",
+      "ml_label": "PERSON",
+      "sources": [
+        "Big Bang (nhóm nhạc)",
+        "E (album của Big Bang)"
+      ]
+    },
+    {
       "text": "Zenith News",
       "type": "Group",
       "method": "ml-based",
@@ -34227,6 +34055,17 @@
       ]
     },
     {
+      "text": "LuHan",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.7796101212501526,
+      "source_node": "Lu Han",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Lu Han"
+      ]
+    },
+    {
       "text": "Hitchhiker",
       "type": "Group",
       "method": "ml-based",
@@ -34302,6 +34141,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "F(x) (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Pony Canyon",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.7762151956558228,
+      "source_node": "Koo Hye-sun",
+      "ml_label": "PERSON",
+      "sources": [
+        "Koo Hye-sun"
       ]
     },
     {
@@ -34390,6 +34240,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Natty"
+      ]
+    },
+    {
+      "text": "San E",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.7738507211208344,
+      "source_node": "RM (rapper)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "RM (rapper)"
       ]
     },
     {
@@ -35081,6 +34942,17 @@
       ]
     },
     {
+      "text": "Pdogg",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.7557281076908112,
+      "source_node": "Mic Drop (bài hát)",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Mic Drop (bài hát)"
+      ]
+    },
+    {
       "text": "CyWord",
       "type": "Group",
       "method": "ml-based",
@@ -35200,6 +35072,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Made (album của Big Bang)"
+      ]
+    },
+    {
+      "text": "Dynamic Duo",
+      "type": "Artist",
+      "method": "ml-based",
+      "confidence": 0.7530321657657624,
+      "source_node": "Park Ji-hoon",
+      "ml_label": "PERSON",
+      "sources": [
+        "Park Ji-hoon"
       ]
     },
     {
@@ -35644,17 +35527,6 @@
       ]
     },
     {
-      "text": "Starship _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.737660425901413,
-      "source_node": "Company_Starship Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Starship Entertainment"
-      ]
-    },
-    {
       "text": "Staples DMC",
       "type": "Group",
       "method": "ml-based",
@@ -35696,17 +35568,6 @@
       "ml_label": "PERSON",
       "sources": [
         "CNBLUE"
-      ]
-    },
-    {
-      "text": "Fave _ Entertainment",
-      "type": "Company",
-      "method": "ml-based",
-      "confidence": 0.7347630500793457,
-      "source_node": "Company_Fave Entertainment",
-      "ml_label": "ORGANIZATION",
-      "sources": [
-        "Company_Fave Entertainment"
       ]
     },
     {
@@ -36612,6 +36473,17 @@
       ]
     },
     {
+      "text": "Jeno",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.686280244588852,
+      "source_node": "Haechan",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Haechan"
+      ]
+    },
+    {
       "text": "Portug",
       "type": "Group",
       "method": "ml-based",
@@ -36667,6 +36539,17 @@
       ]
     },
     {
+      "text": "Born Pink",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.6829538226127625,
+      "source_node": "BLACKPINK",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "BLACKPINK"
+      ]
+    },
+    {
       "text": "Kwangya",
       "type": "Group",
       "method": "ml-based",
@@ -36719,6 +36602,17 @@
       "ml_label": "ORGANIZATION",
       "sources": [
         "Red Velvet (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Iriver",
+      "type": "Group",
+      "method": "ml-based",
+      "confidence": 0.6809123396873474,
+      "source_node": "Company_JYP Entertainment",
+      "ml_label": "ORGANIZATION",
+      "sources": [
+        "Company_JYP Entertainment"
       ]
     },
     {

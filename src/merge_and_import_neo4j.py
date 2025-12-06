@@ -7,8 +7,10 @@ Script để merge dữ liệu từ 3 file JSON và đẩy vào Neo4j
 import sys
 import io
 import json
-from typing import Dict, List, Any, Set
+import re
+from typing import Dict, List, Any, Set, Tuple
 from datetime import datetime
+from collections import defaultdict
 from neo4j import GraphDatabase
 
 # Robust UTF-8 console output on Windows
@@ -18,6 +20,40 @@ if sys.platform == 'win32':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     except Exception:
         pass
+
+
+def normalize_node_name(name: str) -> str:
+    """
+    Chuẩn hóa tên node để so sánh nhất quán.
+    Giống với normalize_node_name trong run_relationship_extraction.py
+    """
+    if not name:
+        return ""
+    
+    # Loại bỏ các pattern trong ngoặc đơn ở cuối
+    name = re.sub(r'\s*\([^)]*(?:ca sĩ|nhóm nhạc|ban nhạc|nghệ sĩ|singer|group|band)[^)]*\)\s*$', '', name, flags=re.IGNORECASE)
+    
+    # Chuẩn hóa khoảng trắng
+    name = re.sub(r'\s+', ' ', name)
+    name = name.strip()
+    
+    return name
+
+
+def normalize_for_comparison(name: str) -> str:
+    """
+    Chuẩn hóa tên để so sánh (loại bỏ khoảng trắng, dấu gạch nối, lowercase)
+    Dùng để match entities giữa NER và Relationships
+    
+    Xử lý các trường hợp:
+    - "Ahn Ji-young" vs "Ahn Ji young" -> cùng một node
+    - "Miyeon" vs "Miyeon (ca sĩ)" -> cùng một node
+    """
+    normalized = normalize_node_name(name)
+    # Loại bỏ khoảng trắng, dấu gạch nối, và lowercase để so sánh
+    # Điều này giúp match "Ahn Ji-young" với "Ahn Ji young"
+    normalized = normalized.lower().replace(' ', '').replace('-', '').replace('_', '')
+    return normalized
 
 
 def load_json_file(filepath: str) -> Dict:
@@ -83,6 +119,18 @@ def merge_data(
     new_entities_count = 0
     existing_entities_count = 0
     
+    # Tạo mapping từ (normalized name, type) -> original name để match chính xác
+    # QUAN TRỌNG: Phải check cả type để tránh trùng lặp giữa các type khác nhau
+    # QUAN TRỌNG: Lưu thông tin node nào từ BFS để ưu tiên giữ lại
+    normalized_to_original: Dict[Tuple[str, str], str] = {}
+    bfs_node_ids = set(bfs_nodes.keys())  # Lưu danh sách node IDs từ BFS
+    for node_id in merged["nodes"].keys():
+        normalized_key = normalize_for_comparison(node_id)
+        node_type = merged["nodes"][node_id].get("label", "Entity")
+        key = (normalized_key, node_type)
+        if key not in normalized_to_original:
+            normalized_to_original[key] = node_id
+    
     for entity in ner_entities:
         entity_id = entity.get("text", "")
         entity_type = entity.get("type", "Entity")
@@ -90,31 +138,116 @@ def merge_data(
         if not entity_id:
             continue
         
-        # Nếu node chưa tồn tại, tạo mới
-        if entity_id not in merged["nodes"]:
-            merged["nodes"][entity_id] = {
-                "label": entity_type,
-                "title": entity_id,
-                "properties": {
-                    "method": entity.get("method", "unknown"),
-                    "confidence": entity.get("confidence", 0.0),
-                    "source_node": entity.get("source_node", ""),
-                    "sources": entity.get("sources", [])
-                }
-            }
-            new_entities_count += 1
+        # Chuẩn hóa để tìm node đã tồn tại
+        normalized_key = normalize_for_comparison(entity_id)
+        key = (normalized_key, entity_type)
+        existing_node_id = normalized_to_original.get(key)
+        
+        if existing_node_id:
+            # Node đã tồn tại VÀ CÙNG TYPE (có thể tên khác một chút do chuẩn hóa)
+            existing_node = merged["nodes"][existing_node_id]
+            existing_node_type = existing_node.get("label", "Entity")
+            
+            # Double check: phải cùng type mới cập nhật
+            if existing_node_type == entity_type:
+                # QUAN TRỌNG: Nếu node từ BFS graph (có infobox), chỉ cập nhật properties, KHÔNG ghi đè
+                if existing_node_id in bfs_node_ids:
+                    # Node từ BFS -> giữ nguyên, chỉ thêm NER properties
+                    if "properties" not in existing_node:
+                        existing_node["properties"] = {}
+                    existing_node["properties"].update({
+                        "ner_method": entity.get("method", "unknown"),
+                        "ner_confidence": entity.get("confidence", 0.0),
+                        "ner_source_node": entity.get("source_node", ""),
+                        "ner_sources": entity.get("sources", [])
+                    })
+                else:
+                    # Node không phải từ BFS -> cập nhật như bình thường
+                    if "properties" not in existing_node:
+                        existing_node["properties"] = {}
+                    existing_node["properties"].update({
+                        "ner_method": entity.get("method", "unknown"),
+                        "ner_confidence": entity.get("confidence", 0.0),
+                        "ner_source_node": entity.get("source_node", ""),
+                        "ner_sources": entity.get("sources", [])
+                    })
+                existing_entities_count += 1
+            else:
+                # Tên giống nhưng type khác -> cho phép cả hai cùng tồn tại
+                # Kiểm tra xem có node nào với cùng tên (entity_id) nhưng type khác không
+                if entity_id in merged["nodes"]:
+                    # Đã có node với tên này (có thể type khác) -> tạo node mới với tên khác
+                    new_entity_id = f"{entity_id} ({entity_type})"
+                    # Kiểm tra xem tên mới đã tồn tại chưa
+                    if new_entity_id in merged["nodes"]:
+                        # Tên đã tồn tại -> bỏ qua
+                        continue
+                    # Tạo node mới với tên khác
+                    merged["nodes"][new_entity_id] = {
+                        "label": entity_type,
+                        "title": new_entity_id,
+                        "properties": {
+                            "method": entity.get("method", "unknown"),
+                            "confidence": entity.get("confidence", 0.0),
+                            "source_node": entity.get("source_node", ""),
+                            "sources": entity.get("sources", []),
+                            "original_name": entity_id  # Lưu tên gốc để reference
+                        }
+                    }
+                    normalized_to_original[key] = new_entity_id
+                    new_entities_count += 1
+                else:
+                    # Chưa có node với tên này -> tạo node mới với tên gốc
+                    merged["nodes"][entity_id] = {
+                        "label": entity_type,
+                        "title": entity_id,
+                        "properties": {
+                            "method": entity.get("method", "unknown"),
+                            "confidence": entity.get("confidence", 0.0),
+                            "source_node": entity.get("source_node", ""),
+                            "sources": entity.get("sources", [])
+                        }
+                    }
+                    normalized_to_original[key] = entity_id
+                    new_entities_count += 1
         else:
-            # Cập nhật properties nếu node đã tồn tại
-            existing_node = merged["nodes"][entity_id]
-            if "properties" not in existing_node:
-                existing_node["properties"] = {}
-            existing_node["properties"].update({
-                "ner_method": entity.get("method", "unknown"),
-                "ner_confidence": entity.get("confidence", 0.0),
-                "ner_source_node": entity.get("source_node", ""),
-                "ner_sources": entity.get("sources", [])
-            })
-            existing_entities_count += 1
+            # Node chưa tồn tại với key (normalized_name, type) này
+            # Kiểm tra xem có node nào với cùng tên (entity_id) nhưng type khác không
+            if entity_id in merged["nodes"]:
+                # Đã có node với tên này (có thể type khác) -> tạo node mới với tên khác
+                new_entity_id = f"{entity_id} ({entity_type})"
+                # Kiểm tra xem tên mới đã tồn tại chưa
+                if new_entity_id in merged["nodes"]:
+                    # Tên đã tồn tại -> bỏ qua
+                    continue
+                # Tạo node mới với tên khác
+                merged["nodes"][new_entity_id] = {
+                    "label": entity_type,
+                    "title": new_entity_id,
+                    "properties": {
+                        "method": entity.get("method", "unknown"),
+                        "confidence": entity.get("confidence", 0.0),
+                        "source_node": entity.get("source_node", ""),
+                        "sources": entity.get("sources", []),
+                        "original_name": entity_id  # Lưu tên gốc để reference
+                    }
+                }
+                normalized_to_original[key] = new_entity_id
+                new_entities_count += 1
+            else:
+                # Chưa có node với tên này -> tạo node mới với tên gốc
+                merged["nodes"][entity_id] = {
+                    "label": entity_type,
+                    "title": entity_id,
+                    "properties": {
+                        "method": entity.get("method", "unknown"),
+                        "confidence": entity.get("confidence", 0.0),
+                        "source_node": entity.get("source_node", ""),
+                        "sources": entity.get("sources", [])
+                    }
+                }
+                normalized_to_original[key] = entity_id
+                new_entities_count += 1
     
     print(f"  ✓ Đã thêm {new_entities_count} entities mới")
     print(f"  ✓ Đã cập nhật {existing_entities_count} entities đã tồn tại")
@@ -124,6 +257,7 @@ def merge_data(
     relationships = relationships_data.get("relationships", [])
     new_relationships_count = 0
     duplicate_relationships_count = 0
+    skipped_missing_nodes = 0
     
     # Tạo set để check duplicate
     existing_edges_set: Set[tuple] = set()
@@ -135,15 +269,195 @@ def merge_data(
         )
         existing_edges_set.add(key)
     
-    for rel in relationships:
-        source = rel.get("source", "")
-        target = rel.get("target", "")
-        rel_type = rel.get("type", "")
+    # Tạo mapping normalized -> original cho tất cả nodes hiện có
+    # Dùng để tìm node đã tồn tại dựa trên normalized name (check trùng lặp tốt hơn)
+    # QUAN TRỌNG: Tạo mapping SAU KHI đã merge tất cả nodes (BFS + NER)
+    normalized_to_original_rel: Dict[str, str] = {}
+    # Tạo mapping với tất cả các biến thể tên có thể có
+    # VÀ tạo mapping từ các phần tên (để match "Miyeon" với "Cho Mi-yeon")
+    name_parts_to_nodes: Dict[str, List[str]] = defaultdict(list)
+    
+    for node_id in merged["nodes"].keys():
+        normalized_key = normalize_for_comparison(node_id)
+        # Nếu có nhiều node cùng normalized name, ưu tiên node từ BFS graph (tên gốc)
+        if normalized_key not in normalized_to_original_rel:
+            normalized_to_original_rel[normalized_key] = node_id
+        else:
+            # Ưu tiên node từ BFS graph nếu có
+            existing_node_id = normalized_to_original_rel[normalized_key]
+            if node_id in bfs_nodes and existing_node_id not in bfs_nodes:
+                normalized_to_original_rel[normalized_key] = node_id
         
-        if not source or not target or not rel_type:
+        # Tạo mapping từ các phần tên (tách theo khoảng trắng và dấu gạch nối)
+        # Ví dụ: "Cho Mi-yeon" -> ["cho", "mi", "yeon"]
+        # Để match "Miyeon" -> "miyeon" với "Cho Mi-yeon" -> "chomiyeon"
+        name_parts = re.split(r'[\s\-_]+', normalized_key)
+        for part in name_parts:
+            if len(part) >= 3:  # Chỉ lưu các phần có độ dài >= 3
+                name_parts_to_nodes[part].append(node_id)
+        
+        # THÊM: Lưu toàn bộ normalized name (nếu đủ dài) để tìm substring trực tiếp
+        # Ví dụ: "chomiyeon" sẽ match với "miyeon" nếu "miyeon" được tìm trong name_parts_to_nodes
+        if len(normalized_key) >= 3:
+            name_parts_to_nodes[normalized_key].append(node_id)
+    
+    # Thống kê relationships bị bỏ qua để debug
+    missing_source_stats = defaultdict(int)
+    missing_target_stats = defaultdict(int)
+    
+    for rel in relationships:
+        source_original = rel.get("source", "")
+        target_original = rel.get("target", "")
+        rel_type = rel.get("type", "")
+        source_type = rel.get("source_type", "")
+        target_type = rel.get("target_type", "")
+        
+        if not source_original or not target_original or not rel_type:
             continue
         
-        # Check duplicate
+        # Chuẩn hóa để tìm node đã tồn tại (có thể tên khác một chút do chuẩn hóa)
+        source_normalized = normalize_for_comparison(source_original)
+        target_normalized = normalize_for_comparison(target_original)
+        
+        source_node_id = normalized_to_original_rel.get(source_normalized)
+        target_node_id = normalized_to_original_rel.get(target_normalized)
+        
+        # Nếu không tìm thấy bằng normalized name, thử tìm bằng name parts
+        # Ví dụ: "Miyeon" không khớp với "Cho Mi-yeon", nhưng "miyeon" có trong "chomiyeon"
+        if not source_node_id:
+            candidates = []
+            
+            # CÁCH 1: Tìm trực tiếp source_normalized trong name_parts_to_nodes
+            # (nếu source_normalized là substring của một normalized name)
+            if source_normalized in name_parts_to_nodes:
+                candidates.extend(name_parts_to_nodes[source_normalized])
+            
+            # CÁCH 2: Tách source thành các phần và tìm
+            source_parts = re.split(r'[\s\-_]+', source_normalized)
+            for part in source_parts:
+                if len(part) >= 3 and part in name_parts_to_nodes:
+                    candidates.extend(name_parts_to_nodes[part])
+            
+            # CÁCH 3: Tìm trong tất cả nodes xem có node nào có normalized name chứa source_normalized
+            if not candidates:
+                for node_id in merged["nodes"].keys():
+                    candidate_norm = normalize_for_comparison(node_id)
+                    if source_normalized in candidate_norm:
+                        candidate_type = merged["nodes"][node_id].get("label", "")
+                        if not source_type or candidate_type == source_type:
+                            candidates.append(node_id)
+            
+            # Loại bỏ duplicate candidates
+            candidates = list(set(candidates))
+            
+            # Tìm node tốt nhất: node có normalized name chứa source hoặc ngược lại
+            best_match = None
+            best_score = 0
+            
+            for candidate in candidates:
+                candidate_norm = normalize_for_comparison(candidate)
+                candidate_type = merged["nodes"][candidate].get("label", "")
+                
+                # Kiểm tra type có khớp không
+                if source_type and candidate_type != source_type:
+                    continue
+                
+                # Tính điểm match:
+                # - Nếu source là substring của candidate: điểm cao
+                # - Nếu candidate là substring của source: điểm thấp hơn
+                # - Nếu có nhiều phần khớp: điểm cao hơn
+                score = 0
+                if source_normalized in candidate_norm:
+                    # Source là substring của candidate (ví dụ: "miyeon" trong "chomiyeon")
+                    score = 100 + len(source_normalized)
+                elif candidate_norm in source_normalized:
+                    # Candidate là substring của source (ít phổ biến hơn)
+                    score = 50 + len(candidate_norm)
+                else:
+                    # Đếm số phần khớp
+                    matching_parts = sum(1 for part in source_parts if part in candidate_norm)
+                    if matching_parts > 0:
+                        score = matching_parts * 10
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = candidate
+            
+            if best_match:
+                source_node_id = best_match
+        
+        if not target_node_id:
+            # Tương tự cho target
+            candidates = []
+            
+            # CÁCH 1: Tìm trực tiếp target_normalized trong name_parts_to_nodes
+            if target_normalized in name_parts_to_nodes:
+                candidates.extend(name_parts_to_nodes[target_normalized])
+            
+            # CÁCH 2: Tách target thành các phần và tìm
+            target_parts = re.split(r'[\s\-_]+', target_normalized)
+            for part in target_parts:
+                if len(part) >= 3 and part in name_parts_to_nodes:
+                    candidates.extend(name_parts_to_nodes[part])
+            
+            # CÁCH 3: Tìm trong tất cả nodes
+            if not candidates:
+                for node_id in merged["nodes"].keys():
+                    candidate_norm = normalize_for_comparison(node_id)
+                    if target_normalized in candidate_norm:
+                        candidate_type = merged["nodes"][node_id].get("label", "")
+                        if not target_type or candidate_type == target_type:
+                            candidates.append(node_id)
+            
+            # Loại bỏ duplicate candidates
+            candidates = list(set(candidates))
+            
+            best_match = None
+            best_score = 0
+            
+            for candidate in candidates:
+                candidate_norm = normalize_for_comparison(candidate)
+                candidate_type = merged["nodes"][candidate].get("label", "")
+                
+                # Kiểm tra type có khớp không
+                if target_type and candidate_type != target_type:
+                    continue
+                
+                # Tính điểm match tương tự như source
+                score = 0
+                if target_normalized in candidate_norm:
+                    score = 100 + len(target_normalized)
+                elif candidate_norm in target_normalized:
+                    score = 50 + len(candidate_norm)
+                else:
+                    matching_parts = sum(1 for part in target_parts if part in candidate_norm)
+                    if matching_parts > 0:
+                        score = matching_parts * 10
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = candidate
+            
+            if best_match:
+                target_node_id = best_match
+        
+        # CHỈ thêm relationship nếu CẢ HAI nodes đều tồn tại
+        # KHÔNG tạo node mới - chỉ dùng nodes đã có sẵn
+        if not source_node_id:
+            skipped_missing_nodes += 1
+            missing_source_stats[source_type] += 1
+            continue
+        
+        if not target_node_id:
+            skipped_missing_nodes += 1
+            missing_target_stats[target_type] += 1
+            continue
+        
+        # Dùng tên node gốc đã tồn tại
+        source = source_node_id
+        target = target_node_id
+        
+        # Check duplicate (dùng tên gốc đã tồn tại)
         key = (source, target, rel_type)
         if key in existing_edges_set:
             duplicate_relationships_count += 1
@@ -158,8 +472,8 @@ def merge_data(
             "properties": {
                 "confidence": rel.get("confidence", 0.0),
                 "method": rel.get("method", "unknown"),
-                "source_type": rel.get("source_type", ""),
-                "target_type": rel.get("target_type", "")
+                "source_type": source_type,
+                "target_type": target_type
             }
         })
         existing_edges_set.add(key)
@@ -167,6 +481,20 @@ def merge_data(
     
     print(f"  ✓ Đã thêm {new_relationships_count} relationships mới")
     print(f"  ✓ Đã bỏ qua {duplicate_relationships_count} relationships trùng lặp")
+    print(f"  ✓ Đã bỏ qua {skipped_missing_nodes} relationships (thiếu source/target node)")
+    
+    if skipped_missing_nodes > 0:
+        print(f"\n  📊 Thống kê relationships bị bỏ qua:")
+        if missing_source_stats:
+            print(f"    - Thiếu source node:")
+            for node_type, count in sorted(missing_source_stats.items(), key=lambda x: -x[1]):
+                print(f"      • {node_type}: {count}")
+        if missing_target_stats:
+            print(f"    - Thiếu target node:")
+            for node_type, count in sorted(missing_target_stats.items(), key=lambda x: -x[1]):
+                print(f"      • {node_type}: {count}")
+        print(f"\n  💡 Lưu ý: Các relationships này bị bỏ qua vì source/target node không tồn tại.")
+        print(f"     Đảm bảo các Artist từ infobox đã được thêm vào NER result trước khi merge.")
     
     # 5. Cập nhật metadata
     merged["metadata"]["total_nodes"] = len(merged["nodes"])
@@ -406,13 +734,13 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Merge 3 file JSON và import vào Neo4j")
-    parser.add_argument("--bfs-file", default="korean_artists_graph_bfs.json",
+    parser.add_argument("--bfs-file", default="data/korean_artists_graph_bfs.json",
                         help="File BFS graph JSON")
-    parser.add_argument("--ner-file", default="kpop_ner_result.json",
+    parser.add_argument("--ner-file", default="data/kpop_ner_result.json",
                         help="File NER result JSON")
-    parser.add_argument("--relationships-file", default="kpop_relationships_result.json",
+    parser.add_argument("--relationships-file", default="data/kpop_relationships_result.json",
                         help="File relationships result JSON")
-    parser.add_argument("--output-file", default="merged_kpop_data.json",
+    parser.add_argument("--output-file", default="data/merged_kpop_data.json",
                         help="File output merged")
     parser.add_argument("--neo4j-uri", default="bolt://localhost:7687",
                         help="Neo4j URI")

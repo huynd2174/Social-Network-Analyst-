@@ -128,3 +128,6 @@ Nếu script nào đó không hoạt động, kiểm tra đường dẫn file tr
 4. **Merge & Import**: `src/merge_and_import_neo4j.py` → `data/merged_kpop_data.json` + Neo4j
 5. **Analysis**: `notebooks/network_analysis.ipynb` → `outputs/*.png`
 
+
+
+

@@ -1,17 +1,17 @@
 {
   "metadata": {
     "description": "Thực thể K-pop được nhận dạng và lọc (Rule-based)",
-    "processed_at": "2025-12-05T14:19:18.955039",
+    "processed_at": "2025-12-06T19:20:02.601854",
     "total_records": 1260,
-    "raw_entities": 4272,
-    "merged_entities": 2991,
-    "final_entities": 2778,
+    "raw_entities": 4543,
+    "merged_entities": 3207,
+    "final_entities": 3045,
     "entities_by_type": {
-      "Artist": 718,
-      "Company": 83,
-      "Album": 542,
-      "Song": 1385,
-      "Group": 50
+      "Artist": 942,
+      "Company": 84,
+      "Album": 563,
+      "Song": 1405,
+      "Group": 51
     },
     "filter_criteria": [
       "Phải có context K-pop (>=3 từ khóa K-pop trong văn bản nguồn)",
@@ -23,109 +23,6 @@
     ]
   },
   "entities": [
-    {
-      "text": "Eunjung",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "T-ara",
-      "sources": [
-        "T-ara",
-        "Ham Eun-jeong",
-        "Park So-yeon (ca sĩ)",
-        "Qri",
-        "Supernova (South Korean band)",
-        "T-ara N4"
-      ]
-    },
-    {
-      "text": "Johnny",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "NCT 127",
-      "sources": [
-        "NCT 127",
-        "Hendery",
-        "NCT (nhóm nhạc)",
-        "NCT U",
-        "SM Rookies",
-        "Taeyong"
-      ]
-    },
-    {
-      "text": "Kris",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "EXO",
-      "sources": [
-        "EXO",
-        "Exodus (album của EXO)",
-        "Miracles in December",
-        "Overdose (EP)",
-        "Overdose (bài hát của EXO)"
-      ]
-    },
-    {
-      "text": "Kun",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "NCT U",
-      "sources": [
-        "NCT U",
-        "Haechan",
-        "Hendery",
-        "NCT (nhóm nhạc)",
-        "Tiền Côn"
-      ]
-    },
-    {
-      "text": "Lay",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "EXO",
-      "sources": [
-        "EXO",
-        "Chen (ca sĩ)",
-        "Don't Mess Up My Tempo",
-        "Lay Zhang",
-        "Miracles in December",
-        "NCT 127"
-      ]
-    },
-    {
-      "text": "RM",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "BTS",
-      "sources": [
-        "BTS",
-        "J-Hope",
-        "Mic Drop (bài hát)",
-        "RM (rapper)",
-        "Spring Day (bài hát)",
-        "V (ca sĩ)",
-        "Younha"
-      ]
-    },
-    {
-      "text": "Suga",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "BTS",
-      "sources": [
-        "BTS",
-        "Dark & Wild",
-        "J-Hope",
-        "Kim Seok-jin",
-        "V (ca sĩ)"
-      ]
-    },
     {
       "text": "Verbal Jint",
       "type": "Artist",
@@ -140,49 +37,6 @@
         "Girls' Generation",
         "I (Bài hát của Taeyeon)",
         "I (EP của Taeyeon)"
-      ]
-    },
-    {
-      "text": "Wheesung",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "YG Family",
-      "sources": [
-        "YG Family",
-        "Absolute First Album",
-        "T-ara",
-        "TWICE",
-        "Taeyang"
-      ]
-    },
-    {
-      "text": "Winwin",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "NCT U",
-      "sources": [
-        "NCT U",
-        "Haechan",
-        "Hendery",
-        "NCT (nhóm nhạc)",
-        "NCT 127",
-        "SM Rookies"
-      ]
-    },
-    {
-      "text": "Zico",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.95,
-      "source_node": "Block B",
-      "sources": [
-        "Block B",
-        "Dean (ca sĩ Hàn Quốc)",
-        "Jennie (ca sĩ)",
-        "Kim Se-jeong",
-        "Zico (rapper)"
       ]
     },
     {
@@ -577,13 +431,43 @@
       ]
     },
     {
-      "text": "Ahn Ji young",
+      "text": "A-na",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Hearts2Hearts",
+      "sources": [
+        "Hearts2Hearts"
+      ]
+    },
+    {
+      "text": "AJ",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "U-KISS",
+      "sources": [
+        "U-KISS"
+      ]
+    },
+    {
+      "text": "Ahn Ji-young",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Bolbbalgan4",
       "sources": [
         "Bolbbalgan4"
+      ]
+    },
+    {
+      "text": "Ahyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Babymonster",
+      "sources": [
+        "Babymonster"
       ]
     },
     {
@@ -617,6 +501,16 @@
       ]
     },
     {
+      "text": "Alexander Lee Eusebio",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "U-KISS",
+      "sources": [
+        "U-KISS"
+      ]
+    },
+    {
       "text": "Allen",
       "type": "Artist",
       "method": "infobox_members",
@@ -637,7 +531,7 @@
       ]
     },
     {
-      "text": "An Yu jin",
+      "text": "An Yu-jin",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -667,6 +561,16 @@
       ]
     },
     {
+      "text": "Aran",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Fifty Fifty",
+      "sources": [
+        "Fifty Fifty"
+      ]
+    },
+    {
       "text": "Arin",
       "type": "Artist",
       "method": "infobox_members",
@@ -683,9 +587,17 @@
       "confidence": 0.9,
       "source_node": "NU'EST",
       "sources": [
-        "NU'EST",
-        "Company_Pledis Entertainment",
-        "Ren (ca sĩ)"
+        "NU'EST"
+      ]
+    },
+    {
+      "text": "Asa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Babymonster",
+      "sources": [
+        "Babymonster"
       ]
     },
     {
@@ -709,15 +621,63 @@
       ]
     },
     {
+      "text": "B-Ryong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SSAK3",
+      "sources": [
+        "SSAK3"
+      ]
+    },
+    {
+      "text": "B.I",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "iKON",
+      "sources": [
+        "iKON"
+      ]
+    },
+    {
+      "text": "Bae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NMIXX",
+      "sources": [
+        "NMIXX"
+      ]
+    },
+    {
       "text": "Baekho",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "NU'EST",
       "sources": [
-        "NU'EST",
-        "JR (ca sĩ)",
-        "Ren (ca sĩ)"
+        "NU'EST"
+      ]
+    },
+    {
+      "text": "Baro",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "B1A4",
+      "sources": [
+        "B1A4"
+      ]
+    },
+    {
+      "text": "Bea Miller",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "K/DA",
+      "sources": [
+        "K/DA"
       ]
     },
     {
@@ -747,9 +707,7 @@
       "confidence": 0.9,
       "source_node": "iKON",
       "sources": [
-        "iKON",
-        "B.I (rapper)",
-        "Bobby (IKON)"
+        "iKON"
       ]
     },
     {
@@ -763,6 +721,16 @@
       ]
     },
     {
+      "text": "Bom",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2NE1",
+      "sources": [
+        "2NE1"
+      ]
+    },
+    {
       "text": "Bomin",
       "type": "Artist",
       "method": "infobox_members",
@@ -770,6 +738,36 @@
       "source_node": "Golden Child",
       "sources": [
         "Golden Child"
+      ]
+    },
+    {
+      "text": "Bora",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Cherry Bullet",
+      "sources": [
+        "Cherry Bullet"
+      ]
+    },
+    {
+      "text": "Boram",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "T-ara",
+      "sources": [
+        "T-ara"
+      ]
+    },
+    {
+      "text": "Brave Brothers",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
       ]
     },
     {
@@ -803,6 +801,26 @@
       ]
     },
     {
+      "text": "Cha Jun-ho",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "X1 (nhóm nhạc)",
+      "sources": [
+        "X1 (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Chae Dong-ha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SG Wannabe",
+      "sources": [
+        "SG Wannabe"
+      ]
+    },
+    {
       "text": "Chaein",
       "type": "Artist",
       "method": "infobox_members",
@@ -813,6 +831,16 @@
       ]
     },
     {
+      "text": "Chaekyung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "April (nhóm nhạc)",
+      "sources": [
+        "April (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Chaerin",
       "type": "Artist",
       "method": "infobox_members",
@@ -820,6 +848,36 @@
       "source_node": "Cherry Bullet",
       "sources": [
         "Cherry Bullet"
+      ]
+    },
+    {
+      "text": "Chaeryeong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ITZY",
+      "sources": [
+        "ITZY"
+      ]
+    },
+    {
+      "text": "Chaeyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TWICE",
+      "sources": [
+        "TWICE"
+      ]
+    },
+    {
+      "text": "Chan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "iKON",
+      "sources": [
+        "iKON"
       ]
     },
     {
@@ -840,6 +898,36 @@
       "source_node": "Teen Top",
       "sources": [
         "Teen Top"
+      ]
+    },
+    {
+      "text": "Changuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Drippin",
+      "sources": [
+        "Drippin"
+      ]
+    },
+    {
+      "text": "Chani",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SF9",
+      "sources": [
+        "SF9"
+      ]
+    },
+    {
+      "text": "Chansung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
       ]
     },
     {
@@ -873,6 +961,26 @@
       ]
     },
     {
+      "text": "Cho Myung-ik",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Turbo (ban nhạc Hàn Quốc)",
+      "sources": [
+        "Turbo (ban nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Choa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
+      ]
+    },
+    {
       "text": "Choerry",
       "type": "Artist",
       "method": "infobox_members",
@@ -880,6 +988,26 @@
       "source_node": "Loona (nhóm nhạc)",
       "sources": [
         "Loona (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Choi Hyunsuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Treasure",
+      "sources": [
+        "Treasure"
+      ]
+    },
+    {
+      "text": "Choi Kyu-sung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Black Eyed Pilseung",
+      "sources": [
+        "Black Eyed Pilseung"
       ]
     },
     {
@@ -933,6 +1061,16 @@
       ]
     },
     {
+      "text": "DK",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "iKON",
+      "sources": [
+        "iKON"
+      ]
+    },
+    {
       "text": "Daehyeon",
       "type": "Artist",
       "method": "infobox_members",
@@ -940,6 +1078,36 @@
       "source_node": "Wei (nhóm nhạc)",
       "sources": [
         "Wei (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Dahee",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Glam (nhóm nhạc)",
+      "sources": [
+        "Glam (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Dahyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Rocket Punch",
+      "sources": [
+        "Rocket Punch"
+      ]
+    },
+    {
+      "text": "Dami",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Dreamcatcher (nhóm nhạc)",
+      "sources": [
+        "Dreamcatcher (nhóm nhạc)"
       ]
     },
     {
@@ -955,6 +1123,16 @@
       ]
     },
     {
+      "text": "Danny Ahn",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "G.o.d",
+      "sources": [
+        "G.o.d"
+      ]
+    },
+    {
       "text": "Dara",
       "type": "Artist",
       "method": "infobox_members",
@@ -962,6 +1140,28 @@
       "source_node": "2NE1",
       "sources": [
         "2NE1"
+      ]
+    },
+    {
+      "text": "Dasom",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SISTAR",
+      "sources": [
+        "SISTAR"
+      ]
+    },
+    {
+      "text": "Davichi",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.9,
+      "source_node": "Company_Core Contents Media",
+      "sources": [
+        "Company_Core Contents Media",
+        "Ham Eun-jeong",
+        "T-ara"
       ]
     },
     {
@@ -975,6 +1175,16 @@
       ]
     },
     {
+      "text": "Dawon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WJSN",
+      "sources": [
+        "WJSN"
+      ]
+    },
+    {
       "text": "Daye",
       "type": "Artist",
       "method": "infobox_members",
@@ -985,6 +1195,16 @@
       ]
     },
     {
+      "text": "Dayoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WJSN",
+      "sources": [
+        "WJSN"
+      ]
+    },
+    {
       "text": "Dino",
       "type": "Artist",
       "method": "infobox_members",
@@ -992,6 +1212,16 @@
       "source_node": "Seventeen (nhóm nhạc)",
       "sources": [
         "Seventeen (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Dohwa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
       ]
     },
     {
@@ -1012,6 +1242,46 @@
       "source_node": "Verivery",
       "sources": [
         "Verivery"
+      ]
+    },
+    {
+      "text": "Donghae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
+      ]
+    },
+    {
+      "text": "Donghan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wei (nhóm nhạc)",
+      "sources": [
+        "Wei (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Donghyuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Blank2y",
+      "sources": [
+        "Blank2y"
+      ]
+    },
+    {
+      "text": "Dongkyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
       ]
     },
     {
@@ -1055,6 +1325,16 @@
       ]
     },
     {
+      "text": "E-Jae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
+      ]
+    },
+    {
       "text": "E:U",
       "type": "Artist",
       "method": "infobox_members",
@@ -1072,6 +1352,16 @@
       "source_node": "U-KISS",
       "sources": [
         "U-KISS"
+      ]
+    },
+    {
+      "text": "Elkie",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "CLC (nhóm nhạc)",
+      "sources": [
+        "CLC (nhóm nhạc)"
       ]
     },
     {
@@ -1105,7 +1395,7 @@
       ]
     },
     {
-      "text": "Euiwoong Lew",
+      "text": "Euiwoong",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -1115,15 +1405,43 @@
       ]
     },
     {
-      "text": "Eun woo",
+      "text": "Eun-woo",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Pristin V",
       "sources": [
-        "Pristin V",
-        "Cha Eun-woo",
-        "Moonbin"
+        "Pristin V"
+      ]
+    },
+    {
+      "text": "Eunbin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "CLC (nhóm nhạc)",
+      "sources": [
+        "CLC (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Eunji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brave Girls",
+      "sources": [
+        "Brave Girls"
+      ]
+    },
+    {
+      "text": "Eunjung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "T-ara",
+      "sources": [
+        "T-ara"
       ]
     },
     {
@@ -1137,15 +1455,43 @@
       ]
     },
     {
+      "text": "Eunyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brave Girls",
+      "sources": [
+        "Brave Girls"
+      ]
+    },
+    {
+      "text": "Fei",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Miss A",
+      "sources": [
+        "Miss A"
+      ]
+    },
+    {
       "text": "Felix",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Stray Kids",
       "sources": [
-        "Stray Kids",
-        "Felix Lee",
-        "Han (ca sĩ)"
+        "Stray Kids"
+      ]
+    },
+    {
+      "text": "Ga-in",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brown Eyed Girls",
+      "sources": [
+        "Brown Eyed Girls"
       ]
     },
     {
@@ -1169,6 +1515,36 @@
       ]
     },
     {
+      "text": "Gaga",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Nature (nhóm nhạc)",
+      "sources": [
+        "Nature (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Gahyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Dreamcatcher (nhóm nhạc)",
+      "sources": [
+        "Dreamcatcher (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Gayoon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "4Minute",
+      "sources": [
+        "4Minute"
+      ]
+    },
+    {
       "text": "Gayoung",
       "type": "Artist",
       "method": "infobox_members",
@@ -1176,6 +1552,16 @@
       "source_node": "Stellar",
       "sources": [
         "Stellar"
+      ]
+    },
+    {
+      "text": "Genki Sudo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
       ]
     },
     {
@@ -1219,6 +1605,16 @@
       ]
     },
     {
+      "text": "GyeHyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Verivery",
+      "sources": [
+        "Verivery"
+      ]
+    },
+    {
       "text": "Gyeongwon",
       "type": "Artist",
       "method": "infobox_members",
@@ -1239,6 +1635,16 @@
       ]
     },
     {
+      "text": "Gyuri",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
       "text": "HaSeul",
       "type": "Artist",
       "method": "infobox_members",
@@ -1246,6 +1652,16 @@
       "source_node": "Loona (nhóm nhạc)",
       "sources": [
         "Loona (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Haeryeong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
       ]
     },
     {
@@ -1279,13 +1695,33 @@
       ]
     },
     {
-      "text": "Hana Zinger",
+      "text": "Han Geng",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
-      "source_node": "Secret (nhóm nhạc)",
+      "source_node": "Super Junior",
       "sources": [
-        "Secret (nhóm nhạc)"
+        "Super Junior"
+      ]
+    },
+    {
+      "text": "Handong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Dreamcatcher (nhóm nhạc)",
+      "sources": [
+        "Dreamcatcher (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Hara",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)"
       ]
     },
     {
@@ -1339,6 +1775,36 @@
       ]
     },
     {
+      "text": "Heechul",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
+      ]
+    },
+    {
+      "text": "Heehyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "DIA (nhóm nhạc)",
+      "sources": [
+        "DIA (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Heejin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Loona (nhóm nhạc)",
+      "sources": [
+        "Loona (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Heeseung",
       "type": "Artist",
       "method": "infobox_members",
@@ -1355,9 +1821,7 @@
       "confidence": 0.9,
       "source_node": "Super Junior-M",
       "sources": [
-        "Super Junior-M",
-        "Chanyeol",
-        "SM Rookies"
+        "Super Junior-M"
       ]
     },
     {
@@ -1371,6 +1835,16 @@
       ]
     },
     {
+      "text": "Hero Jaejoong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TVXQ",
+      "sources": [
+        "TVXQ"
+      ]
+    },
+    {
       "text": "High.D",
       "type": "Artist",
       "method": "infobox_members",
@@ -1378,6 +1852,16 @@
       "source_node": "Sonamoo",
       "sources": [
         "Sonamoo"
+      ]
+    },
+    {
+      "text": "Himchan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "B.A.P",
+      "sources": [
+        "B.A.P"
       ]
     },
     {
@@ -1391,6 +1875,16 @@
       ]
     },
     {
+      "text": "Hitomi",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Say My Name (nhóm nhạc)",
+      "sources": [
+        "Say My Name (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "HoYoung",
       "type": "Artist",
       "method": "infobox_members",
@@ -1398,6 +1892,26 @@
       "source_node": "Verivery",
       "sources": [
         "Verivery"
+      ]
+    },
+    {
+      "text": "Hong Hye-ju",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Classy (nhóm nhạc)",
+      "sources": [
+        "Classy (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Hong Seong-jun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BDC (nhóm nhạc)",
+      "sources": [
+        "BDC (nhóm nhạc)"
       ]
     },
     {
@@ -1431,6 +1945,16 @@
       ]
     },
     {
+      "text": "Hoony",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
+      ]
+    },
+    {
       "text": "Hoshi",
       "type": "Artist",
       "method": "infobox_members",
@@ -1441,7 +1965,7 @@
       ]
     },
     {
-      "text": "Huh Yun jin",
+      "text": "Huh Yun-jin",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -1481,6 +2005,16 @@
       ]
     },
     {
+      "text": "Hwanhee",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "UP10TION",
+      "sources": [
+        "UP10TION"
+      ]
+    },
+    {
       "text": "Hwanwoong",
       "type": "Artist",
       "method": "infobox_members",
@@ -1501,6 +2035,36 @@
       ]
     },
     {
+      "text": "Hwayoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "T-ara",
+      "sources": [
+        "T-ara"
+      ]
+    },
+    {
+      "text": "Hyejeong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
+      ]
+    },
+    {
+      "text": "Hyelin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
+      ]
+    },
+    {
       "text": "Hyeongjun",
       "type": "Artist",
       "method": "infobox_members",
@@ -1508,6 +2072,16 @@
       "source_node": "Cravity",
       "sources": [
         "Cravity"
+      ]
+    },
+    {
+      "text": "Hyeongseop",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Hyeongseop X Euiwoong",
+      "sources": [
+        "Hyeongseop X Euiwoong"
       ]
     },
     {
@@ -1531,6 +2105,36 @@
       ]
     },
     {
+      "text": "Hyeri",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girl's Day",
+      "sources": [
+        "Girl's Day"
+      ]
+    },
+    {
+      "text": "Hyerim",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wonder Girls",
+      "sources": [
+        "Wonder Girls"
+      ]
+    },
+    {
+      "text": "Hyeryung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Bestie",
+      "sources": [
+        "Bestie"
+      ]
+    },
+    {
       "text": "Hyoeun",
       "type": "Artist",
       "method": "infobox_members",
@@ -1551,6 +2155,16 @@
       ]
     },
     {
+      "text": "Hyoyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "5dolls",
+      "sources": [
+        "5dolls"
+      ]
+    },
+    {
       "text": "Hyun Seong",
       "type": "Artist",
       "method": "infobox_members",
@@ -1561,6 +2175,36 @@
       ]
     },
     {
+      "text": "Hyunbin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Tri.be",
+      "sources": [
+        "Tri.be"
+      ]
+    },
+    {
+      "text": "Hyunjin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Loona (nhóm nhạc)",
+      "sources": [
+        "Loona (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Hyunseung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Trouble Maker",
+      "sources": [
+        "Trouble Maker"
+      ]
+    },
+    {
       "text": "Hyunyoung",
       "type": "Artist",
       "method": "infobox_members",
@@ -1568,6 +2212,16 @@
       "source_node": "Rainbow (nhóm nhạc Hàn Quốc)",
       "sources": [
         "Rainbow (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Ian",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Hearts2Hearts",
+      "sources": [
+        "Hearts2Hearts"
       ]
     },
     {
@@ -1591,6 +2245,16 @@
       ]
     },
     {
+      "text": "Inseong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SF9",
+      "sources": [
+        "SF9"
+      ]
+    },
+    {
       "text": "Ireh",
       "type": "Artist",
       "method": "infobox_members",
@@ -1611,6 +2275,56 @@
       ]
     },
     {
+      "text": "Isa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "STAYC",
+      "sources": [
+        "STAYC"
+      ]
+    },
+    {
+      "text": "Isak",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Isak N Jiyeon",
+      "sources": [
+        "Isak N Jiyeon"
+      ]
+    },
+    {
+      "text": "Jackson",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GOT7",
+      "sources": [
+        "GOT7"
+      ]
+    },
+    {
+      "text": "Jae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Day6",
+      "sources": [
+        "Day6"
+      ]
+    },
+    {
+      "text": "Jaebeom",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
+      ]
+    },
+    {
       "text": "Jaehee",
       "type": "Artist",
       "method": "infobox_members",
@@ -1618,6 +2332,16 @@
       "source_node": "NCT Wish",
       "sources": [
         "NCT Wish"
+      ]
+    },
+    {
+      "text": "Jaejoong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "JYJ",
+      "sources": [
+        "JYJ"
       ]
     },
     {
@@ -1661,6 +2385,46 @@
       ]
     },
     {
+      "text": "Jang Su-won",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Sechs Kies",
+      "sources": [
+        "Sechs Kies"
+      ]
+    },
+    {
+      "text": "Jang Woo-hyuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "H.O.T.",
+      "sources": [
+        "H.O.T."
+      ]
+    },
+    {
+      "text": "Jay",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ENHYPEN",
+      "sources": [
+        "ENHYPEN"
+      ]
+    },
+    {
+      "text": "JayB",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GOT7",
+      "sources": [
+        "GOT7"
+      ]
+    },
+    {
       "text": "Jea",
       "type": "Artist",
       "method": "infobox_members",
@@ -1671,7 +2435,7 @@
       ]
     },
     {
-      "text": "Jeon Do yum",
+      "text": "Jeon Do-yum",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -1691,7 +2455,7 @@
       ]
     },
     {
-      "text": "Jeong Taek hyeon",
+      "text": "Jeong Taek-hyeon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -1711,6 +2475,26 @@
       ]
     },
     {
+      "text": "Jeonghwa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
+      ]
+    },
+    {
+      "text": "Jeongyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TWICE",
+      "sources": [
+        "TWICE"
+      ]
+    },
+    {
       "text": "Jeonyul",
       "type": "Artist",
       "method": "infobox_members",
@@ -1727,21 +2511,7 @@
       "confidence": 0.9,
       "source_node": "Girls' Generation",
       "sources": [
-        "Girls' Generation",
-        "Jessica Jung",
-        "Lion Heart (album của Girls' Generation)"
-      ]
-    },
-    {
-      "text": "Ji Yoon",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.9,
-      "source_node": "2YOON",
-      "sources": [
-        "2YOON",
-        "Jeon Ji-yoon",
-        "Weeekly"
+        "Girls' Generation"
       ]
     },
     {
@@ -1752,6 +2522,26 @@
       "source_node": "Dreamcatcher (nhóm nhạc)",
       "sources": [
         "Dreamcatcher (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Jia",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Miss A",
+      "sources": [
+        "Miss A"
+      ]
+    },
+    {
+      "text": "Jiae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Lovelyz",
+      "sources": [
+        "Lovelyz"
       ]
     },
     {
@@ -1815,6 +2605,26 @@
       ]
     },
     {
+      "text": "Jihyo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TWICE",
+      "sources": [
+        "TWICE"
+      ]
+    },
+    {
+      "text": "Jihyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "4Minute",
+      "sources": [
+        "4Minute"
+      ]
+    },
+    {
       "text": "Jiin",
       "type": "Artist",
       "method": "infobox_members",
@@ -1822,6 +2632,16 @@
       "source_node": "Girl's Day",
       "sources": [
         "Girl's Day"
+      ]
+    },
+    {
+      "text": "Jin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BTS",
+      "sources": [
+        "BTS"
       ]
     },
     {
@@ -1895,6 +2715,16 @@
       ]
     },
     {
+      "text": "Jinyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GOT7",
+      "sources": [
+        "GOT7"
+      ]
+    },
+    {
       "text": "Jisook",
       "type": "Artist",
       "method": "infobox_members",
@@ -1915,6 +2745,16 @@
       ]
     },
     {
+      "text": "Jiwon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Cherry Bullet",
+      "sources": [
+        "Cherry Bullet"
+      ]
+    },
+    {
       "text": "Jiwoo",
       "type": "Artist",
       "method": "infobox_members",
@@ -1922,6 +2762,36 @@
       "source_node": "NMIXX",
       "sources": [
         "NMIXX"
+      ]
+    },
+    {
+      "text": "Jiyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "T-ara",
+      "sources": [
+        "T-ara"
+      ]
+    },
+    {
+      "text": "Jiyoon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "4Minute",
+      "sources": [
+        "4Minute"
+      ]
+    },
+    {
+      "text": "Jiyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)"
       ]
     },
     {
@@ -1945,6 +2815,16 @@
       ]
     },
     {
+      "text": "Johnny",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT 127",
+      "sources": [
+        "NCT 127"
+      ]
+    },
+    {
       "text": "Johyun",
       "type": "Artist",
       "method": "infobox_members",
@@ -1965,6 +2845,26 @@
       ]
     },
     {
+      "text": "Jonghyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SHINee",
+      "sources": [
+        "SHINee"
+      ]
+    },
+    {
+      "text": "Jongkook",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Speed (nhóm nhạc)",
+      "sources": [
+        "Speed (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Joohoney",
       "type": "Artist",
       "method": "infobox_members",
@@ -1972,6 +2872,16 @@
       "source_node": "Monsta X",
       "sources": [
         "Monsta X"
+      ]
+    },
+    {
+      "text": "Jooyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "After School (nhóm nhạc)",
+      "sources": [
+        "After School (nhóm nhạc)"
       ]
     },
     {
@@ -1985,6 +2895,16 @@
       ]
     },
     {
+      "text": "Ju-ne",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "iKON",
+      "sources": [
+        "iKON"
+      ]
+    },
+    {
       "text": "Juhyeon",
       "type": "Artist",
       "method": "infobox_members",
@@ -1992,6 +2912,26 @@
       "source_node": "Lightsum",
       "sources": [
         "Lightsum"
+      ]
+    },
+    {
+      "text": "Juhyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Spica (nhóm nhạc)",
+      "sources": [
+        "Spica (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Jun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "U-KISS",
+      "sources": [
+        "U-KISS"
       ]
     },
     {
@@ -2015,7 +2955,7 @@
       ]
     },
     {
-      "text": "Jung Jin sung",
+      "text": "Jung Jin-sung",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2035,6 +2975,16 @@
       ]
     },
     {
+      "text": "Jungmo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Cravity",
+      "sources": [
+        "Cravity"
+      ]
+    },
+    {
       "text": "Jungwon",
       "type": "Artist",
       "method": "infobox_members",
@@ -2042,6 +2992,26 @@
       "source_node": "ENHYPEN",
       "sources": [
         "ENHYPEN"
+      ]
+    },
+    {
+      "text": "Junho",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
+      ]
+    },
+    {
+      "text": "Junhyeok",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Day6",
+      "sources": [
+        "Day6"
       ]
     },
     {
@@ -2065,6 +3035,26 @@
       ]
     },
     {
+      "text": "Junsu",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "JYJ",
+      "sources": [
+        "JYJ"
+      ]
+    },
+    {
+      "text": "Juri",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Rocket Punch",
+      "sources": [
+        "Rocket Punch"
+      ]
+    },
+    {
       "text": "Juun",
       "type": "Artist",
       "method": "infobox_members",
@@ -2085,7 +3075,17 @@
       ]
     },
     {
-      "text": "Kang Hye won",
+      "text": "Kaeun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "After School (nhóm nhạc)",
+      "sources": [
+        "After School (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Kang Hye-won",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2095,13 +3095,33 @@
       ]
     },
     {
-      "text": "Kang Min hee",
+      "text": "Kang Min-hee",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "X1 (nhóm nhạc)",
       "sources": [
         "X1 (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Kang Min-kyung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Davichi",
+      "sources": [
+        "Davichi"
+      ]
+    },
+    {
+      "text": "KangMin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Verivery",
+      "sources": [
+        "Verivery"
       ]
     },
     {
@@ -2125,6 +3145,16 @@
       ]
     },
     {
+      "text": "Kazuha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "LE SSERAFIM",
+      "sources": [
+        "LE SSERAFIM"
+      ]
+    },
+    {
       "text": "Keena",
       "type": "Artist",
       "method": "infobox_members",
@@ -2132,6 +3162,16 @@
       "source_node": "Fifty Fifty",
       "sources": [
         "Fifty Fifty"
+      ]
+    },
+    {
+      "text": "Keisuke Kimura",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
       ]
     },
     {
@@ -2165,7 +3205,7 @@
       ]
     },
     {
-      "text": "Ki O",
+      "text": "Ki-O",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2175,7 +3215,47 @@
       ]
     },
     {
-      "text": "Kim Ga ram",
+      "text": "Kibum",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
+      ]
+    },
+    {
+      "text": "Kim Chae-won",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "IZ*ONE",
+      "sources": [
+        "IZ*ONE"
+      ]
+    },
+    {
+      "text": "Kim Chung-ha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "I.O.I",
+      "sources": [
+        "I.O.I"
+      ]
+    },
+    {
+      "text": "Kim Dong-wan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Shinhwa",
+      "sources": [
+        "Shinhwa"
+      ]
+    },
+    {
+      "text": "Kim Ga-ram",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2205,6 +3285,26 @@
       ]
     },
     {
+      "text": "Kim Jae-duc",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Sechs Kies",
+      "sources": [
+        "Sechs Kies"
+      ]
+    },
+    {
+      "text": "Kim Jin-ho",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SG Wannabe",
+      "sources": [
+        "SG Wannabe"
+      ]
+    },
+    {
       "text": "Kim Jiwoong",
       "type": "Artist",
       "method": "infobox_members",
@@ -2215,13 +3315,33 @@
       ]
     },
     {
-      "text": "Kim Jun seo",
+      "text": "Kim Jun-seo",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "1the9",
       "sources": [
         "1the9"
+      ]
+    },
+    {
+      "text": "Kim Jung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Turbo (ban nhạc Hàn Quốc)",
+      "sources": [
+        "Turbo (ban nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Kim Jung-seung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Duble Sidekick",
+      "sources": [
+        "Duble Sidekick"
       ]
     },
     {
@@ -2265,7 +3385,7 @@
       ]
     },
     {
-      "text": "Kim Ri won",
+      "text": "Kim Ri-won",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2275,13 +3395,23 @@
       ]
     },
     {
-      "text": "Kim Seon you",
+      "text": "Kim Seon-you",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Classy (nhóm nhạc)",
       "sources": [
         "Classy (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Kim Si-hun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BDC (nhóm nhạc)",
+      "sources": [
+        "BDC (nhóm nhạc)"
       ]
     },
     {
@@ -2295,7 +3425,27 @@
       ]
     },
     {
-      "text": "Kim Yong jun",
+      "text": "Kim Tae-woo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "G.o.d",
+      "sources": [
+        "G.o.d"
+      ]
+    },
+    {
+      "text": "Kim Yong-guk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "JBJ (nhóm nhạc)",
+      "sources": [
+        "JBJ (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Kim Yong-jun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2325,6 +3475,16 @@
       ]
     },
     {
+      "text": "Kiyoyuki Sakiyama",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
+      ]
+    },
+    {
       "text": "Kogyeol",
       "type": "Artist",
       "method": "infobox_members",
@@ -2335,15 +3495,33 @@
       ]
     },
     {
+      "text": "Kosuke Shizunaga",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
+      ]
+    },
+    {
+      "text": "Kris",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXO",
+      "sources": [
+        "EXO"
+      ]
+    },
+    {
       "text": "Krystal",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "F(x) (nhóm nhạc)",
       "sources": [
-        "F(x) (nhóm nhạc)",
-        "Jessica Jung",
-        "Krystal Jung"
+        "F(x) (nhóm nhạc)"
       ]
     },
     {
@@ -2354,6 +3532,16 @@
       "source_node": "UP10TION",
       "sources": [
         "UP10TION"
+      ]
+    },
+    {
+      "text": "Kun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT U",
+      "sources": [
+        "NCT U"
       ]
     },
     {
@@ -2377,13 +3565,33 @@
       ]
     },
     {
-      "text": "Kwon Kwang jin",
+      "text": "Kwon Jung-yeol",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "10cm (nhóm nhạc)",
+      "sources": [
+        "10cm (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Kwon Kwang-jin",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "N.Flying",
       "sources": [
         "N.Flying"
+      ]
+    },
+    {
+      "text": "Kyuhyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
       ]
     },
     {
@@ -2394,6 +3602,16 @@
       "source_node": "NMIXX",
       "sources": [
         "NMIXX"
+      ]
+    },
+    {
+      "text": "Kyulkyung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Pristin V",
+      "sources": [
+        "Pristin V"
       ]
     },
     {
@@ -2417,6 +3635,56 @@
       ]
     },
     {
+      "text": "LE",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
+      ]
+    },
+    {
+      "text": "Lay",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXO",
+      "sources": [
+        "EXO"
+      ]
+    },
+    {
+      "text": "Lee Chan-hyuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AKMU",
+      "sources": [
+        "AKMU"
+      ]
+    },
+    {
+      "text": "Lee Eun-sang",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "X1 (nhóm nhạc)",
+      "sources": [
+        "X1 (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Lee Hae-ri",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Davichi",
+      "sources": [
+        "Davichi"
+      ]
+    },
+    {
       "text": "Lee Hongki",
       "type": "Artist",
       "method": "infobox_members",
@@ -2427,7 +3695,17 @@
       ]
     },
     {
-      "text": "Lee Jae hee",
+      "text": "Lee Jae Jin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "FT Island",
+      "sources": [
+        "FT Island"
+      ]
+    },
+    {
+      "text": "Lee Jae-hee",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2437,7 +3715,7 @@
       ]
     },
     {
-      "text": "Lee Jae won",
+      "text": "Lee Jae-won",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2447,7 +3725,17 @@
       ]
     },
     {
-      "text": "Lee Seok hoon",
+      "text": "Lee Min-woo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Shinhwa",
+      "sources": [
+        "Shinhwa"
+      ]
+    },
+    {
+      "text": "Lee Seok-hoon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2457,7 +3745,7 @@
       ]
     },
     {
-      "text": "Lee Seung hwan",
+      "text": "Lee Seung-hwan",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2467,7 +3755,7 @@
       ]
     },
     {
-      "text": "Lee Seung hyub",
+      "text": "Lee Seung-hyub",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2477,7 +3765,7 @@
       ]
     },
     {
-      "text": "Lee Soo jin",
+      "text": "Lee Soo-jin",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2487,7 +3775,7 @@
       ]
     },
     {
-      "text": "Lee Su hyun",
+      "text": "Lee Su-hyun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2533,9 +3821,7 @@
       "confidence": 0.9,
       "source_node": "YG Family",
       "sources": [
-        "YG Family",
-        "Park Bom",
-        "Taeyang"
+        "YG Family"
       ]
     },
     {
@@ -2549,6 +3835,26 @@
       ]
     },
     {
+      "text": "Lim Na-young",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "I.O.I",
+      "sources": [
+        "I.O.I"
+      ]
+    },
+    {
+      "text": "Lim Seul-ong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2AM",
+      "sources": [
+        "2AM"
+      ]
+    },
+    {
       "text": "Linda G",
       "type": "Artist",
       "method": "infobox_members",
@@ -2556,6 +3862,16 @@
       "source_node": "SSAK3",
       "sources": [
         "SSAK3"
+      ]
+    },
+    {
+      "text": "Lisa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BLACKPINK",
+      "sources": [
+        "BLACKPINK"
       ]
     },
     {
@@ -2575,10 +3891,7 @@
       "confidence": 0.9,
       "source_node": "SuperM",
       "sources": [
-        "SuperM",
-        "Hendery",
-        "NCT (nhóm nhạc)",
-        "NCT U"
+        "SuperM"
       ]
     },
     {
@@ -2599,6 +3912,16 @@
       "source_node": "NiziU",
       "sources": [
         "NiziU"
+      ]
+    },
+    {
+      "text": "Mark",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT 127",
+      "sources": [
+        "NCT 127"
       ]
     },
     {
@@ -2632,6 +3955,16 @@
       ]
     },
     {
+      "text": "Masta Wu",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
+      ]
+    },
+    {
       "text": "Max Changmin",
       "type": "Artist",
       "method": "infobox_members",
@@ -2649,6 +3982,16 @@
       "source_node": "Cherry Bullet",
       "sources": [
         "Cherry Bullet"
+      ]
+    },
+    {
+      "text": "Mayuka",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NiziU",
+      "sources": [
+        "NiziU"
       ]
     },
     {
@@ -2722,6 +4065,26 @@
       ]
     },
     {
+      "text": "Mina",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
+      ]
+    },
+    {
+      "text": "Minah",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girl's Day",
+      "sources": [
+        "Girl's Day"
+      ]
+    },
+    {
       "text": "Mingi",
       "type": "Artist",
       "method": "infobox_members",
@@ -2752,6 +4115,26 @@
       ]
     },
     {
+      "text": "Minho",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SHINee",
+      "sources": [
+        "SHINee"
+      ]
+    },
+    {
+      "text": "Minhyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NU'EST",
+      "sources": [
+        "NU'EST"
+      ]
+    },
+    {
       "text": "Minjae",
       "type": "Artist",
       "method": "infobox_members",
@@ -2762,6 +4145,16 @@
       ]
     },
     {
+      "text": "Minju",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Illit (nhóm nhạc)",
+      "sources": [
+        "Illit (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Minkyeung",
       "type": "Artist",
       "method": "infobox_members",
@@ -2769,6 +4162,26 @@
       "source_node": "HINAPIA",
       "sources": [
         "HINAPIA"
+      ]
+    },
+    {
+      "text": "Minkyung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "The SeeYa",
+      "sources": [
+        "The SeeYa"
+      ]
+    },
+    {
+      "text": "Mino",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WINNER",
+      "sources": [
+        "WINNER"
       ]
     },
     {
@@ -2798,9 +4211,7 @@
       "confidence": 0.9,
       "source_node": "Cherry Bullet",
       "sources": [
-        "Cherry Bullet",
-        "Company_DSP Media",
-        "Company_Daesung Entertainment"
+        "Cherry Bullet"
       ]
     },
     {
@@ -2814,6 +4225,16 @@
       ]
     },
     {
+      "text": "Miryo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brown Eyed Girls",
+      "sources": [
+        "Brown Eyed Girls"
+      ]
+    },
+    {
       "text": "Miso",
       "type": "Artist",
       "method": "infobox_members",
@@ -2821,6 +4242,26 @@
       "source_node": "Glam (nhóm nhạc)",
       "sources": [
         "Glam (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Mithra Jin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Epik High",
+      "sources": [
+        "Epik High"
+      ]
+    },
+    {
+      "text": "Miyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "(G)I-dle",
+      "sources": [
+        "(G)I-dle"
       ]
     },
     {
@@ -2834,6 +4275,16 @@
       ]
     },
     {
+      "text": "Momo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TWICE",
+      "sources": [
+        "TWICE"
+      ]
+    },
+    {
       "text": "Monday",
       "type": "Artist",
       "method": "infobox_members",
@@ -2844,7 +4295,7 @@
       ]
     },
     {
-      "text": "Moon Hee joon",
+      "text": "Moon Hee-joon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2864,7 +4315,7 @@
       ]
     },
     {
-      "text": "Myung Hyung seo",
+      "text": "Myung Hyung-seo",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2881,6 +4332,16 @@
       "source_node": "PURPLE KISS",
       "sources": [
         "PURPLE KISS"
+      ]
+    },
+    {
+      "text": "Naeun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "April (nhóm nhạc)",
+      "sources": [
+        "April (nhóm nhạc)"
       ]
     },
     {
@@ -2904,7 +4365,7 @@
       ]
     },
     {
-      "text": "Nam Do hyon",
+      "text": "Nam Do-hyon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -2924,6 +4385,16 @@
       ]
     },
     {
+      "text": "Nayoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Lightsum",
+      "sources": [
+        "Lightsum"
+      ]
+    },
+    {
       "text": "New Sun",
       "type": "Artist",
       "method": "infobox_members",
@@ -2934,6 +4405,26 @@
       ]
     },
     {
+      "text": "Ni-ki",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ENHYPEN",
+      "sources": [
+        "ENHYPEN"
+      ]
+    },
+    {
+      "text": "Nichkhun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
+      ]
+    },
+    {
       "text": "Nicole",
       "type": "Artist",
       "method": "infobox_members",
@@ -2941,6 +4432,26 @@
       "source_node": "Kara (nhóm nhạc Hàn Quốc)",
       "sources": [
         "Kara (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Niel",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Teen Top",
+      "sources": [
+        "Teen Top"
+      ]
+    },
+    {
+      "text": "Nina",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NiziU",
+      "sources": [
+        "NiziU"
       ]
     },
     {
@@ -2961,6 +4472,16 @@
       "source_node": "Rainbow (nhóm nhạc Hàn Quốc)",
       "sources": [
         "Rainbow (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Noh Tae-hyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "JBJ (nhóm nhạc)",
+      "sources": [
+        "JBJ (nhóm nhạc)"
       ]
     },
     {
@@ -2994,7 +4515,17 @@
       ]
     },
     {
-      "text": "Park Bo eun",
+      "text": "P.O",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Block B",
+      "sources": [
+        "Block B"
+      ]
+    },
+    {
+      "text": "Park Bo-eun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3014,6 +4545,16 @@
       ]
     },
     {
+      "text": "Park Jang-geun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Duble Sidekick",
+      "sources": [
+        "Duble Sidekick"
+      ]
+    },
+    {
       "text": "Park Jieun",
       "type": "Artist",
       "method": "infobox_members",
@@ -3024,7 +4565,17 @@
       ]
     },
     {
-      "text": "Park Joon hyung",
+      "text": "Park Jimin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "15&",
+      "sources": [
+        "15&"
+      ]
+    },
+    {
+      "text": "Park Joon-hyung",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3054,7 +4605,7 @@
       ]
     },
     {
-      "text": "Park So eun",
+      "text": "Park So-eun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3064,7 +4615,7 @@
       ]
     },
     {
-      "text": "Park Sung won",
+      "text": "Park Sung-won",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3094,6 +4645,16 @@
       ]
     },
     {
+      "text": "RM",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BTS",
+      "sources": [
+        "BTS"
+      ]
+    },
+    {
       "text": "Rami",
       "type": "Artist",
       "method": "infobox_members",
@@ -3101,6 +4662,16 @@
       "source_node": "Babymonster",
       "sources": [
         "Babymonster"
+      ]
+    },
+    {
+      "text": "Ravi",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "VIXX",
+      "sources": [
+        "VIXX"
       ]
     },
     {
@@ -3124,15 +4695,23 @@
       ]
     },
     {
+      "text": "Rena",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Pristin V",
+      "sources": [
+        "Pristin V"
+      ]
+    },
+    {
       "text": "Renjun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "NCT Dream",
       "sources": [
-        "NCT Dream",
-        "Haechan",
-        "NCT (nhóm nhạc)"
+        "NCT Dream"
       ]
     },
     {
@@ -3143,6 +4722,16 @@
       "source_node": "Teen Top",
       "sources": [
         "Teen Top"
+      ]
+    },
+    {
+      "text": "Riku",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT Wish",
+      "sources": [
+        "NCT Wish"
       ]
     },
     {
@@ -3176,6 +4765,16 @@
       ]
     },
     {
+      "text": "Roa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Pristin V",
+      "sources": [
+        "Pristin V"
+      ]
+    },
+    {
       "text": "Rora",
       "type": "Artist",
       "method": "infobox_members",
@@ -3183,6 +4782,26 @@
       "source_node": "Babymonster",
       "sources": [
         "Babymonster"
+      ]
+    },
+    {
+      "text": "Ruka",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Babymonster",
+      "sources": [
+        "Babymonster"
+      ]
+    },
+    {
+      "text": "Ryeowook",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
       ]
     },
     {
@@ -3197,6 +4816,26 @@
     },
     {
       "text": "Ryo Noguchi",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
+      ]
+    },
+    {
+      "text": "Ryujin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ITZY",
+      "sources": [
+        "ITZY"
+      ]
+    },
+    {
+      "text": "Ryuta Tomita",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3226,6 +4865,16 @@
       ]
     },
     {
+      "text": "Sakura",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "LE SSERAFIM",
+      "sources": [
+        "LE SSERAFIM"
+      ]
+    },
+    {
       "text": "Sakuya",
       "type": "Artist",
       "method": "infobox_members",
@@ -3246,6 +4895,36 @@
       ]
     },
     {
+      "text": "Sana",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "TWICE",
+      "sources": [
+        "TWICE"
+      ]
+    },
+    {
+      "text": "Sangah",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Lightsum",
+      "sources": [
+        "Lightsum"
+      ]
+    },
+    {
+      "text": "Sean",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Jinusean",
+      "sources": [
+        "Jinusean"
+      ]
+    },
+    {
       "text": "Seeun",
       "type": "Artist",
       "method": "infobox_members",
@@ -3253,6 +4932,16 @@
       "source_node": "STAYC",
       "sources": [
         "STAYC"
+      ]
+    },
+    {
+      "text": "Sehun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXO",
+      "sources": [
+        "EXO"
       ]
     },
     {
@@ -3266,6 +4955,16 @@
       ]
     },
     {
+      "text": "Sejeong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Gugudan",
+      "sources": [
+        "Gugudan"
+      ]
+    },
+    {
       "text": "Sejoon",
       "type": "Artist",
       "method": "infobox_members",
@@ -3273,6 +4972,16 @@
       "source_node": "Speed (nhóm nhạc)",
       "sources": [
         "Speed (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Seo-a",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brave Girls",
+      "sources": [
+        "Brave Girls"
       ]
     },
     {
@@ -3293,6 +5002,16 @@
       "source_node": "Wei (nhóm nhạc)",
       "sources": [
         "Wei (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Seolhyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
       ]
     },
     {
@@ -3356,6 +5075,16 @@
       ]
     },
     {
+      "text": "Seungah",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Rainbow (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Rainbow (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
       "text": "Seunghan",
       "type": "Artist",
       "method": "infobox_members",
@@ -3386,15 +5115,43 @@
       ]
     },
     {
+      "text": "Seungmin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Stray Kids",
+      "sources": [
+        "Stray Kids"
+      ]
+    },
+    {
       "text": "Seungri",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Big Bang (nhóm nhạc)",
       "sources": [
-        "Big Bang (nhóm nhạc)",
-        "Jennie (ca sĩ)",
-        "Taeyang"
+        "Big Bang (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Seungyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Seungyoon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WINNER",
+      "sources": [
+        "WINNER"
       ]
     },
     {
@@ -3428,7 +5185,17 @@
       ]
     },
     {
-      "text": "Shin Ji yoon",
+      "text": "Shin Hye-sung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Shinhwa",
+      "sources": [
+        "Shinhwa"
+      ]
+    },
+    {
+      "text": "Shin Ji-yoon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3438,7 +5205,7 @@
       ]
     },
     {
-      "text": "Shin Ye chan",
+      "text": "Shin Ye-chan",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3478,6 +5245,16 @@
       ]
     },
     {
+      "text": "Shownu",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Monsta X",
+      "sources": [
+        "Monsta X"
+      ]
+    },
+    {
       "text": "Shuhua",
       "type": "Artist",
       "method": "infobox_members",
@@ -3505,6 +5282,36 @@
       "source_node": "Everglow",
       "sources": [
         "Everglow"
+      ]
+    },
+    {
+      "text": "Sio",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Fifty Fifty",
+      "sources": [
+        "Fifty Fifty"
+      ]
+    },
+    {
+      "text": "Sion",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT Wish",
+      "sources": [
+        "NCT Wish"
+      ]
+    },
+    {
+      "text": "Siwon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
       ]
     },
     {
@@ -3538,6 +5345,16 @@
       ]
     },
     {
+      "text": "Skull",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
+      ]
+    },
+    {
       "text": "Sodam",
       "type": "Artist",
       "method": "infobox_members",
@@ -3558,7 +5375,47 @@
       ]
     },
     {
-      "text": "Son Dong pyo",
+      "text": "Sohee",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "RIIZE",
+      "sources": [
+        "RIIZE"
+      ]
+    },
+    {
+      "text": "Sohyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "4Minute",
+      "sources": [
+        "4Minute"
+      ]
+    },
+    {
+      "text": "Sojin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girl's Day",
+      "sources": [
+        "Girl's Day"
+      ]
+    },
+    {
+      "text": "Solji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
+      ]
+    },
+    {
+      "text": "Son Dong-pyo",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3568,13 +5425,43 @@
       ]
     },
     {
-      "text": "Song Hyeong jun",
+      "text": "Son Ho-young",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "G.o.d",
+      "sources": [
+        "G.o.d"
+      ]
+    },
+    {
+      "text": "Song Hyeong-jun",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "X1 (nhóm nhạc)",
       "sources": [
         "X1 (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Song Jihyuk",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Supernova (South Korean band)",
+      "sources": [
+        "Supernova (South Korean band)"
+      ]
+    },
+    {
+      "text": "Song Joo-young",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Black Eyed Pilseung",
+      "sources": [
+        "Black Eyed Pilseung"
       ]
     },
     {
@@ -3585,6 +5472,66 @@
       "source_node": "Tri.be",
       "sources": [
         "Tri.be"
+      ]
+    },
+    {
+      "text": "Soobin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WJSN",
+      "sources": [
+        "WJSN"
+      ]
+    },
+    {
+      "text": "Soojin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "(G)I-dle",
+      "sources": [
+        "(G)I-dle"
+      ]
+    },
+    {
+      "text": "Soomi",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "5dolls",
+      "sources": [
+        "5dolls"
+      ]
+    },
+    {
+      "text": "Sooyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girls' Generation",
+      "sources": [
+        "Girls' Generation"
+      ]
+    },
+    {
+      "text": "Sowon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GFriend",
+      "sources": [
+        "GFriend"
+      ]
+    },
+    {
+      "text": "Soyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "(G)I-dle",
+      "sources": [
+        "(G)I-dle"
       ]
     },
     {
@@ -3648,6 +5595,16 @@
       ]
     },
     {
+      "text": "Suga",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BTS",
+      "sources": [
+        "BTS"
+      ]
+    },
+    {
       "text": "Suhyeon",
       "type": "Artist",
       "method": "infobox_members",
@@ -3655,6 +5612,26 @@
       "source_node": "Billlie",
       "sources": [
         "Billlie"
+      ]
+    },
+    {
+      "text": "Suji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "The Ark (ban nhạc Hàn Quốc)",
+      "sources": [
+        "The Ark (ban nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Sumin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "STAYC",
+      "sources": [
+        "STAYC"
       ]
     },
     {
@@ -3702,6 +5679,16 @@
       ]
     },
     {
+      "text": "Sunghoon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ENHYPEN",
+      "sources": [
+        "ENHYPEN"
+      ]
+    },
+    {
       "text": "Sungjin",
       "type": "Artist",
       "method": "infobox_members",
@@ -3719,6 +5706,26 @@
       "source_node": "Blank2y",
       "sources": [
         "Blank2y"
+      ]
+    },
+    {
+      "text": "Sungmin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Super Junior",
+      "sources": [
+        "Super Junior"
+      ]
+    },
+    {
+      "text": "Sunhwa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Secret (nhóm nhạc)",
+      "sources": [
+        "Secret (nhóm nhạc)"
       ]
     },
     {
@@ -3778,10 +5785,47 @@
       "confidence": 0.9,
       "source_node": "Epik High",
       "sources": [
-        "Epik High",
-        "Taeyang",
-        "Company_YG Entertainment",
-        "Company_YG Plus"
+        "Epik High"
+      ]
+    },
+    {
+      "text": "Taecyeon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
+      ]
+    },
+    {
+      "text": "Taeha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Speed (nhóm nhạc)",
+      "sources": [
+        "Speed (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Taehyun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WINNER",
+      "sources": [
+        "WINNER"
+      ]
+    },
+    {
+      "text": "Taeil",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT 127",
+      "sources": [
+        "NCT 127"
       ]
     },
     {
@@ -3841,9 +5885,27 @@
       "confidence": 0.9,
       "source_node": "EXO",
       "sources": [
-        "EXO",
-        "Exodus (album của EXO)",
-        "Miracles in December"
+        "EXO"
+      ]
+    },
+    {
+      "text": "Teddy",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "1TYM",
+      "sources": [
+        "1TYM"
+      ]
+    },
+    {
+      "text": "The8",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Seventeen (nhóm nhạc)",
+      "sources": [
+        "Seventeen (nhóm nhạc)"
       ]
     },
     {
@@ -3867,6 +5929,16 @@
       ]
     },
     {
+      "text": "Tsuki",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Billlie",
+      "sources": [
+        "Billlie"
+      ]
+    },
+    {
       "text": "Tzuyu",
       "type": "Artist",
       "method": "infobox_members",
@@ -3877,7 +5949,17 @@
       ]
     },
     {
-      "text": "U Know Yunho",
+      "text": "U-Doragon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "SSAK3",
+      "sources": [
+        "SSAK3"
+      ]
+    },
+    {
+      "text": "U-Know Yunho",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3894,6 +5976,26 @@
       "source_node": "Seventeen (nhóm nhạc)",
       "sources": [
         "Seventeen (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Victoria",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "F(x) (nhóm nhạc)",
+      "sources": [
+        "F(x) (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Viki",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Dal Shabet",
+      "sources": [
+        "Dal Shabet"
       ]
     },
     {
@@ -3917,6 +6019,26 @@
       ]
     },
     {
+      "text": "Wei",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "UP10TION",
+      "sources": [
+        "UP10TION"
+      ]
+    },
+    {
+      "text": "Wheesung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "YG Family",
+      "sources": [
+        "YG Family"
+      ]
+    },
+    {
       "text": "Winter",
       "type": "Artist",
       "method": "infobox_members",
@@ -3927,7 +6049,17 @@
       ]
     },
     {
-      "text": "Won Ji min",
+      "text": "Winwin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "NCT U",
+      "sources": [
+        "NCT U"
+      ]
+    },
+    {
+      "text": "Won Ji-min",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -3987,7 +6119,17 @@
       ]
     },
     {
-      "text": "Woo Ji yoon",
+      "text": "Wonyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "IVE",
+      "sources": [
+        "IVE"
+      ]
+    },
+    {
+      "text": "Woo Ji-yoon",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
@@ -4004,6 +6146,16 @@
       "source_node": "Cravity",
       "sources": [
         "Cravity"
+      ]
+    },
+    {
+      "text": "Woohee",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Dal Shabet",
+      "sources": [
+        "Dal Shabet"
       ]
     },
     {
@@ -4027,6 +6179,16 @@
       ]
     },
     {
+      "text": "Wooseok",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Pentagon (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Pentagon (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
       "text": "Wooshin",
       "type": "Artist",
       "method": "infobox_members",
@@ -4034,6 +6196,16 @@
       "source_node": "UP10TION",
       "sources": [
         "UP10TION"
+      ]
+    },
+    {
+      "text": "Wooyoung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "2PM",
+      "sources": [
+        "2PM"
       ]
     },
     {
@@ -4073,9 +6245,7 @@
       "confidence": 0.9,
       "source_node": "NCT U",
       "sources": [
-        "NCT U",
-        "Hendery",
-        "NCT (nhóm nhạc)"
+        "NCT U"
       ]
     },
     {
@@ -4125,9 +6295,47 @@
       "confidence": 0.9,
       "source_node": "NCT U",
       "sources": [
-        "NCT U",
-        "Hendery",
-        "NCT (nhóm nhạc)"
+        "NCT U"
+      ]
+    },
+    {
+      "text": "Ye-on",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Hearts2Hearts",
+      "sources": [
+        "Hearts2Hearts"
+      ]
+    },
+    {
+      "text": "Yeeun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wonder Girls",
+      "sources": [
+        "Wonder Girls"
+      ]
+    },
+    {
+      "text": "Yeji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "ITZY",
+      "sources": [
+        "ITZY"
+      ]
+    },
+    {
+      "text": "Yejin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Brave Girls",
+      "sources": [
+        "Brave Girls"
       ]
     },
     {
@@ -4191,6 +6399,36 @@
       ]
     },
     {
+      "text": "Yeonjung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WJSN",
+      "sources": [
+        "WJSN"
+      ]
+    },
+    {
+      "text": "Yeonkyung",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "The SeeYa",
+      "sources": [
+        "The SeeYa"
+      ]
+    },
+    {
+      "text": "Yeoreum",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "WJSN",
+      "sources": [
+        "WJSN"
+      ]
+    },
+    {
       "text": "Yeosang",
       "type": "Artist",
       "method": "infobox_members",
@@ -4198,6 +6436,16 @@
       "source_node": "Ateez",
       "sources": [
         "Ateez"
+      ]
+    },
+    {
+      "text": "Yerin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GFriend",
+      "sources": [
+        "GFriend"
       ]
     },
     {
@@ -4231,6 +6479,16 @@
       ]
     },
     {
+      "text": "Yohan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wei (nhóm nhạc)",
+      "sources": [
+        "Wei (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "YongSeung",
       "type": "Artist",
       "method": "infobox_members",
@@ -4241,6 +6499,16 @@
       ]
     },
     {
+      "text": "Yongha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wei (nhóm nhạc)",
+      "sources": [
+        "Wei (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Yoo Il",
       "type": "Artist",
       "method": "infobox_members",
@@ -4248,6 +6516,26 @@
       "source_node": "5urprise",
       "sources": [
         "5urprise"
+      ]
+    },
+    {
+      "text": "Yoo Yong-ha",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "1the9",
+      "sources": [
+        "1the9"
+      ]
+    },
+    {
+      "text": "Yoochun",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "JYJ",
+      "sources": [
+        "JYJ"
       ]
     },
     {
@@ -4271,13 +6559,53 @@
       ]
     },
     {
-      "text": "Yoon Chae won",
+      "text": "Yoojin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "The SeeYa",
+      "sources": [
+        "The SeeYa"
+      ]
+    },
+    {
+      "text": "Yoon",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "STAYC",
+      "sources": [
+        "STAYC"
+      ]
+    },
+    {
+      "text": "Yoon Chae-won",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "Classy (nhóm nhạc)",
       "sources": [
         "Classy (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Yoon Cheol-jong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "10cm (nhóm nhạc)",
+      "sources": [
+        "10cm (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Yoon Kye-sang",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "G.o.d",
+      "sources": [
+        "G.o.d"
       ]
     },
     {
@@ -4297,9 +6625,7 @@
       "confidence": 0.9,
       "source_node": "Girls' Generation",
       "sources": [
-        "Girls' Generation",
-        "Im Yoon-ah",
-        "U (bài hát của Super Junior)"
+        "Girls' Generation"
       ]
     },
     {
@@ -4343,6 +6669,46 @@
       ]
     },
     {
+      "text": "Youngjae",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "B.A.P",
+      "sources": [
+        "B.A.P"
+      ]
+    },
+    {
+      "text": "Youngji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Youngjoo",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "The SeeYa",
+      "sources": [
+        "The SeeYa"
+      ]
+    },
+    {
+      "text": "Yubin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Wonder Girls",
+      "sources": [
+        "Wonder Girls"
+      ]
+    },
+    {
       "text": "Yue",
       "type": "Artist",
       "method": "infobox_members",
@@ -4350,6 +6716,16 @@
       "source_node": "Lapillus",
       "sources": [
         "Lapillus"
+      ]
+    },
+    {
+      "text": "Yugyeom",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "GOT7",
+      "sources": [
+        "GOT7"
       ]
     },
     {
@@ -4373,6 +6749,36 @@
       ]
     },
     {
+      "text": "Yuji",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "EXID",
+      "sources": [
+        "EXID"
+      ]
+    },
+    {
+      "text": "Yujin",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "IVE",
+      "sources": [
+        "IVE"
+      ]
+    },
+    {
+      "text": "Yuki",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "PURPLE KISS",
+      "sources": [
+        "PURPLE KISS"
+      ]
+    },
+    {
       "text": "Yulhee",
       "type": "Artist",
       "method": "infobox_members",
@@ -4380,6 +6786,36 @@
       "source_node": "Laboum",
       "sources": [
         "Laboum"
+      ]
+    },
+    {
+      "text": "Yun Jung-hwan",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "BDC (nhóm nhạc)",
+      "sources": [
+        "BDC (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "Yuna",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "AOA",
+      "sources": [
+        "AOA"
+      ]
+    },
+    {
+      "text": "Yunah",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Illit (nhóm nhạc)",
+      "sources": [
+        "Illit (nhóm nhạc)"
       ]
     },
     {
@@ -4403,6 +6839,36 @@
       ]
     },
     {
+      "text": "Yuqi",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "(G)I-dle",
+      "sources": [
+        "(G)I-dle"
+      ]
+    },
+    {
+      "text": "Yura",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girl's Day",
+      "sources": [
+        "Girl's Day"
+      ]
+    },
+    {
+      "text": "Yuri",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Girls' Generation",
+      "sources": [
+        "Girls' Generation"
+      ]
+    },
+    {
       "text": "Yushi",
       "type": "Artist",
       "method": "infobox_members",
@@ -4413,16 +6879,23 @@
       ]
     },
     {
+      "text": "Yusuke Morisawa",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
+      ]
+    },
+    {
       "text": "Yuta",
       "type": "Artist",
       "method": "infobox_members",
       "confidence": 0.9,
       "source_node": "NCT 127",
       "sources": [
-        "NCT 127",
-        "Haechan",
-        "NCT (nhóm nhạc)",
-        "SM Rookies"
+        "NCT 127"
       ]
     },
     {
@@ -4446,6 +6919,26 @@
       ]
     },
     {
+      "text": "ZN",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Laboum",
+      "sources": [
+        "Laboum"
+      ]
+    },
+    {
+      "text": "Zhou Jieqiong",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "I.O.I",
+      "sources": [
+        "I.O.I"
+      ]
+    },
+    {
       "text": "Zhou Mi",
       "type": "Artist",
       "method": "infobox_members",
@@ -4453,6 +6946,16 @@
       "source_node": "Super Junior-M",
       "sources": [
         "Super Junior-M"
+      ]
+    },
+    {
+      "text": "Zico",
+      "type": "Artist",
+      "method": "infobox_members",
+      "confidence": 0.9,
+      "source_node": "Block B",
+      "sources": [
+        "Block B"
       ]
     },
     {
@@ -4960,25 +7463,26 @@
       ]
     },
     {
-      "text": "Ahyeon",
+      "text": "AKB48",
       "type": "Artist",
-      "method": "infobox_members",
+      "method": "rule-based",
       "confidence": 0.85,
-      "source_node": "Babymonster",
+      "source_node": "AKB48",
       "sources": [
-        "Babymonster",
-        "BabyMons7er"
+        "AKB48",
+        "World Order",
+        "Yabuki Nako"
       ]
     },
     {
-      "text": "Baro",
+      "text": "April",
       "type": "Artist",
-      "method": "infobox_members",
+      "method": "rule-based",
       "confidence": 0.85,
-      "source_node": "B1A4",
+      "source_node": "Company_DSP Media",
       "sources": [
-        "B1A4",
-        "Gongchan"
+        "Company_DSP Media",
+        "Company_Daesung Entertainment"
       ]
     },
     {
@@ -4993,6 +7497,17 @@
       ]
     },
     {
+      "text": "Big Bang",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.85,
+      "source_node": "G-Dragon",
+      "sources": [
+        "G-Dragon",
+        "R. Tee"
+      ]
+    },
+    {
       "text": "Chaewon",
       "type": "Artist",
       "method": "rule-based",
@@ -5001,28 +7516,6 @@
       "sources": [
         "April (nhóm nhạc)",
         "Kim Chae-won (sinh 2000)"
-      ]
-    },
-    {
-      "text": "Dahee",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Glam (nhóm nhạc)",
-      "sources": [
-        "Glam (nhóm nhạc)",
-        "Company_Source Music"
-      ]
-    },
-    {
-      "text": "Dami",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Dreamcatcher (nhóm nhạc)",
-      "sources": [
-        "Dreamcatcher (nhóm nhạc)",
-        "Heo Sol-ji"
       ]
     },
     {
@@ -5038,39 +7531,6 @@
       ]
     },
     {
-      "text": "Elkie",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "CLC (nhóm nhạc)",
-      "sources": [
-        "CLC (nhóm nhạc)",
-        "Elkie Chong"
-      ]
-    },
-    {
-      "text": "Ga Yoon",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.85,
-      "source_node": "2YOON",
-      "sources": [
-        "2YOON",
-        "Jeon Ji-yoon"
-      ]
-    },
-    {
-      "text": "Gayoon",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "4Minute",
-      "sources": [
-        "4Minute",
-        "Han Sunhwa"
-      ]
-    },
-    {
       "text": "Haein",
       "type": "Artist",
       "method": "rule-based",
@@ -5079,28 +7539,6 @@
       "sources": [
         "I.B.I (nhóm nhạc)",
         "Laboum"
-      ]
-    },
-    {
-      "text": "Han Geng",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Super Junior",
-      "sources": [
-        "Super Junior",
-        "Super Junior-M"
-      ]
-    },
-    {
-      "text": "Heejin",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Loona (nhóm nhạc)",
-      "sources": [
-        "Loona (nhóm nhạc)",
-        "IZ*ONE"
       ]
     },
     {
@@ -5115,17 +7553,6 @@
       ]
     },
     {
-      "text": "Hero Jaejoong",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "TVXQ",
-      "sources": [
-        "TVXQ",
-        "Keep Your Head Down (album của TVXQ)"
-      ]
-    },
-    {
       "text": "Hyemi",
       "type": "Artist",
       "method": "rule-based",
@@ -5134,28 +7561,6 @@
       "sources": [
         "Nine Muses",
         "Company_Star Empire Entertainment"
-      ]
-    },
-    {
-      "text": "Hyeongseop",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Hyeongseop X Euiwoong",
-      "sources": [
-        "Hyeongseop X Euiwoong",
-        "Tempest"
-      ]
-    },
-    {
-      "text": "Hyerim",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Wonder Girls",
-      "sources": [
-        "Wonder Girls",
-        "TWICE"
       ]
     },
     {
@@ -5171,39 +7576,6 @@
       ]
     },
     {
-      "text": "Jaebeom",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "2PM",
-      "sources": [
-        "2PM",
-        "Jay Park"
-      ]
-    },
-    {
-      "text": "JayB",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "GOT7",
-      "sources": [
-        "GOT7",
-        "Choi Young-jae"
-      ]
-    },
-    {
-      "text": "Jungmo",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Cravity",
-      "sources": [
-        "Cravity",
-        "M&D"
-      ]
-    },
-    {
       "text": "KARD",
       "type": "Artist",
       "method": "rule-based",
@@ -5212,28 +7584,6 @@
       "sources": [
         "Company_DSP Media",
         "Company_Daesung Entertainment"
-      ]
-    },
-    {
-      "text": "Kaeun",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "After School (nhóm nhạc)",
-      "sources": [
-        "After School (nhóm nhạc)",
-        "Company_Pledis Entertainment"
-      ]
-    },
-    {
-      "text": "Kim Chae won",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "IZ*ONE",
-      "sources": [
-        "IZ*ONE",
-        "LE SSERAFIM"
       ]
     },
     {
@@ -5259,17 +7609,6 @@
       ]
     },
     {
-      "text": "Kyulkyung",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Pristin V",
-      "sources": [
-        "Pristin V",
-        "Jung Eun-woo"
-      ]
-    },
-    {
       "text": "LOCO",
       "type": "Artist",
       "method": "rule-based",
@@ -5280,50 +7619,6 @@
         "MAMAMOO",
         "Yuju",
         "Zico (rapper)"
-      ]
-    },
-    {
-      "text": "Lee Jae Jin",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "FT Island",
-      "sources": [
-        "FT Island",
-        "Sechs Kies"
-      ]
-    },
-    {
-      "text": "Lim Na young",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "I.O.I",
-      "sources": [
-        "I.O.I",
-        "Whatta Man (bài hát của I.O.I)"
-      ]
-    },
-    {
-      "text": "Miryo",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Brown Eyed Girls",
-      "sources": [
-        "Brown Eyed Girls",
-        "Sunny (ca sĩ)"
-      ]
-    },
-    {
-      "text": "Mithra Jin",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Epik High",
-      "sources": [
-        "Epik High",
-        "YG Family"
       ]
     },
     {
@@ -5340,58 +7635,16 @@
       ]
     },
     {
-      "text": "Nichkhun",
+      "text": "SM Entertainment",
       "type": "Artist",
-      "method": "infobox_members",
+      "method": "rule-based",
       "confidence": 0.85,
-      "source_node": "2PM",
+      "source_node": "I (EP của Taeyeon)",
       "sources": [
-        "2PM",
+        "I (EP của Taeyeon)",
+        "NCT DoJaeJung",
+        "Seohyun",
         "Tiffany (ca sĩ Hàn Quốc)"
-      ]
-    },
-    {
-      "text": "Ravi",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "VIXX",
-      "sources": [
-        "VIXX",
-        "Ravi (rapper)"
-      ]
-    },
-    {
-      "text": "Rena",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Pristin V",
-      "sources": [
-        "Pristin V",
-        "Jung Eun-woo"
-      ]
-    },
-    {
-      "text": "Riku",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "NCT Wish",
-      "sources": [
-        "NCT Wish",
-        "NiziU"
-      ]
-    },
-    {
-      "text": "Roa",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Pristin V",
-      "sources": [
-        "Pristin V",
-        "Jung Eun-woo"
       ]
     },
     {
@@ -5403,61 +7656,6 @@
       "sources": [
         "5dolls",
         "Company_Core Contents Media"
-      ]
-    },
-    {
-      "text": "Skull",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "YG Family",
-      "sources": [
-        "YG Family",
-        "Brave Girls"
-      ]
-    },
-    {
-      "text": "Soomi",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "5dolls",
-      "sources": [
-        "5dolls",
-        "Co-Ed School"
-      ]
-    },
-    {
-      "text": "Sumin",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "STAYC",
-      "sources": [
-        "STAYC",
-        "Sonamoo"
-      ]
-    },
-    {
-      "text": "Taeha",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Speed (nhóm nhạc)",
-      "sources": [
-        "Speed (nhóm nhạc)",
-        "Berry Good"
-      ]
-    },
-    {
-      "text": "Teddy",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "1TYM",
-      "sources": [
-        "1TYM",
-        "Hate You"
       ]
     },
     {
@@ -5473,36 +7671,14 @@
       ]
     },
     {
-      "text": "Victoria",
+      "text": "WINNER",
       "type": "Artist",
-      "method": "infobox_members",
+      "method": "rule-based",
       "confidence": 0.85,
-      "source_node": "F(x) (nhóm nhạc)",
+      "source_node": "Kim Jin-woo (ca sĩ)",
       "sources": [
-        "F(x) (nhóm nhạc)",
-        "Victoria Song"
-      ]
-    },
-    {
-      "text": "Viki",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Dal Shabet",
-      "sources": [
-        "Dal Shabet",
-        "Bae Woo-hee"
-      ]
-    },
-    {
-      "text": "Yeoreum",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "WJSN",
-      "sources": [
-        "WJSN",
-        "Im Da-young"
+        "Kim Jin-woo (ca sĩ)",
+        "R. Tee"
       ]
     },
     {
@@ -5515,50 +7691,6 @@
         "I Got a Boy (bài hát)",
         "Solar (ca sĩ)",
         "Step Back (bài hát của Got the Beat)"
-      ]
-    },
-    {
-      "text": "Yugyeom",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "GOT7",
-      "sources": [
-        "GOT7",
-        "Choi Young-jae"
-      ]
-    },
-    {
-      "text": "Yuji",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "EXID",
-      "sources": [
-        "EXID",
-        "Seo Hye-lin"
-      ]
-    },
-    {
-      "text": "Yura",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "Girl's Day",
-      "sources": [
-        "Girl's Day",
-        "(G)I-dle"
-      ]
-    },
-    {
-      "text": "Zhou Jieqiong",
-      "type": "Artist",
-      "method": "infobox_members",
-      "confidence": 0.85,
-      "source_node": "I.O.I",
-      "sources": [
-        "I.O.I",
-        "Whatta Man (bài hát của I.O.I)"
       ]
     },
     {
@@ -6034,6 +8166,7 @@
       "sources": [
         "Big Bang (nhóm nhạc)",
         "Bigbang is V.I.P",
+        "Chungha",
         "K.A.R.D"
       ]
     },
@@ -6219,6 +8352,18 @@
       ]
     },
     {
+      "text": "Runaway",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.85,
+      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Kara (nhóm nhạc Hàn Quốc)",
+        "Pentagon (nhóm nhạc Hàn Quốc)",
+        "TXT (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Seoul",
       "type": "Song",
       "method": "rule-based",
@@ -6362,6 +8507,18 @@
         "Miss A",
         "Suzy",
         "Yuta Nakamoto"
+      ]
+    },
+    {
+      "text": "Wanna Be",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.85,
+      "source_node": "AOA",
+      "sources": [
+        "AOA",
+        "Girls' Generation",
+        "Hyoyeon"
       ]
     },
     {
@@ -6510,16 +8667,6 @@
       ]
     },
     {
-      "text": "ChengXiao",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "WJSN",
-      "sources": [
-        "WJSN"
-      ]
-    },
-    {
       "text": "Cho Hyun Young",
       "type": "Artist",
       "method": "rule-based",
@@ -6590,16 +8737,6 @@
       ]
     },
     {
-      "text": "Gain",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "Brown Eyed Girls",
-      "sources": [
-        "Brown Eyed Girls"
-      ]
-    },
-    {
       "text": "Go Woori",
       "type": "Artist",
       "method": "rule-based",
@@ -6607,6 +8744,16 @@
       "source_node": "Rainbow (nhóm nhạc Hàn Quốc)",
       "sources": [
         "Rainbow (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "text": "Golden Child",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.8,
+      "source_node": "Company_Woollim Entertainment",
+      "sources": [
+        "Company_Woollim Entertainment"
       ]
     },
     {
@@ -6717,16 +8864,6 @@
       "source_node": "NU'EST",
       "sources": [
         "NU'EST"
-      ]
-    },
-    {
-      "text": "Ji Hyun",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "Jeon Ji-yoon",
-      "sources": [
-        "Jeon Ji-yoon"
       ]
     },
     {
@@ -6960,6 +9097,16 @@
       ]
     },
     {
+      "text": "Lovelyz",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.8,
+      "source_node": "Company_Woollim Entertainment",
+      "sources": [
+        "Company_Woollim Entertainment"
+      ]
+    },
+    {
       "text": "Mei",
       "type": "Artist",
       "method": "rule-based",
@@ -7000,16 +9147,6 @@
       ]
     },
     {
-      "text": "Mithrajin",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "Epik High",
-      "sources": [
-        "Epik High"
-      ]
-    },
-    {
       "text": "Nam Gyuri",
       "type": "Artist",
       "method": "rule-based",
@@ -7017,16 +9154,6 @@
       "source_node": "SeeYa",
       "sources": [
         "SeeYa"
-      ]
-    },
-    {
-      "text": "Ni Ki",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "ENHYPEN",
-      "sources": [
-        "ENHYPEN"
       ]
     },
     {
@@ -7067,6 +9194,26 @@
       "source_node": "IVE",
       "sources": [
         "IVE"
+      ]
+    },
+    {
+      "text": "Rocket Punch",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.8,
+      "source_node": "Company_Woollim Entertainment",
+      "sources": [
+        "Company_Woollim Entertainment"
+      ]
+    },
+    {
+      "text": "SG Wannabe",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.8,
+      "source_node": "Company_Core Contents Media",
+      "sources": [
+        "Company_Core Contents Media"
       ]
     },
     {
@@ -7117,16 +9264,6 @@
       "source_node": "Coup d'Etat (album của G-Dragon)",
       "sources": [
         "Coup d'Etat (album của G-Dragon)"
-      ]
-    },
-    {
-      "text": "So Hyun",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.8,
-      "source_node": "Jeon Ji-yoon",
-      "sources": [
-        "Jeon Ji-yoon"
       ]
     },
     {
@@ -7690,6 +9827,17 @@
       ]
     },
     {
+      "text": "Solar",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Rise (album của Taeyang)",
+      "sources": [
+        "Rise (album của Taeyang)",
+        "Taeyang"
+      ]
+    },
+    {
       "text": "Square Up",
       "type": "Album",
       "method": "rule-based",
@@ -7855,6 +10003,17 @@
       ]
     },
     {
+      "text": "Brown Eyed Girls",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Eric Mun",
+      "sources": [
+        "Eric Mun",
+        "Narsha"
+      ]
+    },
+    {
       "text": "Dear",
       "type": "Artist",
       "method": "rule-based",
@@ -7877,17 +10036,6 @@
       ]
     },
     {
-      "text": "Ga In",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7999999999999999,
-      "source_node": "Gentleman (bài hát của PSY)",
-      "sources": [
-        "Gentleman (bài hát của PSY)",
-        "Jo Kwon"
-      ]
-    },
-    {
       "text": "Hyorin",
       "type": "Artist",
       "method": "rule-based",
@@ -7907,17 +10055,6 @@
       "sources": [
         "Company_Fantagio",
         "Company_Fantagio Music"
-      ]
-    },
-    {
-      "text": "Jong hyun",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7999999999999999,
-      "source_node": "CNBLUE",
-      "sources": [
-        "CNBLUE",
-        "Jung Yong Hwa"
       ]
     },
     {
@@ -7965,6 +10102,17 @@
       ]
     },
     {
+      "text": "SechsKies",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Eun Ji-won",
+      "sources": [
+        "Eun Ji-won",
+        "Sechs Kies"
+      ]
+    },
+    {
       "text": "Singer",
       "type": "Artist",
       "method": "rule-based",
@@ -7995,6 +10143,17 @@
       "sources": [
         "H.O.T.",
         "Park Yoo-chun"
+      ]
+    },
+    {
+      "text": "CL",
+      "type": "Company",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "G-Dragon",
+      "sources": [
+        "G-Dragon",
+        "Jeon So-yeon"
       ]
     },
     {
@@ -8072,6 +10231,17 @@
       "sources": [
         "Bona (ca sĩ)",
         "SeolA"
+      ]
+    },
+    {
+      "text": "MBLAQ",
+      "type": "Group",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Dara Park",
+      "sources": [
+        "Dara Park",
+        "Thunder (ca sĩ)"
       ]
     },
     {
@@ -8504,6 +10674,17 @@
       ]
     },
     {
+      "text": "Empire",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Company_Empire",
+      "sources": [
+        "Company_Empire",
+        "Minnie (ca sĩ)"
+      ]
+    },
+    {
       "text": "Energetic",
       "type": "Song",
       "method": "rule-based",
@@ -8559,6 +10740,17 @@
       ]
     },
     {
+      "text": "Forever and a Day",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Ha Sung-woon",
+      "sources": [
+        "Ha Sung-woon",
+        "Yoon Ji-sung"
+      ]
+    },
+    {
       "text": "Friday",
       "type": "Song",
       "method": "rule-based",
@@ -8589,6 +10781,17 @@
       "sources": [
         "Gentleman (bài hát của PSY)",
         "MAMAMOO"
+      ]
+    },
+    {
+      "text": "Goodbye",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Kim Jae-hwan (ca sĩ)",
+      "sources": [
+        "Kim Jae-hwan (ca sĩ)",
+        "Wheein"
       ]
     },
     {
@@ -9285,17 +11488,6 @@
       ]
     },
     {
-      "text": "Runaway",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7999999999999999,
-      "source_node": "Kara (nhóm nhạc Hàn Quốc)",
-      "sources": [
-        "Kara (nhóm nhạc Hàn Quốc)",
-        "Pentagon (nhóm nhạc Hàn Quốc)"
-      ]
-    },
-    {
       "text": "Rush Hour",
       "type": "Song",
       "method": "rule-based",
@@ -9326,6 +11518,17 @@
       "sources": [
         "Lee Donghae",
         "Super Junior"
+      ]
+    },
+    {
+      "text": "Say My Name",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7999999999999999,
+      "source_node": "Ateez",
+      "sources": [
+        "Ateez",
+        "Im Na-young"
       ]
     },
     {
@@ -9656,17 +11859,6 @@
       "sources": [
         "Mr.Mr. (EP)",
         "Mr.Mr. (bài hát)"
-      ]
-    },
-    {
-      "text": "Wannabe",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7999999999999999,
-      "source_node": "Girls' Generation",
-      "sources": [
-        "Girls' Generation",
-        "Hyoyeon"
       ]
     },
     {
@@ -10234,6 +12426,16 @@
       ]
     },
     {
+      "text": "BTS",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Seventeen (nhóm nhạc)",
+      "sources": [
+        "Seventeen (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Baby Boy",
       "type": "Album",
       "method": "rule-based",
@@ -10321,6 +12523,16 @@
       "source_node": "Beep Beep (EP)",
       "sources": [
         "Beep Beep (EP)"
+      ]
+    },
+    {
+      "text": "Big Bang",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Big Bang 2 (album)",
+      "sources": [
+        "Big Bang 2 (album)"
       ]
     },
     {
@@ -10481,6 +12693,16 @@
       "source_node": "Koo Hye-sun",
       "sources": [
         "Koo Hye-sun"
+      ]
+    },
+    {
+      "text": "Bunny Style",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Park Ji-yeon",
+      "sources": [
+        "Park Ji-yeon"
       ]
     },
     {
@@ -10711,6 +12933,16 @@
       "source_node": "Lee Seung-gi",
       "sources": [
         "Lee Seung-gi"
+      ]
+    },
+    {
+      "text": "Crush",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "2NE1",
+      "sources": [
+        "2NE1"
       ]
     },
     {
@@ -11344,6 +13576,16 @@
       ]
     },
     {
+      "text": "Girls' Generation",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Kissing You (bài hát của Girls' Generation)",
+      "sources": [
+        "Kissing You (bài hát của Girls' Generation)"
+      ]
+    },
+    {
       "text": "Girls' Invasion",
       "type": "Album",
       "method": "rule-based",
@@ -11514,6 +13756,16 @@
       ]
     },
     {
+      "text": "Haru Haru",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Big Bang (nhóm nhạc)",
+      "sources": [
+        "Big Bang (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Have a nice day",
       "type": "Album",
       "method": "rule-based",
@@ -11601,6 +13853,16 @@
       "source_node": "Epik High",
       "sources": [
         "Epik High"
+      ]
+    },
+    {
+      "text": "Highlight",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Highlight (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Highlight (nhóm nhạc Hàn Quốc)"
       ]
     },
     {
@@ -12164,6 +14426,16 @@
       ]
     },
     {
+      "text": "Kiss of Life",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Kiss of Life",
+      "sources": [
+        "Kiss of Life"
+      ]
+    },
+    {
       "text": "Kwon Ji Yong",
       "type": "Album",
       "method": "rule-based",
@@ -12181,6 +14453,16 @@
       "source_node": "ONEUS",
       "sources": [
         "ONEUS"
+      ]
+    },
+    {
+      "text": "Latata",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "(G)I-dle",
+      "sources": [
+        "(G)I-dle"
       ]
     },
     {
@@ -12684,6 +14966,16 @@
       ]
     },
     {
+      "text": "New Jeans",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "NewJeans",
+      "sources": [
+        "NewJeans"
+      ]
+    },
+    {
       "text": "Next World",
       "type": "Album",
       "method": "rule-based",
@@ -12761,6 +15053,16 @@
       "source_node": "Stray Kids",
       "sources": [
         "Stray Kids"
+      ]
+    },
+    {
+      "text": "OH MY GIRL",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Oh My Girl",
+      "sources": [
+        "Oh My Girl"
       ]
     },
     {
@@ -12891,6 +15193,16 @@
       "source_node": "EXO",
       "sources": [
         "EXO"
+      ]
+    },
+    {
+      "text": "Pentagon",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Pentagon (nhóm nhạc Hàn Quốc)",
+      "sources": [
+        "Pentagon (nhóm nhạc Hàn Quốc)"
       ]
     },
     {
@@ -13271,6 +15583,16 @@
       "source_node": "SF9",
       "sources": [
         "SF9"
+      ]
+    },
+    {
+      "text": "Rokkugo",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Shindong",
+      "sources": [
+        "Shindong"
       ]
     },
     {
@@ -13734,6 +16056,16 @@
       ]
     },
     {
+      "text": "Stardom",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Company_Stardom",
+      "sources": [
+        "Company_Stardom"
+      ]
+    },
+    {
       "text": "Staydom",
       "type": "Album",
       "method": "rule-based",
@@ -13801,6 +16133,16 @@
       "source_node": "Time Slip (album của Super Junior)",
       "sources": [
         "Time Slip (album của Super Junior)"
+      ]
+    },
+    {
+      "text": "SuperM",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "NCT (nhóm nhạc)",
+      "sources": [
+        "NCT (nhóm nhạc)"
       ]
     },
     {
@@ -13881,6 +16223,16 @@
       "source_node": "MAMAMOO",
       "sources": [
         "MAMAMOO"
+      ]
+    },
+    {
+      "text": "Taemin",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Taemin",
+      "sources": [
+        "Taemin"
       ]
     },
     {
@@ -14184,6 +16536,16 @@
       ]
     },
     {
+      "text": "Trouble Maker",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Trouble Maker",
+      "sources": [
+        "Trouble Maker"
+      ]
+    },
+    {
       "text": "True Colors",
       "type": "Album",
       "method": "rule-based",
@@ -14211,6 +16573,16 @@
       "source_node": "AKB48",
       "sources": [
         "AKB48"
+      ]
+    },
+    {
+      "text": "Turbo",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Turbo (ban nhạc Hàn Quốc)",
+      "sources": [
+        "Turbo (ban nhạc Hàn Quốc)"
       ]
     },
     {
@@ -14291,6 +16663,16 @@
       "source_node": "Verivery",
       "sources": [
         "Verivery"
+      ]
+    },
+    {
+      "text": "Victon",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Han Seung-woo",
+      "sources": [
+        "Han Seung-woo"
       ]
     },
     {
@@ -14381,6 +16763,16 @@
       "source_node": "Weeekly",
       "sources": [
         "Weeekly"
+      ]
+    },
+    {
+      "text": "Week 25",
+      "type": "Album",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Square Up (EP)",
+      "sources": [
+        "Square Up (EP)"
       ]
     },
     {
@@ -14794,6 +17186,16 @@
       ]
     },
     {
+      "text": "Bolbbalgan4",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Bolbbalgan4",
+      "sources": [
+        "Bolbbalgan4"
+      ]
+    },
+    {
       "text": "Bouquet",
       "type": "Artist",
       "method": "rule-based",
@@ -14821,16 +17223,6 @@
       "source_node": "Spicy (bài hát của Aespa)",
       "sources": [
         "Spicy (bài hát của Aespa)"
-      ]
-    },
-    {
-      "text": "Chae won",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Kim Chae-won (sinh 2000)",
-      "sources": [
-        "Kim Chae-won (sinh 2000)"
       ]
     },
     {
@@ -14904,16 +17296,6 @@
       ]
     },
     {
-      "text": "Donghyun",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Golden Child",
-      "sources": [
-        "Golden Child"
-      ]
-    },
-    {
       "text": "Dongwan",
       "type": "Artist",
       "method": "rule-based",
@@ -14921,6 +17303,16 @@
       "source_node": "Shinhwa",
       "sources": [
         "Shinhwa"
+      ]
+    },
+    {
+      "text": "Duble Sidekick",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Davichi",
+      "sources": [
+        "Davichi"
       ]
     },
     {
@@ -15014,6 +17406,16 @@
       ]
     },
     {
+      "text": "Fantagio",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Astro (nhóm nhạc)",
+      "sources": [
+        "Astro (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Firework",
       "type": "Artist",
       "method": "rule-based",
@@ -15084,6 +17486,16 @@
       ]
     },
     {
+      "text": "Gen 4",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Treasure",
+      "sources": [
+        "Treasure"
+      ]
+    },
+    {
       "text": "Gill",
       "type": "Artist",
       "method": "rule-based",
@@ -15111,6 +17523,16 @@
       "source_node": "PURPLE KISS",
       "sources": [
         "PURPLE KISS"
+      ]
+    },
+    {
+      "text": "Gugudan",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Kang Mi-na",
+      "sources": [
+        "Kang Mi-na"
       ]
     },
     {
@@ -15324,16 +17746,6 @@
       ]
     },
     {
-      "text": "Ji Ae",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Lovelyz",
-      "sources": [
-        "Lovelyz"
-      ]
-    },
-    {
       "text": "Jinbyjin",
       "type": "Artist",
       "method": "rule-based",
@@ -15404,16 +17816,6 @@
       ]
     },
     {
-      "text": "Jung hwa",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "T.O.P",
-      "sources": [
-        "T.O.P"
-      ]
-    },
-    {
       "text": "Junggigo",
       "type": "Artist",
       "method": "rule-based",
@@ -15431,16 +17833,6 @@
       "source_node": "MAMAMOO",
       "sources": [
         "MAMAMOO"
-      ]
-    },
-    {
-      "text": "Junjin",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Shinhwa",
-      "sources": [
-        "Shinhwa"
       ]
     },
     {
@@ -15504,13 +17896,13 @@
       ]
     },
     {
-      "text": "Lim Nayoung",
+      "text": "Lee Su ji",
       "type": "Artist",
       "method": "rule-based",
       "confidence": 0.7,
-      "source_node": "Chungha",
+      "source_node": "UNI.T",
       "sources": [
-        "Chungha"
+        "UNI.T"
       ]
     },
     {
@@ -15661,6 +18053,16 @@
       "source_node": "Kei (ca sĩ)",
       "sources": [
         "Kei (ca sĩ)"
+      ]
+    },
+    {
+      "text": "N.Flying",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "N.Flying",
+      "sources": [
+        "N.Flying"
       ]
     },
     {
@@ -15914,16 +18316,6 @@
       ]
     },
     {
-      "text": "Shin Jiyoon",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Weeekly",
-      "sources": [
-        "Weeekly"
-      ]
-    },
-    {
       "text": "Shohei",
       "type": "Artist",
       "method": "rule-based",
@@ -15931,16 +18323,6 @@
       "source_node": "SM Rookies",
       "sources": [
         "SM Rookies"
-      ]
-    },
-    {
-      "text": "Si hyeon",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Han Hye-ri",
-      "sources": [
-        "Han Hye-ri"
       ]
     },
     {
@@ -16004,6 +18386,16 @@
       ]
     },
     {
+      "text": "Speed",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Zico (rapper)",
+      "sources": [
+        "Zico (rapper)"
+      ]
+    },
+    {
       "text": "Stam",
       "type": "Artist",
       "method": "rule-based",
@@ -16034,16 +18426,6 @@
       ]
     },
     {
-      "text": "SungGyu",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Kim Sung-kyu",
-      "sources": [
-        "Kim Sung-kyu"
-      ]
-    },
-    {
       "text": "Sunshine",
       "type": "Artist",
       "method": "rule-based",
@@ -16051,6 +18433,16 @@
       "source_node": "Nature (nhóm nhạc)",
       "sources": [
         "Nature (nhóm nhạc)"
+      ]
+    },
+    {
+      "text": "SuperM",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "SuperM",
+      "sources": [
+        "SuperM"
       ]
     },
     {
@@ -16071,6 +18463,16 @@
       "source_node": "Sunmi",
       "sources": [
         "Sunmi"
+      ]
+    },
+    {
+      "text": "TEMPEST",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Tempest",
+      "sources": [
+        "Tempest"
       ]
     },
     {
@@ -16144,6 +18546,16 @@
       ]
     },
     {
+      "text": "VICTON",
+      "type": "Artist",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "VICTON",
+      "sources": [
+        "VICTON"
+      ]
+    },
+    {
       "text": "Verbal",
       "type": "Artist",
       "method": "rule-based",
@@ -16201,16 +18613,6 @@
       "source_node": "Wolf (bài hát)",
       "sources": [
         "Wolf (bài hát)"
-      ]
-    },
-    {
-      "text": "Won young",
-      "type": "Artist",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "IZ*ONE",
-      "sources": [
-        "IZ*ONE"
       ]
     },
     {
@@ -16874,6 +19276,16 @@
       ]
     },
     {
+      "text": "Chen",
+      "type": "Group",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Suho",
+      "sources": [
+        "Suho"
+      ]
+    },
+    {
       "text": "D Unit",
       "type": "Group",
       "method": "rule-based",
@@ -16921,16 +19333,6 @@
       "source_node": "Sulli",
       "sources": [
         "Sulli"
-      ]
-    },
-    {
-      "text": "Fromis 9",
-      "type": "Group",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Company_Pledis Entertainment",
-      "sources": [
-        "Company_Pledis Entertainment"
       ]
     },
     {
@@ -17021,26 +19423,6 @@
       "source_node": "I.O.I",
       "sources": [
         "I.O.I"
-      ]
-    },
-    {
-      "text": "Kpop BTS",
-      "type": "Group",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "BTS",
-      "sources": [
-        "BTS"
-      ]
-    },
-    {
-      "text": "MBLAQ",
-      "type": "Group",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Thunder (ca sĩ)",
-      "sources": [
-        "Thunder (ca sĩ)"
       ]
     },
     {
@@ -17164,6 +19546,16 @@
       ]
     },
     {
+      "text": "Suho",
+      "type": "Group",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Chen (ca sĩ)",
+      "sources": [
+        "Chen (ca sĩ)"
+      ]
+    },
+    {
       "text": "TAN",
       "type": "Group",
       "method": "rule-based",
@@ -17281,6 +19673,16 @@
       "source_node": "Heo Sol-ji",
       "sources": [
         "Heo Sol-ji"
+      ]
+    },
+    {
+      "text": "Wendy",
+      "type": "Group",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Seulgi",
+      "sources": [
+        "Seulgi"
       ]
     },
     {
@@ -17581,6 +19983,16 @@
       "source_node": "IVE",
       "sources": [
         "IVE"
+      ]
+    },
+    {
+      "text": "After School",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Weeekly",
+      "sources": [
+        "Weeekly"
       ]
     },
     {
@@ -18274,6 +20686,16 @@
       ]
     },
     {
+      "text": "Before U Go",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "TVXQ",
+      "sources": [
+        "TVXQ"
+      ]
+    },
+    {
       "text": "Beg For You",
       "type": "Song",
       "method": "rule-based",
@@ -18484,6 +20906,16 @@
       ]
     },
     {
+      "text": "Bonamana",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Bonamana",
+      "sources": [
+        "Bonamana"
+      ]
+    },
+    {
       "text": "Boogie Up",
       "type": "Song",
       "method": "rule-based",
@@ -18581,6 +21013,16 @@
       "source_node": "Drippin",
       "sources": [
         "Drippin"
+      ]
+    },
+    {
+      "text": "Boyfriend",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Boyfriend (nhóm nhạc)",
+      "sources": [
+        "Boyfriend (nhóm nhạc)"
       ]
     },
     {
@@ -19004,6 +21446,16 @@
       ]
     },
     {
+      "text": "Classy",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Classy (nhóm nhạc)",
+      "sources": [
+        "Classy (nhóm nhạc)"
+      ]
+    },
+    {
       "text": "Clik Clak",
       "type": "Song",
       "method": "rule-based",
@@ -19264,6 +21716,16 @@
       ]
     },
     {
+      "text": "Crush",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "I.O.I",
+      "sources": [
+        "I.O.I"
+      ]
+    },
+    {
       "text": "Crush On You",
       "type": "Song",
       "method": "rule-based",
@@ -19495,6 +21957,16 @@
     },
     {
       "text": "Day and Night",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "T-ara",
+      "sources": [
+        "T-ara"
+      ]
+    },
+    {
+      "text": "Day by Day",
       "type": "Song",
       "method": "rule-based",
       "confidence": 0.7,
@@ -20444,6 +22916,16 @@
       ]
     },
     {
+      "text": "Feel Special",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Feel Special",
+      "sources": [
+        "Feel Special"
+      ]
+    },
+    {
       "text": "Feeling Only You",
       "type": "Song",
       "method": "rule-based",
@@ -20684,26 +23166,6 @@
       ]
     },
     {
-      "text": "Forever and A Da y",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Yoon Ji-sung",
-      "sources": [
-        "Yoon Ji-sung"
-      ]
-    },
-    {
-      "text": "Forever and a Day",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Ha Sung-woon",
-      "sources": [
-        "Ha Sung-woon"
-      ]
-    },
-    {
       "text": "Freal Luv",
       "type": "Song",
       "method": "rule-based",
@@ -20721,6 +23183,16 @@
       "source_node": "Drippin",
       "sources": [
         "Drippin"
+      ]
+    },
+    {
+      "text": "Free Somebody",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Free Somebody",
+      "sources": [
+        "Free Somebody"
       ]
     },
     {
@@ -21124,6 +23596,16 @@
       ]
     },
     {
+      "text": "Gone Not Around Any Longer",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Gone Not Around Any Longer",
+      "sources": [
+        "Gone Not Around Any Longer"
+      ]
+    },
+    {
       "text": "Gone with the wind",
       "type": "Song",
       "method": "rule-based",
@@ -21141,16 +23623,6 @@
       "source_node": "VIXX",
       "sources": [
         "VIXX"
-      ]
-    },
-    {
-      "text": "Good Bye",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Wheein",
-      "sources": [
-        "Wheein"
       ]
     },
     {
@@ -21211,16 +23683,6 @@
       "source_node": "G-Dragon",
       "sources": [
         "G-Dragon"
-      ]
-    },
-    {
-      "text": "Goodbye",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Kim Jae-hwan (ca sĩ)",
-      "sources": [
-        "Kim Jae-hwan (ca sĩ)"
       ]
     },
     {
@@ -21901,6 +24363,16 @@
       "source_node": "My Voice",
       "sources": [
         "My Voice"
+      ]
+    },
+    {
+      "text": "I Got a Boy",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Girls' Generation",
+      "sources": [
+        "Girls' Generation"
       ]
     },
     {
@@ -23054,16 +25526,6 @@
       ]
     },
     {
-      "text": "LaLaLa",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "Chungha",
-      "sources": [
-        "Chungha"
-      ]
-    },
-    {
       "text": "Labrador Retriever",
       "type": "Song",
       "method": "rule-based",
@@ -23091,6 +25553,16 @@
       "source_node": "TVXQ",
       "sources": [
         "TVXQ"
+      ]
+    },
+    {
+      "text": "Last Fantasy",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Last Fantasy",
+      "sources": [
+        "Last Fantasy"
       ]
     },
     {
@@ -24294,6 +26766,16 @@
       ]
     },
     {
+      "text": "Mirotic",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Mirotic",
+      "sources": [
+        "Mirotic"
+      ]
+    },
+    {
       "text": "Mirror",
       "type": "Song",
       "method": "rule-based",
@@ -24431,6 +26913,16 @@
       "source_node": "Apink",
       "sources": [
         "Apink"
+      ]
+    },
+    {
+      "text": "Mr. Simple",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Mr. Simple",
+      "sources": [
+        "Mr. Simple"
       ]
     },
     {
@@ -25264,6 +27756,16 @@
       ]
     },
     {
+      "text": "Pink Blossom",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Mr. Chu",
+      "sources": [
+        "Mr. Chu"
+      ]
+    },
+    {
       "text": "Pit a Pat",
       "type": "Song",
       "method": "rule-based",
@@ -25434,6 +27936,16 @@
       ]
     },
     {
+      "text": "Punch",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "NCT 127",
+      "sources": [
+        "NCT 127"
+      ]
+    },
+    {
       "text": "Purple",
       "type": "Song",
       "method": "rule-based",
@@ -25501,6 +28013,16 @@
       "source_node": "Moon Tae-il",
       "sources": [
         "Moon Tae-il"
+      ]
+    },
+    {
+      "text": "Rain",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Rain (bài hát của Taeyeon)",
+      "sources": [
+        "Rain (bài hát của Taeyeon)"
       ]
     },
     {
@@ -25851,16 +28373,6 @@
       "source_node": "4 Walls (bài hát)",
       "sources": [
         "4 Walls (bài hát)"
-      ]
-    },
-    {
-      "text": "Run Away",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "TXT (nhóm nhạc)",
-      "sources": [
-        "TXT (nhóm nhạc)"
       ]
     },
     {
@@ -26324,6 +28836,16 @@
       ]
     },
     {
+      "text": "Simon Dominic",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Simon Dominic",
+      "sources": [
+        "Simon Dominic"
+      ]
+    },
+    {
       "text": "Simon Says",
       "type": "Song",
       "method": "rule-based",
@@ -26331,6 +28853,16 @@
       "source_node": "Haechan",
       "sources": [
         "Haechan"
+      ]
+    },
+    {
+      "text": "Sing for You",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Sing for You",
+      "sources": [
+        "Sing for You"
       ]
     },
     {
@@ -26471,6 +29003,16 @@
       "source_node": "Stray Kids",
       "sources": [
         "Stray Kids"
+      ]
+    },
+    {
+      "text": "Solar",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Solar (album của Taeyang)",
+      "sources": [
+        "Solar (album của Taeyang)"
       ]
     },
     {
@@ -27594,6 +30136,16 @@
       ]
     },
     {
+      "text": "Trouble Maker",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Trouble Maker (EP)",
+      "sources": [
+        "Trouble Maker (EP)"
+      ]
+    },
+    {
       "text": "Tsubasa wa Iranai",
       "type": "Song",
       "method": "rule-based",
@@ -27944,6 +30496,16 @@
       ]
     },
     {
+      "text": "Volume Up",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "Volume Up",
+      "sources": [
+        "Volume Up"
+      ]
+    },
+    {
       "text": "Voodoo Doll",
       "type": "Song",
       "method": "rule-based",
@@ -27991,16 +30553,6 @@
       "source_node": "Block B",
       "sources": [
         "Block B"
-      ]
-    },
-    {
-      "text": "Wanna Be",
-      "type": "Song",
-      "method": "rule-based",
-      "confidence": 0.7,
-      "source_node": "AOA",
-      "sources": [
-        "AOA"
       ]
     },
     {
@@ -28531,6 +31083,16 @@
       "source_node": "Jisung",
       "sources": [
         "Jisung"
+      ]
+    },
+    {
+      "text": "World Order",
+      "type": "Song",
+      "method": "rule-based",
+      "confidence": 0.7,
+      "source_node": "World Order",
+      "sources": [
+        "World Order"
       ]
     },
     {

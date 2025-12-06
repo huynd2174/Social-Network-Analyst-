@@ -10,23 +10,38 @@ import sys
 import io
 import json
 import re
+import argparse
 from collections import defaultdict
 from datetime import datetime
+from typing import Dict, Set
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='K-pop NER: Rule-based và ML-based')
+parser.add_argument('--rule-only', '--no-ml', action='store_true',
+                    help='Chỉ chạy rule-based NER, không dùng ML-based')
+args = parser.parse_args()
 
 # Import ML-based NER module
-try:
-    from ml_ner import extract_ml_entities, get_ner_model
-    ML_NER_AVAILABLE = True
-except ImportError:
+if args.rule_only:
     ML_NER_AVAILABLE = False
-    print("⚠️  ml_ner module không khả dụng. Chỉ sử dụng rule-based NER.")
+    print("⚠️  Chế độ --rule-only: Chỉ sử dụng rule-based NER")
+else:
+    try:
+        from ml_ner import extract_ml_entities, get_ner_model
+        ML_NER_AVAILABLE = True
+    except ImportError:
+        ML_NER_AVAILABLE = False
+        print("⚠️  ml_ner module không khả dụng. Chỉ sử dụng rule-based NER.")
 
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 print("=" * 70)
-print("MÔ HÌNH NHẬN DẠNG THỰC THỂ K-POP (HYBRID: RULE-BASED + ML)")
+if args.rule_only:
+    print("MÔ HÌNH NHẬN DẠNG THỰC THỂ K-POP (RULE-BASED ONLY)")
+else:
+    print("MÔ HÌNH NHẬN DẠNG THỰC THỂ K-POP (HYBRID: RULE-BASED + ML)")
 print("=" * 70)
 
 # Khởi tạo ML model nếu có
@@ -337,9 +352,36 @@ KOREAN_SURNAMES = {
 # =====================================================
 # HÀM CHUẨN HÓA TÊN (PHẢI ĐỊNH NGHĨA TRƯỚC KHI SỬ DỤNG)
 # =====================================================
+def normalize_for_comparison(name: str) -> str:
+    """
+    Chuẩn hóa tên để so sánh (loại bỏ khoảng trắng, dấu gạch nối, dấu gạch dưới, lowercase)
+    ĐỒNG BỘ HÓA VỚI merge_and_import_neo4j.py để đảm bảo cùng cách chuẩn hóa
+    
+    Xử lý các trường hợp:
+    - "Ahn Ji-young" vs "Ahn Ji young" -> cùng một node
+    - "Miyeon" vs "Miyeon (ca sĩ)" -> cùng một node
+    - "Cho Mi-yeon" vs "Miyeon" -> có thể match nếu dùng substring matching
+    """
+    if not name:
+        return ""
+    
+    # Dùng clean_text để chuẩn hóa cơ bản (loại bỏ suffix, normalize khoảng trắng)
+    normalized = clean_text(name)
+    
+    # Loại bỏ khoảng trắng, dấu gạch nối, dấu gạch dưới và lowercase để so sánh
+    # Điều này giúp match "Ahn Ji-young" với "Ahn Ji young"
+    normalized = normalized.lower().replace(' ', '').replace('-', '').replace('_', '')
+    return normalized
+
 def clean_text(text):
-    """Làm sạch text và loại bỏ từ thừa ở cuối"""
+    """Làm sạch text và loại bỏ từ thừa ở đầu/cuối"""
     text = text.strip()
+    
+    # ============================================
+    # LOẠI BỎ TIỀN TỐ "Kpop", "K-pop", "K pop" Ở ĐẦU
+    # ============================================
+    # Pattern: "Kpop BTS" -> "BTS", "K-pop Blackpink" -> "Blackpink"
+    text = re.sub(r'^(?:k[\s\-]?pop|kpop|k-pop|k\s+pop)\s+', '', text, flags=re.IGNORECASE)
     
     # Xử lý dấu ngoặc đơn chưa đóng (ví dụ: "Euiwoong (Lew" -> "Euiwoong Lew")
     # Tìm các pattern có dấu mở ngoặc nhưng không có dấu đóng ngoặc
@@ -379,7 +421,7 @@ def clean_text(text):
 # LOAD DỮ LIỆU
 # =====================================================
 print("\n📂 Đang load dữ liệu...")
-with open('enrichment_text_data.json', 'r', encoding='utf-8') as f:
+with open('data/enrichment_text_data.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 records = data.get('data', [])
@@ -387,28 +429,30 @@ print(f"✓ Đã load {len(records)} records")
 
 # Tạo mapping node_id -> text (lowercase) để kiểm tra context
 node_texts = {}
-existing_lower = set()
+# QUAN TRỌNG: Lưu cả type để check trùng theo cả tên VÀ type
+# existing_lower: Dict[normalized_name] -> Set[type]
+existing_lower: Dict[str, Set[str]] = defaultdict(set)
 for record in records:
     node_id = record.get('node_id', '')
     node_name = record.get('node_name', '')
+    node_label = record.get('node_label', 'Entity')  # Lấy label/type từ record
     text = record.get('text', '')
     node_texts[node_id] = text.lower()
     if node_name:
-        # CHUẨN HÓA tên node gốc để loại bỏ suffix như "(ca sĩ)", "(nhóm nhạc)"
-        normalized_name = clean_text(node_name)
-        normalized_lower = normalized_name.lower()
-        # Loại bỏ khoảng trắng để check trùng với node gốc (Big Bang = BIGBANG)
-        # Dùng để LOẠI BỎ node mới nếu trùng với node gốc
-        key_without_spaces = normalized_lower.replace(' ', '')
-        existing_lower.add(key_without_spaces)
+        # CHUẨN HÓA tên node gốc để check trùng
+        # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+        # Loại bỏ khoảng trắng, dấu gạch nối, dấu gạch dưới để check trùng (Big Bang = BIGBANG = Big-Bang)
+        key_normalized = normalize_for_comparison(node_name)
+        existing_lower[key_normalized].add(node_label)
 
-print(f"✓ Có {len(existing_lower)} entities trong đồ thị")
+total_existing = sum(len(types) for types in existing_lower.values())
+print(f"✓ Có {total_existing} entities trong đồ thị (theo tên và type)")
 
 # =====================================================
 # LOAD THÔNG TIN THÀNH VIÊN TỪ INFOBOX (ĐÃ CRAWL SẴN)
 # =====================================================
 try:
-    with open('infobox_members.json', 'r', encoding='utf-8') as f:
+    with open('data/infobox_members.json', 'r', encoding='utf-8') as f:
         INFOBOX_MEMBERS = json.load(f)
 except Exception:
     INFOBOX_MEMBERS = {"groups": {}, "artists": {}}
@@ -518,7 +562,8 @@ def is_valid_entity(text, entity_type):
         return False
     
     # Loại bỏ entities quá ngắn (trừ một số tên nghệ sĩ hợp lệ như RM, IU, CL)
-    valid_short_names = {'rm', 'iu', 'cl', 'bm', 'jb', 'jj', 'jo', 'im', 'do'}
+    # Bổ sung thêm các tên ngắn hợp lệ từ infobox: DK, ZN, P.O, The8
+    valid_short_names = {'rm', 'iu', 'cl', 'bm', 'jb', 'jj', 'jo', 'im', 'do', 'dk', 'zn', 'p.o', 'the8'}
     if len(text) < 3 and text.lower() not in valid_short_names:
         return False
     # Không chấp nhận nghệ sĩ chỉ 1 ký tự (tránh các tên bị cắt cụt như "B", "K")
@@ -1695,10 +1740,12 @@ def extract_entities(text, entity_type, pattern_list):
                 if not entity_text or entity_text.lower() in seen:
                     continue
                 # CHUẨN HÓA entity text trước khi check với existing_lower
-                normalized_entity = clean_text(entity_text)
-                # Loại bỏ khoảng trắng để so sánh với existing_lower (đã loại bỏ khoảng trắng)
-                entity_key = normalized_entity.lower().replace(' ', '')
-                if entity_key in existing_lower:
+                # QUAN TRỌNG: Dùng CÙNG cách chuẩn hóa như khi tạo existing_lower
+                # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                entity_key = normalize_for_comparison(entity_text)
+                # QUAN TRỌNG: Chỉ loại bỏ nếu cùng tên VÀ cùng type
+                # Nếu trùng -> bỏ qua (không tạo node mới)
+                if entity_key in existing_lower and entity_type in existing_lower[entity_key]:
                     continue
                 if not is_valid_entity(entity_text, entity_type):
                     continue
@@ -1852,10 +1899,10 @@ def extract_members_from_list(text):
                     
                     # Bỏ qua nếu đã tồn tại trong graph gốc (existing_lower)
                     # CHUẨN HÓA member trước khi check
-                    normalized_member = clean_text(member)
-                    # Loại bỏ khoảng trắng để so sánh với existing_lower
-                    member_key = normalized_member.lower().replace(' ', '')
-                    if member_key in existing_lower:
+                    # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                    member_key = normalize_for_comparison(member)
+                    # QUAN TRỌNG: Chỉ loại bỏ nếu cùng tên VÀ cùng type (Artist)
+                    if member_key in existing_lower and 'Artist' in existing_lower[member_key]:
                         continue
                     
                     if member.lower() in seen:
@@ -1864,7 +1911,8 @@ def extract_members_from_list(text):
                     # Kiểm tra tính hợp lệ - nhưng vẫn nới lỏng cho tên thành viên
                     lower_member = member.lower()
                     # Whitelist tên ngắn hợp lệ (trùng với is_valid_entity)
-                    valid_short_names = {'rm', 'iu', 'cl', 'bm', 'jb', 'jj', 'jo', 'im', 'do'}
+                    # Bổ sung thêm các tên ngắn hợp lệ từ infobox: DK, ZN, P.O, The8
+                    valid_short_names = {'rm', 'iu', 'cl', 'bm', 'jb', 'jj', 'jo', 'im', 'do', 'dk', 'zn', 'p.o', 'the8'}
                     
                     if len(member) <= 2:
                         # Chỉ cho phép nếu là tên ngắn hợp lệ trong whitelist
@@ -1976,10 +2024,11 @@ def extract_groups_from_list(text):
                         continue
                     
                     # Bỏ qua nếu đã có trong graph hoặc đã thấy
-                    # CHUẨN HÓA group name trước khi check (grp đã được clean_text ở trên)
-                    # Loại bỏ khoảng trắng để so sánh với existing_lower
-                    group_key = grp.lower().replace(' ', '')
-                    if group_key in existing_lower or group_key in seen:
+                    # CHUẨN HÓA group name trước khi check
+                    # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                    group_key = normalize_for_comparison(grp)
+                    # QUAN TRỌNG: Chỉ loại bỏ nếu cùng tên VÀ cùng type (Group)
+                    if (group_key in existing_lower and 'Group' in existing_lower[group_key]) or group_key in seen:
                         continue
                     
                     # Phải qua kiểm tra group hợp lệ
@@ -2069,10 +2118,10 @@ def extract_companies_from_list(text):
                     
                     # Bỏ qua nếu đã có trong graph hoặc đã thấy
                     # CHUẨN HÓA company name trước khi check
-                    normalized_company = clean_text(comp)
-                    # Loại bỏ khoảng trắng để so sánh với existing_lower
-                    company_key = normalized_company.lower().replace(' ', '')
-                    if company_key in existing_lower or company_key in seen:
+                    # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                    company_key = normalize_for_comparison(comp)
+                    # QUAN TRỌNG: Chỉ loại bỏ nếu cùng tên VÀ cùng type (Company)
+                    if (company_key in existing_lower and 'Company' in existing_lower[company_key]) or company_key in seen:
                         continue
                     
                     # Phải qua kiểm tra company hợp lệ
@@ -2106,21 +2155,20 @@ def extract_artists_from_infobox_groups():
     if not isinstance(groups, dict):
         return entities
 
+    # ĐỒNG BỘ HÓA VỚI RE: Sử dụng cùng member keys và logic parse
     member_keys = [
+        # Current members (giống RE)
         'Current members',
-        'Past members',
         'Thành viên',
-        'Cựu thành viên',
         'Thành viên hiện tại',
-        'Thành viên cũ',
+        'Members',
+        # Past members (giống RE)
+        'Past members',
+        'Cựu thành viên',
         'Former members',
+        # Bổ sung thêm
+        'Thành viên cũ',
     ]
-    
-    # Các từ chung chung cần loại bỏ (không phải tên thành viên)
-    GENERIC_MEMBER_TERMS = {
-        'thành viên', 'members', 'member', 'cựu thành viên', 'former members',
-        'past members', 'current members', 'thành viên hiện tại', 'thành viên cũ',
-    }
 
     for group_name, data in groups.items():
         info = data.get('infobox') or {}
@@ -2132,51 +2180,74 @@ def extract_artists_from_infobox_groups():
             if not raw:
                 continue
 
-            # Tách danh sách tên theo dấu phẩy
-            parts = [p.strip() for p in raw.split(',') if p.strip()]
+            # ĐỒNG BỘ HÓA VỚI RE: Parse giống _parse_member_list()
+            # Tách theo dấu phẩy, dấu *, dấu • (giống RE)
+            parts = re.split(r'[,*•]', raw)
+            
             for part in parts:
-                member = clean_text(part)
+                part = part.strip()
+                if not part:
+                    continue
+                
+                # ĐỒNG BỘ HÓA VỚI RE: Loại bỏ [1], [2], etc. và (notes) trước khi parse
+                part = re.sub(r'\[.*?\]', '', part)  # Loại bỏ [1], [2], etc.
+                part = re.sub(r'\(.*?\)', '', part)  # Loại bỏ (notes)
+                part = part.strip()
+                
+                if not part:
+                    continue
+                
+                # Kiểm tra độ dài cơ bản (giống RE)
+                if len(part) < 2 or len(part) > 40:
+                    continue
+                
+                # Kiểm tra bắt đầu bằng chữ (giống RE)
+                if not re.match(r'^[A-Za-z\u3131-\u318E\u4E00-\u9FFF]', part):
+                    continue
+                
+                # ĐỒNG BỘ HÓA VỚI RE: Loại bỏ các từ chung chung (không phải tên thành viên)
+                # Giống RE: filter các từ như "Thành viên", "Danh sách", etc.
+                GENERIC_TERMS = {
+                    'thành viên', 'members', 'member', 'cựu thành viên', 'former members',
+                    'past members', 'current members', 'thành viên hiện tại', 'thành viên cũ',
+                    'danh sách', 'danh sách thành viên', 'danh sách cựu thành viên',
+                    'list', 'list of members', 'list of former members',
+                    'current', 'former', 'past', 'cựu'
+                }
+                part_lower = part.lower()
+                if part_lower in GENERIC_TERMS:
+                    continue
+                # Loại bỏ nếu chứa cụm từ chung chung (chỉ check các từ dài hơn 3 ký tự)
+                if any(term in part_lower for term in GENERIC_TERMS if len(term) > 3):
+                    continue
+                
+                # ĐỒNG BỘ HÓA VỚI RE: KHÔNG dùng clean_text() vì RE không dùng
+                # RE trả về part trực tiếp, NER cũng phải giữ tên gốc như vậy
+                # CHỈ dùng normalize_for_comparison để check trùng lặp (không thay đổi tên gốc)
+                member = part  # Giữ tên gốc như RE
                 if not member:
                     continue
 
-                low = member.lower()
+                # ============================================
+                # CHỈ CHECK TRÙNG LẶP (KHÔNG CÓ BỘ LỌC KHÁC)
+                # ============================================
+                # Giống RE: đã filter từ chung chung ở trên, chỉ check trùng lặp
+                # Vì đã được verify từ infobox Wikipedia
                 
-                # Loại bỏ các từ chung chung (không phải tên thành viên)
-                if low in GENERIC_MEMBER_TERMS:
+                # QUAN TRỌNG: Dùng CÙNG cách chuẩn hóa như khi tạo existing_lower
+                # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                member_key = normalize_for_comparison(member)
+                
+                # Check trùng với node gốc (cùng tên VÀ cùng type Artist)
+                if member_key in existing_lower and 'Artist' in existing_lower[member_key]:
                     continue
                 
-                # Loại bỏ nếu chỉ là một từ chung chung (không phải tên người)
-                if low in ['thành viên', 'members', 'member', 'cựu', 'former', 'past', 'current']:
-                    continue
-
-                # Không trùng node gốc
-                # CHUẨN HÓA member trước khi check
-                normalized_member = clean_text(member)
-                # Loại bỏ khoảng trắng để so sánh với existing_lower
-                member_key = normalized_member.lower().replace(' ', '')
-                if member_key in existing_lower:
-                    continue
-                # Không trùng trong danh sách infobox đã thêm
+                # Check trùng trong danh sách infobox đã thêm
                 if member_key in seen:
                     continue
 
-                # Độ dài hợp lý cho Artist
-                if len(member) < 2 or len(member) > 40:
-                    continue
-
-                # Bỏ từ vô nghĩa
-                if low in INVALID_WORDS:
-                    continue
-
-                # Không chứa số lạ (cho phép tên kiểu 2AM, 2PM nhưng đó là nhóm, không phải thành viên)
-                if re.search(r'\d', member):
-                    continue
-
-                # Chỉ chấp nhận nếu là Artist hợp lệ
-                if not is_valid_entity(member, 'Artist'):
-                    continue
-
-                seen.add(normalized_member.lower())
+                # Thêm vào seen và entities
+                seen.add(member_key)
                 entities.append({
                     'text': member,
                     'type': 'Artist',
@@ -2194,10 +2265,10 @@ def extract_known_companies(text):
     text_lower = text.lower()
     for company in KNOWN_COMPANIES:
         # CHUẨN HÓA company name trước khi check
-        normalized_company = clean_text(company)
-        # Loại bỏ khoảng trắng để so sánh với existing_lower
-        company_key = normalized_company.lower().replace(' ', '')
-        if company.lower() in text_lower and company_key not in existing_lower:
+        # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+        company_key = normalize_for_comparison(company)
+        # QUAN TRỌNG: Chỉ thêm nếu chưa có trong graph (cùng tên VÀ cùng type Company)
+        if company.lower() in text_lower and not (company_key in existing_lower and 'Company' in existing_lower[company_key]):
             entities.append({
                 'text': company,
                 'type': 'Company',
@@ -2267,10 +2338,11 @@ for i, record in enumerate(records, 1):
                         continue
                     
                     # CHECK TRÙNG VỚI GRAPH GỐC (giống rule-based)
-                    normalized_entity = clean_text(entity_text)
-                    entity_key = normalized_entity.lower().replace(' ', '')
-                    if entity_key in existing_lower:
-                        # Entity đã tồn tại trong graph gốc -> bỏ qua
+                    # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+                    entity_key = normalize_for_comparison(entity_text)
+                    # QUAN TRỌNG: Chỉ loại bỏ nếu cùng tên VÀ cùng type
+                    if entity_key in existing_lower and entity_type in existing_lower[entity_key]:
+                        # Entity đã tồn tại trong graph gốc (cùng tên và type) -> bỏ qua
                         continue
                     
                     # KHÔNG CHECK TRÙNG VỚI RULE-BASED (sẽ lưu riêng)
@@ -2295,24 +2367,44 @@ print("\n📊 Bước 2a: Gộp và loại bỏ trùng lặp (Rule-based)...")
 unique_rule = {}
 
 for ent in all_entities:
-    # Chuẩn hóa text để tránh trùng do khác khoảng trắng / hoa thường
-    normalized_text = clean_text(ent['text'])
+    # QUAN TRỌNG: Entities từ infobox KHÔNG được clean_text() vì phải giữ tên gốc như RE
+    # Chỉ clean_text() cho các entities từ rule-based (text extraction)
+    if ent.get('method') == 'infobox_members':
+        # Giữ nguyên tên gốc, không clean_text()
+        normalized_text = ent['text']
+    else:
+        # Chuẩn hóa text để tránh trùng do khác khoảng trắng / hoa thường
+        normalized_text = clean_text(ent['text'])
+    
     ent['text'] = normalized_text
     
-    # Tạo key để gộp: CHỈ merge các entity hoàn toàn giống nhau (sau khi normalize)
-    normalized_lower = normalized_text.lower()
-    key = (normalized_lower, ent['type'])
+    # Tạo key để gộp: Dùng normalize_for_comparison() để match các biến thể
+    # (ví dụ: "Kwon Jung-yeol" vs "Kwon Jung yeol" -> cùng một node)
+    # QUAN TRỌNG: Dùng cùng cách normalize như khi check với existing_lower
+    merge_key = normalize_for_comparison(normalized_text)
+    key = (merge_key, ent['type'])
     
     if key not in unique_rule:
         unique_rule[key] = {**ent, 'sources': [ent.get('source_node', '')]}
     else:
-        # Gộp sources - chỉ merge nếu text hoàn toàn giống nhau (sau normalize)
+        # ƯU TIÊN NODE TỪ INFOBOX: Nếu trùng, giữ node từ infobox, loại node còn lại
         existing = unique_rule[key]
-        source_node = ent.get('source_node', '')
-        if source_node and source_node not in existing.get('sources', []):
-            existing['sources'].append(source_node)
-        # Giữ confidence cao nhất
-        existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
+        existing_is_infobox = existing.get('method') == 'infobox_members'
+        new_is_infobox = ent.get('method') == 'infobox_members'
+        
+        if new_is_infobox and not existing_is_infobox:
+            # Node mới từ infobox, node existing không phải -> thay thế
+            unique_rule[key] = {**ent, 'sources': [ent.get('source_node', '')]}
+        elif existing_is_infobox and not new_is_infobox:
+            # Node existing từ infobox, node mới không phải -> bỏ qua node mới (giữ existing)
+            continue
+        else:
+            # Cả hai đều từ infobox hoặc cả hai đều không -> merge như bình thường
+            source_node = ent.get('source_node', '')
+            if source_node and source_node not in existing.get('sources', []):
+                existing['sources'].append(source_node)
+            # Giữ confidence cao nhất
+            existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
 
 merged_rule_entities = list(unique_rule.values())
 print(f"  ✓ Còn {len(merged_rule_entities)} entities (rule-based) sau khi gộp")
@@ -2330,9 +2422,10 @@ if ML_NER_AVAILABLE and ml_all_entities:
         normalized_text = clean_text(ent['text'])
         ent['text'] = normalized_text
         
-        # Tạo key để gộp: CHỈ merge các entity hoàn toàn giống nhau (sau khi normalize)
-        normalized_lower = normalized_text.lower()
-        key = (normalized_lower, ent['type'])
+        # Tạo key để gộp: Dùng normalize_for_comparison() để match các biến thể
+        # QUAN TRỌNG: Dùng cùng cách normalize như khi check với existing_lower
+        merge_key = normalize_for_comparison(normalized_text)
+        key = (merge_key, ent['type'])
         
         if key not in unique_ml:
             unique_ml[key] = {**ent, 'sources': [ent.get('source_node', '')]}
@@ -2349,17 +2442,82 @@ if ML_NER_AVAILABLE and ml_all_entities:
     print(f"  ✓ Còn {len(merged_ml_entities)} entities (ML-based) sau khi gộp")
 
 # =====================================================
+# HÀM FIX TYPE SAI
+# =====================================================
+def fix_entity_type(entity_text, entity_type, sources):
+    """
+    Sửa type sai cho entity.
+    Ví dụ: "Lee Su ji" bị nhầm là Group nhưng thực ra là Artist.
+    """
+    text_lower = entity_text.lower().strip()
+    
+    # ============================================
+    # FIX: TÊN NGƯỜI BỊ NHẦM LÀ GROUP
+    # ============================================
+    if entity_type == 'Group':
+        # Pattern tên người Hàn Quốc: "Họ Tên" (2-3 từ, bắt đầu bằng họ Hàn)
+        korean_surnames_lower = {s.lower() for s in KOREAN_SURNAMES}
+        words = entity_text.split()
+        
+        # Nếu có 2-3 từ và từ đầu là họ Hàn Quốc -> có thể là tên người
+        if 2 <= len(words) <= 3:
+            first_word = words[0].strip()
+            if first_word.lower() in korean_surnames_lower:
+                # Kiểm tra context: nếu có từ khóa nghệ sĩ/ca sĩ -> chuyển thành Artist
+                for source in sources:
+                    full_text = node_texts.get(source, '')
+                    if full_text:
+                        # Tìm vị trí entity trong text
+                        idx = full_text.find(text_lower)
+                        if idx != -1:
+                            # Lấy context xung quanh (200 ký tự)
+                            start = max(0, idx - 100)
+                            end = min(len(full_text), idx + len(entity_text) + 100)
+                            context = full_text[start:end].lower()
+                            
+                            # Nếu có từ khóa nghệ sĩ/ca sĩ/thành viên -> là Artist
+                            artist_keywords = ['ca sĩ', 'nghệ sĩ', 'thành viên', 'singer', 'artist', 'member', 'idol']
+                            if any(kw in context for kw in artist_keywords):
+                                return 'Artist'
+                            
+                            # Nếu có từ khóa nhóm nhạc/group -> giữ Group
+                            group_keywords = ['nhóm nhạc', 'ban nhạc', 'group', 'band']
+                            if any(kw in context for kw in group_keywords):
+                                return 'Group'
+        
+        # Danh sách tên người đã biết bị nhầm là Group
+        known_artist_names = {
+            'lee su ji', 'lee su-ji', 'leesuji',  # Ví dụ từ user
+            # Có thể thêm các tên khác nếu phát hiện
+        }
+        if text_lower in known_artist_names:
+            return 'Artist'
+    
+    return entity_type
+
+# =====================================================
 # LỌC THEO CONTEXT K-POP VÀ PHÙ HỢP VỚI MẠNG LƯỚI (RULE-BASED)
 # =====================================================
 print("\n📊 Bước 3a: Lọc theo context K-pop và phù hợp mạng lưới (Rule-based)...")
 filtered_rule_entities = []
 removed_count_rule = defaultdict(int)
 removed_reason_rule = defaultdict(lambda: defaultdict(int))
+fixed_type_count = defaultdict(int)
 
 for ent in merged_rule_entities:
     sources = ent.get('sources', [ent.get('source_node', '')])
     entity_type = ent['type']
     entity_text = ent['text']
+    
+    # ============================================
+    # FIX TYPE SAI TRƯỚC KHI FILTER
+    # ============================================
+    original_type = entity_type
+    entity_type = fix_entity_type(entity_text, entity_type, sources)
+    if entity_type != original_type:
+        ent['type'] = entity_type
+        fixed_type_count[f"{original_type}->{entity_type}"] += 1
+        print(f"   🔧 Fixed type: '{entity_text}' {original_type} -> {entity_type}")
     
     # Safety filter bổ sung cho Group để loại bỏ các mảnh tên sai còn sót như "Indie OKDAL Y"
     if entity_type == 'Group':
@@ -2371,6 +2529,30 @@ for ent in merged_rule_entities:
     
     # Known list (công ty đã biết) -> luôn giữ
     if ent.get('method') == 'known_list':
+        filtered_rule_entities.append(ent)
+        continue
+    
+    # QUAN TRỌNG: Artists từ infobox -> luôn giữ (vì đã được verify từ infobox của group)
+    # Không cần check context vì họ là thành viên của group đã có trong graph
+    if ent.get('method') == 'infobox_members':
+        # Kiểm tra xem source_node (group name) có trong graph không
+        source_node = ent.get('source_node', '')
+        if source_node:
+            # Nếu group có trong graph -> artist hợp lệ
+            # Dùng normalize_for_comparison để đảm bảo cùng cách chuẩn hóa với merge_and_import_neo4j.py
+            source_normalized = normalize_for_comparison(source_node)
+            # existing_lower là Dict[str, Set[str]] - check xem có Group type không
+            if source_normalized in existing_lower and 'Group' in existing_lower[source_normalized]:
+                filtered_rule_entities.append(ent)
+                continue
+            # Hoặc nếu group có trong danh sách groups từ infobox -> cũng hợp lệ
+            groups_infobox = INFOBOX_MEMBERS.get('groups', {})
+            if source_node in groups_infobox or any(g.lower() == source_node.lower() for g in groups_infobox.keys()):
+                filtered_rule_entities.append(ent)
+                continue
+        
+        # Nếu không có source_node, vẫn giữ (có thể là từ infobox nhưng không có group name)
+        # Vì đã được verify từ infobox nên đáng tin cậy
         filtered_rule_entities.append(ent)
         continue
     
@@ -2430,6 +2612,7 @@ for ent in merged_rule_entities:
 filtered_ml_entities = []
 removed_count_ml = defaultdict(int)
 removed_reason_ml = defaultdict(lambda: defaultdict(int))
+fixed_type_count_ml = defaultdict(int)
 
 if ML_NER_AVAILABLE and merged_ml_entities:
     print("\n📊 Bước 3b: Lọc theo context K-pop và phù hợp mạng lưới (ML-based)...")
@@ -2438,6 +2621,16 @@ if ML_NER_AVAILABLE and merged_ml_entities:
         sources = ent.get('sources', [ent.get('source_node', '')])
         entity_type = ent['type']
         entity_text = ent['text']
+        
+        # ============================================
+        # FIX TYPE SAI TRƯỚC KHI FILTER (giống rule-based)
+        # ============================================
+        original_type = entity_type
+        entity_type = fix_entity_type(entity_text, entity_type, sources)
+        if entity_type != original_type:
+            ent['type'] = entity_type
+            fixed_type_count_ml[f"{original_type}->{entity_type}"] += 1
+            print(f"   🔧 Fixed type (ML): '{entity_text}' {original_type} -> {entity_type}")
         
         # Kiểm tra 1: Phải có context K-pop
         if not has_kpop_context(sources):
@@ -2480,20 +2673,37 @@ if ML_NER_AVAILABLE and merged_ml_entities:
 # =====================================================
 final_unique_rule = {}
 for ent in filtered_rule_entities:
-    norm_text = clean_text(ent['text'])
+    # QUAN TRỌNG: Entities từ infobox KHÔNG được clean_text() vì phải giữ tên gốc như RE
+    if ent.get('method') == 'infobox_members':
+        norm_text = ent['text']  # Giữ nguyên tên gốc
+    else:
+        norm_text = clean_text(ent['text'])
     ent['text'] = norm_text
     
-    normalized_lower = norm_text.lower()
-    key = (normalized_lower, ent['type'])
+    # Dùng normalize_for_comparison() để match các biến thể
+    merge_key = normalize_for_comparison(norm_text)
+    key = (merge_key, ent['type'])
     
     if key not in final_unique_rule:
         final_unique_rule[key] = {**ent}
     else:
+        # ƯU TIÊN NODE TỪ INFOBOX: Nếu trùng, giữ node từ infobox, loại node còn lại
         existing = final_unique_rule[key]
-        existing_sources = set(existing.get('sources', []))
-        new_sources = set(ent.get('sources', []))
-        existing['sources'] = list(existing_sources | new_sources)
-        existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
+        existing_is_infobox = existing.get('method') == 'infobox_members'
+        new_is_infobox = ent.get('method') == 'infobox_members'
+        
+        if new_is_infobox and not existing_is_infobox:
+            # Node mới từ infobox, node existing không phải -> thay thế
+            final_unique_rule[key] = {**ent}
+        elif existing_is_infobox and not new_is_infobox:
+            # Node existing từ infobox, node mới không phải -> bỏ qua node mới (giữ existing)
+            continue
+        else:
+            # Cả hai đều từ infobox hoặc cả hai đều không -> merge như bình thường
+            existing_sources = set(existing.get('sources', []))
+            new_sources = set(ent.get('sources', []))
+            existing['sources'] = list(existing_sources | new_sources)
+            existing['confidence'] = max(existing.get('confidence', 0), ent.get('confidence', 0))
 
 filtered_rule_entities = list(final_unique_rule.values())
 print(f"  ✓ Còn {len(filtered_rule_entities)} entities (rule-based) sau khi lọc")
@@ -2506,8 +2716,9 @@ for ent in filtered_ml_entities:
     norm_text = clean_text(ent['text'])
     ent['text'] = norm_text
     
-    normalized_lower = norm_text.lower()
-    key = (normalized_lower, ent['type'])
+    # Dùng normalize_for_comparison() để match các biến thể
+    merge_key = normalize_for_comparison(norm_text)
+    key = (merge_key, ent['type'])
     
     if key not in final_unique_ml:
         final_unique_ml[key] = {**ent}
@@ -2561,7 +2772,7 @@ output_rule = {
     'entities': filtered_rule_entities
 }
 
-with open('kpop_ner_result.json', 'w', encoding='utf-8') as f:
+with open('data/kpop_ner_result.json', 'w', encoding='utf-8') as f:
     json.dump(output_rule, f, ensure_ascii=False, indent=2)
 
 # =====================================================
@@ -2591,7 +2802,7 @@ if ML_NER_AVAILABLE:
         'entities': filtered_ml_entities
     }
     
-    with open('kpop_ner_ml_result.json', 'w', encoding='utf-8') as f:
+    with open('data/kpop_ner_ml_result.json', 'w', encoding='utf-8') as f:
         json.dump(output_ml, f, ensure_ascii=False, indent=2)
 
 # =====================================================
@@ -2613,6 +2824,13 @@ print(f"   Sau khi lọc K-pop: {len(filtered_rule_entities)}")
 print(f"\n   Phân loại cuối cùng (Rule-based):")
 for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
     print(f"     - {t}: {counts_rule.get(t, 0)}")
+
+print(f"\n   Số entities đã sửa type (Rule-based):")
+if fixed_type_count:
+    for fix_type, count in fixed_type_count.items():
+        print(f"     - {fix_type}: {count}")
+else:
+    print(f"     - Không có")
 
 print(f"\n   Số entities bị loại (Rule-based):")
 for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
@@ -2637,6 +2855,13 @@ if ML_NER_AVAILABLE:
     print(f"\n   Phân loại cuối cùng (ML-based):")
     for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:
         print(f"     - {t}: {counts_ml.get(t, 0)}")
+    
+    print(f"\n   Số entities đã sửa type (ML-based):")
+    if fixed_type_count_ml:
+        for fix_type, count in fixed_type_count_ml.items():
+            print(f"     - {fix_type}: {count}")
+    else:
+        print(f"     - Không có")
     
     print(f"\n   Số entities bị loại (ML-based):")
     for t in ['Company', 'Group', 'Artist', 'Album', 'Song']:

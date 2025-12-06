@@ -1,0 +1,605 @@
+"""
+Chatbot Comparison Module
+
+This module compares the K-pop Knowledge Graph Chatbot with
+popular chatbots on the market (ChatGPT, Gemini, etc.)
+
+Evaluation metrics:
+- Accuracy: Correct answers / Total questions
+- Precision: For each category
+- Response time
+- Multi-hop reasoning capability
+"""
+
+import json
+import time
+import os
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+import requests
+
+# Optional: OpenAI API for ChatGPT comparison
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+
+@dataclass
+class EvaluationResult:
+    """Result of evaluating a single question."""
+    question_id: str
+    question: str
+    question_type: str
+    correct_answer: str
+    predicted_answer: str
+    is_correct: bool
+    confidence: float
+    response_time: float  # seconds
+    hops: int
+    category: str
+
+
+@dataclass
+class ChatbotEvaluation:
+    """Overall evaluation of a chatbot."""
+    chatbot_name: str
+    total_questions: int
+    correct_answers: int
+    accuracy: float
+    accuracy_by_hops: Dict[int, float]
+    accuracy_by_type: Dict[str, float]
+    accuracy_by_category: Dict[str, float]
+    avg_response_time: float
+    evaluated_at: str
+    results: List[EvaluationResult]
+
+
+class ChatbotComparison:
+    """
+    Compare K-pop chatbot with other chatbots.
+    
+    Supported comparisons:
+    - ChatGPT (OpenAI API)
+    - Gemini (Google API)
+    - Claude (Anthropic API)
+    - Local baseline (no knowledge graph)
+    """
+    
+    def __init__(
+        self,
+        kpop_chatbot=None,
+        openai_api_key: Optional[str] = None,
+        google_api_key: Optional[str] = None
+    ):
+        """
+        Initialize comparison module.
+        
+        Args:
+            kpop_chatbot: Our K-pop chatbot instance
+            openai_api_key: OpenAI API key for ChatGPT
+            google_api_key: Google API key for Gemini
+        """
+        self.kpop_chatbot = kpop_chatbot
+        
+        # API keys from environment or parameters
+        self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
+        self.google_api_key = google_api_key or os.environ.get("GOOGLE_API_KEY")
+        
+        # Initialize OpenAI client if available
+        if OPENAI_AVAILABLE and self.openai_api_key:
+            openai.api_key = self.openai_api_key
+            
+    def load_evaluation_dataset(
+        self,
+        path: str = "data/evaluation_dataset.json"
+    ) -> List[Dict]:
+        """Load evaluation dataset."""
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data['questions']
+        
+    def evaluate_kpop_chatbot(
+        self,
+        questions: List[Dict],
+        max_questions: Optional[int] = None
+    ) -> ChatbotEvaluation:
+        """
+        Evaluate our K-pop chatbot.
+        
+        Args:
+            questions: List of evaluation questions
+            max_questions: Limit number of questions
+            
+        Returns:
+            ChatbotEvaluation results
+        """
+        if self.kpop_chatbot is None:
+            raise ValueError("K-pop chatbot not initialized")
+            
+        if max_questions:
+            questions = questions[:max_questions]
+            
+        print(f"🔄 Evaluating K-pop Chatbot on {len(questions)} questions...")
+        
+        results = []
+        correct = 0
+        total_time = 0
+        
+        for i, q in enumerate(questions):
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/{len(questions)}")
+                
+            start_time = time.time()
+            
+            try:
+                if q['question_type'] == 'true_false':
+                    result = self.kpop_chatbot.answer_yes_no(q['question'])
+                    predicted = "Đúng" if result['answer'] in ['Có', 'Đúng', 'Yes'] else "Sai"
+                elif q['question_type'] == 'yes_no':
+                    result = self.kpop_chatbot.answer_yes_no(q['question'])
+                    predicted = result['answer']
+                else:  # multiple_choice
+                    result = self.kpop_chatbot.answer_multiple_choice(
+                        q['question'],
+                        q['choices']
+                    )
+                    predicted = result['selected_letter']
+                    
+                confidence = result.get('confidence', 0.5)
+                
+            except Exception as e:
+                predicted = "Error"
+                confidence = 0.0
+                
+            end_time = time.time()
+            response_time = end_time - start_time
+            total_time += response_time
+            
+            is_correct = predicted == q['answer']
+            if is_correct:
+                correct += 1
+                
+            results.append(EvaluationResult(
+                question_id=q['id'],
+                question=q['question'],
+                question_type=q['question_type'],
+                correct_answer=q['answer'],
+                predicted_answer=predicted,
+                is_correct=is_correct,
+                confidence=confidence,
+                response_time=response_time,
+                hops=q['hops'],
+                category=q['category']
+            ))
+            
+        # Calculate metrics
+        accuracy = correct / len(questions) if questions else 0
+        
+        # Accuracy by hops
+        accuracy_by_hops = {}
+        for hop in [1, 2, 3]:
+            hop_results = [r for r in results if r.hops == hop]
+            if hop_results:
+                accuracy_by_hops[hop] = sum(1 for r in hop_results if r.is_correct) / len(hop_results)
+                
+        # Accuracy by type
+        accuracy_by_type = {}
+        for qtype in ['true_false', 'yes_no', 'multiple_choice']:
+            type_results = [r for r in results if r.question_type == qtype]
+            if type_results:
+                accuracy_by_type[qtype] = sum(1 for r in type_results if r.is_correct) / len(type_results)
+                
+        # Accuracy by category
+        accuracy_by_category = {}
+        categories = set(r.category for r in results)
+        for cat in categories:
+            cat_results = [r for r in results if r.category == cat]
+            if cat_results:
+                accuracy_by_category[cat] = sum(1 for r in cat_results if r.is_correct) / len(cat_results)
+                
+        return ChatbotEvaluation(
+            chatbot_name="K-pop Knowledge Graph Chatbot",
+            total_questions=len(questions),
+            correct_answers=correct,
+            accuracy=accuracy,
+            accuracy_by_hops=accuracy_by_hops,
+            accuracy_by_type=accuracy_by_type,
+            accuracy_by_category=accuracy_by_category,
+            avg_response_time=total_time / len(questions) if questions else 0,
+            evaluated_at=datetime.now().isoformat(),
+            results=results
+        )
+        
+    def evaluate_chatgpt(
+        self,
+        questions: List[Dict],
+        model: str = "gpt-3.5-turbo",
+        max_questions: Optional[int] = None
+    ) -> ChatbotEvaluation:
+        """
+        Evaluate ChatGPT on the dataset.
+        
+        Args:
+            questions: List of evaluation questions
+            model: ChatGPT model to use
+            max_questions: Limit number of questions
+            
+        Returns:
+            ChatbotEvaluation results
+        """
+        if not OPENAI_AVAILABLE or not self.openai_api_key:
+            print("⚠️ OpenAI API not available. Skipping ChatGPT evaluation.")
+            return self._create_mock_evaluation("ChatGPT (Not Available)", questions[:max_questions or len(questions)])
+            
+        if max_questions:
+            questions = questions[:max_questions]
+            
+        print(f"🔄 Evaluating ChatGPT ({model}) on {len(questions)} questions...")
+        
+        results = []
+        correct = 0
+        total_time = 0
+        
+        for i, q in enumerate(questions):
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/{len(questions)}")
+                
+            start_time = time.time()
+            
+            try:
+                prompt = self._format_question_for_api(q)
+                
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "Bạn là chuyên gia về K-pop. Trả lời ngắn gọn."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=50,
+                    temperature=0.1
+                )
+                
+                answer_text = response.choices[0].message.content.strip()
+                predicted = self._parse_api_response(answer_text, q['question_type'], q.get('choices', []))
+                confidence = 0.8
+                
+            except Exception as e:
+                predicted = "Error"
+                confidence = 0.0
+                
+            end_time = time.time()
+            response_time = end_time - start_time
+            total_time += response_time
+            
+            is_correct = predicted == q['answer']
+            if is_correct:
+                correct += 1
+                
+            results.append(EvaluationResult(
+                question_id=q['id'],
+                question=q['question'],
+                question_type=q['question_type'],
+                correct_answer=q['answer'],
+                predicted_answer=predicted,
+                is_correct=is_correct,
+                confidence=confidence,
+                response_time=response_time,
+                hops=q['hops'],
+                category=q['category']
+            ))
+            
+            # Rate limiting
+            time.sleep(0.5)
+            
+        # Calculate metrics (same as above)
+        accuracy = correct / len(questions) if questions else 0
+        
+        accuracy_by_hops = {}
+        for hop in [1, 2, 3]:
+            hop_results = [r for r in results if r.hops == hop]
+            if hop_results:
+                accuracy_by_hops[hop] = sum(1 for r in hop_results if r.is_correct) / len(hop_results)
+                
+        accuracy_by_type = {}
+        for qtype in ['true_false', 'yes_no', 'multiple_choice']:
+            type_results = [r for r in results if r.question_type == qtype]
+            if type_results:
+                accuracy_by_type[qtype] = sum(1 for r in type_results if r.is_correct) / len(type_results)
+                
+        accuracy_by_category = {}
+        categories = set(r.category for r in results)
+        for cat in categories:
+            cat_results = [r for r in results if r.category == cat]
+            if cat_results:
+                accuracy_by_category[cat] = sum(1 for r in cat_results if r.is_correct) / len(cat_results)
+                
+        return ChatbotEvaluation(
+            chatbot_name=f"ChatGPT ({model})",
+            total_questions=len(questions),
+            correct_answers=correct,
+            accuracy=accuracy,
+            accuracy_by_hops=accuracy_by_hops,
+            accuracy_by_type=accuracy_by_type,
+            accuracy_by_category=accuracy_by_category,
+            avg_response_time=total_time / len(questions) if questions else 0,
+            evaluated_at=datetime.now().isoformat(),
+            results=results
+        )
+        
+    def evaluate_baseline(
+        self,
+        questions: List[Dict],
+        max_questions: Optional[int] = None
+    ) -> ChatbotEvaluation:
+        """
+        Evaluate random baseline (for comparison).
+        
+        Args:
+            questions: List of evaluation questions
+            max_questions: Limit number of questions
+            
+        Returns:
+            ChatbotEvaluation results
+        """
+        import random
+        
+        if max_questions:
+            questions = questions[:max_questions]
+            
+        print(f"🔄 Evaluating Random Baseline on {len(questions)} questions...")
+        
+        results = []
+        correct = 0
+        
+        for q in questions:
+            if q['question_type'] == 'true_false':
+                predicted = random.choice(["Đúng", "Sai"])
+            elif q['question_type'] == 'yes_no':
+                predicted = random.choice(["Có", "Không"])
+            else:
+                predicted = random.choice(['A', 'B', 'C', 'D'])
+                
+            is_correct = predicted == q['answer']
+            if is_correct:
+                correct += 1
+                
+            results.append(EvaluationResult(
+                question_id=q['id'],
+                question=q['question'],
+                question_type=q['question_type'],
+                correct_answer=q['answer'],
+                predicted_answer=predicted,
+                is_correct=is_correct,
+                confidence=0.25 if q['question_type'] == 'multiple_choice' else 0.5,
+                response_time=0.001,
+                hops=q['hops'],
+                category=q['category']
+            ))
+            
+        accuracy = correct / len(questions) if questions else 0
+        
+        # Calculate by hops
+        accuracy_by_hops = {}
+        for hop in [1, 2, 3]:
+            hop_results = [r for r in results if r.hops == hop]
+            if hop_results:
+                accuracy_by_hops[hop] = sum(1 for r in hop_results if r.is_correct) / len(hop_results)
+                
+        return ChatbotEvaluation(
+            chatbot_name="Random Baseline",
+            total_questions=len(questions),
+            correct_answers=correct,
+            accuracy=accuracy,
+            accuracy_by_hops=accuracy_by_hops,
+            accuracy_by_type={},
+            accuracy_by_category={},
+            avg_response_time=0.001,
+            evaluated_at=datetime.now().isoformat(),
+            results=results
+        )
+        
+    def _format_question_for_api(self, question: Dict) -> str:
+        """Format question for API call."""
+        q = question['question']
+        
+        if question['question_type'] == 'true_false':
+            return f"Nhận định sau đúng hay sai? Chỉ trả lời 'Đúng' hoặc 'Sai'.\n\n{q}"
+        elif question['question_type'] == 'yes_no':
+            return f"Trả lời 'Có' hoặc 'Không': {q}"
+        else:
+            choices = question['choices']
+            choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(choices)])
+            return f"Chọn đáp án đúng (trả lời A, B, C, hoặc D):\n\n{q}\n\n{choices_str}"
+            
+    def _parse_api_response(
+        self,
+        response: str,
+        question_type: str,
+        choices: List[str] = None
+    ) -> str:
+        """Parse API response to standard format."""
+        response_upper = response.upper().strip()
+        
+        if question_type == 'true_false':
+            if 'ĐÚNG' in response_upper or 'TRUE' in response_upper or 'CORRECT' in response_upper:
+                return "Đúng"
+            else:
+                return "Sai"
+        elif question_type == 'yes_no':
+            if 'CÓ' in response_upper or 'YES' in response_upper:
+                return "Có"
+            else:
+                return "Không"
+        else:
+            for letter in ['A', 'B', 'C', 'D']:
+                if letter in response_upper:
+                    return letter
+            return "A"  # Default
+            
+    def _create_mock_evaluation(
+        self,
+        name: str,
+        questions: List[Dict]
+    ) -> ChatbotEvaluation:
+        """Create mock evaluation when API not available."""
+        return ChatbotEvaluation(
+            chatbot_name=name,
+            total_questions=len(questions),
+            correct_answers=0,
+            accuracy=0.0,
+            accuracy_by_hops={},
+            accuracy_by_type={},
+            accuracy_by_category={},
+            avg_response_time=0.0,
+            evaluated_at=datetime.now().isoformat(),
+            results=[]
+        )
+        
+    def compare_chatbots(
+        self,
+        questions: List[Dict],
+        include_chatgpt: bool = True,
+        include_baseline: bool = True,
+        max_questions: Optional[int] = None,
+        output_path: str = "data/comparison_results.json"
+    ) -> Dict:
+        """
+        Run full comparison between chatbots.
+        
+        Args:
+            questions: Evaluation dataset
+            include_chatgpt: Include ChatGPT in comparison
+            include_baseline: Include random baseline
+            max_questions: Limit questions per chatbot
+            output_path: Path to save results
+            
+        Returns:
+            Comparison results dictionary
+        """
+        if max_questions:
+            questions = questions[:max_questions]
+            
+        print(f"\n{'='*60}")
+        print(f"🔬 Chatbot Comparison ({len(questions)} questions)")
+        print(f"{'='*60}\n")
+        
+        evaluations = {}
+        
+        # 1. K-pop Chatbot
+        if self.kpop_chatbot:
+            eval_kpop = self.evaluate_kpop_chatbot(questions)
+            evaluations['kpop_chatbot'] = eval_kpop
+            print(f"✅ K-pop Chatbot: {eval_kpop.accuracy:.2%} accuracy")
+            
+        # 2. ChatGPT
+        if include_chatgpt:
+            eval_chatgpt = self.evaluate_chatgpt(questions)
+            evaluations['chatgpt'] = eval_chatgpt
+            print(f"✅ ChatGPT: {eval_chatgpt.accuracy:.2%} accuracy")
+            
+        # 3. Baseline
+        if include_baseline:
+            eval_baseline = self.evaluate_baseline(questions)
+            evaluations['baseline'] = eval_baseline
+            print(f"✅ Baseline: {eval_baseline.accuracy:.2%} accuracy")
+            
+        # Create comparison report
+        comparison = {
+            "metadata": {
+                "total_questions": len(questions),
+                "comparison_date": datetime.now().isoformat(),
+                "chatbots_compared": list(evaluations.keys())
+            },
+            "summary": {},
+            "detailed_results": {}
+        }
+        
+        for name, eval_result in evaluations.items():
+            comparison["summary"][name] = {
+                "accuracy": eval_result.accuracy,
+                "accuracy_by_hops": eval_result.accuracy_by_hops,
+                "accuracy_by_type": eval_result.accuracy_by_type,
+                "avg_response_time": eval_result.avg_response_time
+            }
+            comparison["detailed_results"][name] = {
+                "correct_answers": eval_result.correct_answers,
+                "total_questions": eval_result.total_questions,
+                "accuracy_by_category": eval_result.accuracy_by_category,
+                "results": [asdict(r) for r in eval_result.results[:100]]  # Sample
+            }
+            
+        # Save results
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(comparison, f, ensure_ascii=False, indent=2)
+            
+        print(f"\n📄 Results saved to: {output_path}")
+        
+        # Print comparison table
+        self._print_comparison_table(evaluations)
+        
+        return comparison
+        
+    def _print_comparison_table(self, evaluations: Dict[str, ChatbotEvaluation]):
+        """Print formatted comparison table."""
+        print(f"\n{'='*70}")
+        print(f"{'📊 COMPARISON RESULTS':^70}")
+        print(f"{'='*70}")
+        
+        # Header
+        print(f"{'Chatbot':<30} {'Accuracy':>10} {'1-hop':>8} {'2-hop':>8} {'3-hop':>8}")
+        print("-" * 70)
+        
+        # Data rows
+        for name, eval_result in evaluations.items():
+            hop1 = eval_result.accuracy_by_hops.get(1, 0)
+            hop2 = eval_result.accuracy_by_hops.get(2, 0)
+            hop3 = eval_result.accuracy_by_hops.get(3, 0)
+            
+            print(f"{name:<30} {eval_result.accuracy:>9.1%} {hop1:>7.1%} {hop2:>7.1%} {hop3:>7.1%}")
+            
+        print("=" * 70)
+        
+        # Winner
+        if evaluations:
+            winner = max(evaluations.items(), key=lambda x: x[1].accuracy)
+            print(f"\n🏆 Best performer: {winner[0]} ({winner[1].accuracy:.1%} accuracy)")
+
+
+def main():
+    """Run chatbot comparison."""
+    from .chatbot import KpopChatbot
+    from .evaluation import EvaluationDatasetGenerator
+    
+    # Generate evaluation dataset if not exists
+    dataset_path = "data/evaluation_dataset.json"
+    if not os.path.exists(dataset_path):
+        print("📝 Generating evaluation dataset...")
+        generator = EvaluationDatasetGenerator()
+        generator.generate_full_dataset(output_path=dataset_path)
+        
+    # Initialize chatbot
+    print("\n🤖 Initializing K-pop Chatbot...")
+    chatbot = KpopChatbot(verbose=True)
+    
+    # Run comparison
+    comparison = ChatbotComparison(kpop_chatbot=chatbot)
+    questions = comparison.load_evaluation_dataset(dataset_path)
+    
+    results = comparison.compare_chatbots(
+        questions,
+        include_chatgpt=False,  # Set True if you have API key
+        include_baseline=True,
+        max_questions=500  # Limit for testing
+    )
+    
+    print("\n✅ Comparison complete!")
+
+
+if __name__ == "__main__":
+    main()
+

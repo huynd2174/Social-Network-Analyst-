@@ -464,6 +464,24 @@ class RelationshipExtractor:
             if len(target) < 2 or len(target) > 100:
                 continue
             
+            # Loại bỏ các từ chung chung không phải tên thực thể
+            GENERIC_TERMS = {
+                'thành viên', 'members', 'member', 'cựu thành viên', 'former members',
+                'past members', 'current members', 'thành viên hiện tại', 'thành viên cũ',
+                'danh sách', 'danh sách thành viên', 'danh sách cựu thành viên',
+                'list', 'list of members', 'list of former members',
+                'current', 'former', 'past', 'cựu'
+            }
+            source_lower = source.lower().strip()
+            target_lower = target.lower().strip()
+            if source_lower in GENERIC_TERMS or target_lower in GENERIC_TERMS:
+                continue
+            # Loại bỏ nếu chứa cụm từ chung chung (chỉ check các từ dài hơn 3 ký tự)
+            if any(term in source_lower for term in GENERIC_TERMS if len(term) > 3):
+                continue
+            if any(term in target_lower for term in GENERIC_TERMS if len(term) > 3):
+                continue
+            
             # Loại bỏ các quan hệ có context quá dài (entities quá xa nhau)
             context = rel.get('context', '')
             
@@ -1609,6 +1627,15 @@ class RelationshipExtractor:
         if not value:
             return []
         
+        # Từ chung chung cần loại bỏ (không phải tên thành viên)
+        GENERIC_TERMS = {
+            'thành viên', 'members', 'member', 'cựu thành viên', 'former members',
+            'past members', 'current members', 'thành viên hiện tại', 'thành viên cũ',
+            'danh sách', 'danh sách thành viên', 'danh sách cựu thành viên',
+            'list', 'list of members', 'list of former members',
+            'current', 'former', 'past', 'cựu'
+        }
+        
         # Tách theo dấu phẩy hoặc dấu *
         members = []
         parts = re.split(r'[,*•]', value)
@@ -1620,7 +1647,18 @@ class RelationshipExtractor:
             part = re.sub(r'\(.*?\)', '', part)  # Loại bỏ (notes)
             part = part.strip()
             
-            if part and len(part) >= 2 and len(part) <= 40:
+            if not part:
+                continue
+            
+            # Loại bỏ các từ chung chung (không phải tên thành viên)
+            part_lower = part.lower()
+            if part_lower in GENERIC_TERMS:
+                continue
+            # Loại bỏ nếu chứa cụm từ chung chung
+            if any(term in part_lower for term in GENERIC_TERMS if len(term) > 3):
+                continue
+            
+            if len(part) >= 2 and len(part) <= 40:
                 # Kiểm tra không phải số hoặc ký tự đặc biệt
                 if re.match(r'^[A-Za-z\u3131-\u318E\u4E00-\u9FFF]', part):
                     members.append(part)
@@ -1816,7 +1854,7 @@ def main():
     
     # Load entities đã nhận dạng
     try:
-        with open('kpop_ner_result.json', 'r', encoding='utf-8') as f:
+        with open('data/kpop_ner_result.json', 'r', encoding='utf-8') as f:
             ner_data = json.load(f)
         entities = ner_data.get('entities', [])
         print(f"  ✓ Đã load {len(entities)} entities từ kpop_ner_result.json")
@@ -1826,7 +1864,7 @@ def main():
     
     # Load text data
     try:
-        with open('enrichment_text_data.json', 'r', encoding='utf-8') as f:
+        with open('data/enrichment_text_data.json', 'r', encoding='utf-8') as f:
             text_data = json.load(f)
         records = text_data.get('data', [])
         print(f"  ✓ Đã load {len(records)} records từ enrichment_text_data.json")
@@ -1836,7 +1874,7 @@ def main():
     
     # Load graph nodes và edges để làm entities reference và kiểm tra trùng lặp
     try:
-        with open('korean_artists_graph_bfs.json', 'r', encoding='utf-8') as f:
+        with open('data/korean_artists_graph_bfs.json', 'r', encoding='utf-8') as f:
             graph_data = json.load(f)
         graph_nodes = graph_data.get('nodes', {})
         graph_edges = graph_data.get('edges', [])
@@ -1872,7 +1910,7 @@ def main():
     
     # Load infobox members
     try:
-        with open('infobox_members.json', 'r', encoding='utf-8') as f:
+        with open('data/infobox_members.json', 'r', encoding='utf-8') as f:
             infobox_data = json.load(f)
         print(f"  ✓ Đã load infobox_members.json")
     except Exception as e:
@@ -2148,7 +2186,7 @@ def main():
         'relationships': unique_relationships,
     }
     
-    output_file = 'kpop_relationships_result.json'
+    output_file = 'data/kpop_relationships_result.json'
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
     
