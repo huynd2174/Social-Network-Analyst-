@@ -170,6 +170,19 @@ QUAN TRỌNG - TẤT CẢ THÔNG TIN ĐỀU TỪ ĐỒ THỊ TRI THỨC:
         """Load the language model and tokenizer."""
         print(f"🔄 Loading model: {self.config.model_name}")
         
+        # Check GPU availability
+        if torch.cuda.is_available():
+            gpu_count = torch.cuda.device_count()
+            gpu_name = torch.cuda.get_device_name(0) if gpu_count > 0 else "Unknown"
+            print(f"✅ GPU detected: {gpu_name} ({gpu_count} device(s))")
+            print(f"   CUDA version: {torch.version.cuda}")
+            print(f"   PyTorch version: {torch.__version__}")
+        else:
+            print("⚠️  GPU not available, using CPU")
+            # Force CPU if no GPU
+            if self.config.device_map == "auto":
+                print("   Note: device_map='auto' will use CPU")
+        
         # Quantization config
         quantization_config = None
         if self.config.use_4bit:
@@ -228,6 +241,20 @@ QUAN TRỌNG - TẤT CẢ THÔNG TIN ĐỀU TỪ ĐỒ THỊ TRI THỨC:
                 **model_kwargs
             )
             
+            # Check which device the model is on
+            if hasattr(self.model, 'device'):
+                device_info = f"Device: {self.model.device}"
+            elif hasattr(self.model, 'hf_device_map'):
+                # Model is on multiple devices
+                device_info = f"Device map: {self.model.hf_device_map}"
+            else:
+                # Try to get device from first parameter
+                try:
+                    first_param = next(self.model.parameters())
+                    device_info = f"Device: {first_param.device}"
+                except:
+                    device_info = "Device: auto (detected by transformers)"
+            
             # Create pipeline
             self.pipe = pipeline(
                 "text-generation",
@@ -237,6 +264,16 @@ QUAN TRỌNG - TẤT CẢ THÔNG TIN ĐỀU TỪ ĐỒ THỊ TRI THỨC:
             
             print(f"✅ Model loaded successfully!")
             print(f"   Model size: {self._get_model_size()}")
+            print(f"   {device_info}")
+            
+            # Show GPU memory usage if available
+            if torch.cuda.is_available():
+                try:
+                    memory_allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
+                    memory_reserved = torch.cuda.memory_reserved(0) / 1024**3  # GB
+                    print(f"   GPU Memory: {memory_allocated:.2f} GB allocated, {memory_reserved:.2f} GB reserved")
+                except:
+                    pass
             
         except Exception as e:
             print(f"❌ Failed to load model: {e}")

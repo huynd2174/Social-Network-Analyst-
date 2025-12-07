@@ -1,7 +1,11 @@
 """
 Script để đánh giá chatbot trên evaluation dataset
 
+Mặc định: Đánh giá TẤT CẢ câu hỏi trong dataset (không cần lựa chọn)
+
 Chạy: python src/run_evaluation.py
+
+Để đánh giá một phần (nhanh hơn), dùng: python src/run_evaluation_quick.py
 """
 
 import os
@@ -56,29 +60,12 @@ def main():
     # Initialize comparison (chỉ cần để dùng evaluate_kpop_chatbot)
     comparison = ChatbotComparison(kpop_chatbot=chatbot)
     
-    # Ask user how many questions to evaluate
-    print(f"\n💡 Bạn muốn đánh giá bao nhiêu câu hỏi?")
-    print(f"   - Nhấn Enter để đánh giá TẤT CẢ ({len(questions)} câu) - có thể mất nhiều thời gian")
-    print(f"   - Hoặc nhập số (ví dụ: 100, 500, 1000)")
+    # Mặc định: Đánh giá TẤT CẢ câu hỏi
+    max_questions = None  # None = tất cả
     
-    try:
-        user_input = input("\n   Số câu hỏi (Enter = tất cả): ").strip()
-        if user_input:
-            max_questions = int(user_input)
-            if max_questions <= 0 or max_questions > len(questions):
-                print(f"   ⚠️  Số không hợp lệ, dùng tất cả {len(questions)} câu")
-                max_questions = None
-        else:
-            max_questions = None
-    except ValueError:
-        print(f"   ⚠️  Input không hợp lệ, dùng tất cả {len(questions)} câu")
-        max_questions = None
-    
-    if max_questions:
-        print(f"\n🔄 Đang đánh giá trên {max_questions} câu hỏi...")
-    else:
-        print(f"\n🔄 Đang đánh giá trên TẤT CẢ {len(questions)} câu hỏi...")
-        print(f"   ⚠️  Có thể mất nhiều thời gian (ước tính: {len(questions) * 2 / 60:.1f} phút)")
+    print(f"\n🔄 Đang đánh giá trên TẤT CẢ {len(questions)} câu hỏi...")
+    print(f"   ⚠️  Có thể mất nhiều thời gian (ước tính: {len(questions) * 2 / 60:.1f} phút)")
+    print(f"   💡 Để đánh giá một phần, sửa max_questions trong code hoặc dùng: python src/run_evaluation_quick.py")
     
     # Run evaluation
     start_time = datetime.now()
