@@ -29,19 +29,39 @@ from .evaluation import EvaluationDatasetGenerator
 chatbot = None
 
 
-def initialize_chatbot():
-    """Initialize the chatbot."""
+def initialize_chatbot(skip_llm: bool = False):
+    """
+    Initialize the chatbot.
+    
+    Args:
+        skip_llm: If True, skip loading LLM (faster startup, graph-only mode)
+    """
     global chatbot
     if chatbot is None:
         try:
             print("🔄 Initializing K-pop Chatbot...")
-            chatbot = KpopChatbot(verbose=True)
+            print("   (Lần đầu khởi tạo có thể mất 30-60 giây...)")
+            
+            # Initialize without LLM first for fast startup
+            chatbot = KpopChatbot(
+                verbose=True,
+                llm_model="qwen2-0.5b" if not skip_llm else None
+            )
             print("✅ Chatbot initialized successfully!")
+            
         except Exception as e:
             print(f"❌ Failed to initialize chatbot: {e}")
             import traceback
             traceback.print_exc()
-            raise
+            
+            # Try fallback without LLM
+            try:
+                print("🔄 Retrying without LLM...")
+                chatbot = KpopChatbot(verbose=True, llm_model=None)
+                print("✅ Chatbot initialized (graph-only mode)")
+            except Exception as e2:
+                print(f"❌ Fallback also failed: {e2}")
+                raise
     return chatbot
 
 
@@ -69,12 +89,18 @@ def chat_response(
     try:
         bot = initialize_chatbot()
         
-        # Get response
+        # ✅ YÊU CẦU BÀI TẬP: Phải dùng Small LLM dựa trên đồ thị tri thức
+        # LLM sẽ sử dụng context từ Knowledge Graph (GraphRAG) để trả lời
+        use_llm = True  # Luôn dùng LLM để đáp ứng yêu cầu
+        
+        # Get response using Small LLM with Knowledge Graph context
+        # Note: This may take 10-30 seconds, but UI will wait
         result = bot.chat(
             message,
             use_multi_hop=use_multihop,
             max_hops=max_hops,
-            return_details=True
+            return_details=True,
+            use_llm=use_llm  # Dùng Small LLM với context từ Knowledge Graph
         )
         
         response = result['response']
@@ -343,6 +369,8 @@ def create_ui():
         Chatbot thông minh về K-pop sử dụng **đồ thị tri thức** và **suy luận multi-hop**.
         
         > 💡 *Powered by GraphRAG + Small LLM (Qwen2-0.5B)*
+        > 
+        > ⏳ **Lưu ý:** Các câu hỏi có thể mất 10-30 giây để xử lý. Vui lòng kiên nhẫn đợi, chương trình sẽ không bị dừng!
         """)
         
         with gr.Tabs():
@@ -374,17 +402,40 @@ def create_ui():
                     )
                     clear_btn = gr.Button("Xóa 🗑️")
                     
-                # Event handlers
-                submit_btn.click(
-                    chat_response,
-                    inputs=[msg, chatbot_ui, use_multihop, max_hops],
-                    outputs=[msg, chatbot_ui]
-                )
-                msg.submit(
-                    chat_response,
-                    inputs=[msg, chatbot_ui, use_multihop, max_hops],
-                    outputs=[msg, chatbot_ui]
-                )
+                gr.Markdown("""
+                > 💡 **Gợi ý:** 
+                > - Chatbot sử dụng chế độ nhanh (graph-only) trước, sau đó mới dùng LLM nếu cần.
+                > - Để có câu trả lời nhanh nhất, hỏi về: thành viên, công ty, cùng công ty, nhóm nhạc...
+                > - ⏳ **Lưu ý:** Câu hỏi có thể mất 10-30 giây để xử lý. Vui lòng đợi, UI sẽ không bị dừng!
+                """)
+                    
+                # Event handlers - queue parameter may not be available in older Gradio versions
+                # If queue is not supported, Gradio will still process requests, just without queuing
+                try:
+                    submit_btn.click(
+                        chat_response,
+                        inputs=[msg, chatbot_ui, use_multihop, max_hops],
+                        outputs=[msg, chatbot_ui],
+                        queue=True  # Enable queue for long-running tasks (if supported)
+                    )
+                    msg.submit(
+                        chat_response,
+                        inputs=[msg, chatbot_ui, use_multihop, max_hops],
+                        outputs=[msg, chatbot_ui],
+                        queue=True  # Enable queue for long-running tasks (if supported)
+                    )
+                except TypeError:
+                    # Fallback for older Gradio versions without queue parameter
+                    submit_btn.click(
+                        chat_response,
+                        inputs=[msg, chatbot_ui, use_multihop, max_hops],
+                        outputs=[msg, chatbot_ui]
+                    )
+                    msg.submit(
+                        chat_response,
+                        inputs=[msg, chatbot_ui, use_multihop, max_hops],
+                        outputs=[msg, chatbot_ui]
+                    )
                 clear_btn.click(lambda: (None, []), outputs=[msg, chatbot_ui])
                 
             # Tab 2: Question Answering
@@ -514,12 +565,25 @@ def main():
     
     if app:
         print("\n🚀 Launching K-pop Chatbot UI...")
-        app.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            share=False,
-            show_error=True
-        )
+        print("💡 Lưu ý: Các câu hỏi có thể mất 10-30 giây để xử lý.")
+        print("   UI sẽ hiển thị 'Đang xử lý...' trong lúc chờ.\n")
+        
+        # Try with max_threads, fallback if not supported
+        try:
+            app.launch(
+                server_name="0.0.0.0",
+                server_port=7860,
+                share=False,
+                show_error=True,
+                max_threads=10  # Allow multiple concurrent requests
+            )
+        except TypeError:
+            # Fallback for older Gradio versions
+            app.launch(
+                server_name="0.0.0.0",
+                server_port=7860,
+                share=False
+            )
 
 
 if __name__ == "__main__":

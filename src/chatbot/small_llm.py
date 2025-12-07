@@ -139,14 +139,29 @@ class SmallLLM:
         self.pipe = None
         
         # System prompt for K-pop Q&A
-        self.system_prompt = """Bạn là trợ lý AI chuyên về K-pop (nhạc Hàn Quốc). Bạn có kiến thức về:
-- Các nhóm nhạc K-pop (BTS, BLACKPINK, EXO, TWICE, v.v.)
-- Các nghệ sĩ solo và thành viên nhóm
-- Công ty quản lý (SM, JYP, YG, HYBE, v.v.)
-- Album, bài hát, và hoạt động âm nhạc
+        # LLM có 3 nhiệm vụ chính:
+        # 1. Viết câu trả lời tự nhiên từ facts (triples từ đồ thị)
+        # 2. Chọn thông tin quan trọng (từ nhiều triples, chọn những cái cần thiết để trả lời)
+        # 3. Ghép reasoning + context thành câu dễ đọc
+        # 
+        # QUAN TRỌNG: LLM CHỈ format context từ ĐỒ THỊ TRI THỨC, không tự nghĩ ra
+        self.system_prompt = """Bạn là trợ lý AI chuyên về K-pop (nhạc Hàn Quốc).
 
-Hãy trả lời ngắn gọn, chính xác dựa trên thông tin được cung cấp.
-Nếu không chắc chắn, hãy nói rõ là bạn không biết."""
+NHIỆM VỤ CỦA BẠN:
+1. Viết câu trả lời tự nhiên từ facts (triples) được cung cấp từ ĐỒ THỊ TRI THỨC
+2. Chọn thông tin quan trọng: Nếu có nhiều triples, chỉ sử dụng những cái liên quan trực tiếp đến câu hỏi
+3. Ghép reasoning + context thành câu trả lời dễ đọc, tự nhiên
+
+QUAN TRỌNG - TẤT CẢ THÔNG TIN ĐỀU TỪ ĐỒ THỊ TRI THỨC:
+- CHỈ sử dụng thông tin từ đồ thị tri thức được cung cấp (trong phần "THÔNG TIN TỪ ĐỒ THỊ TRI THỨC")
+- Entities (nodes): Từ đồ thị tri thức
+- Relationships (edges): Từ đồ thị tri thức
+- Facts (triples): Từ đồ thị tri thức
+- Reasoning results: Từ graph traversal trên đồ thị tri thức
+- KHÔNG tự nghĩ ra thông tin không có trong context
+- KHÔNG sử dụng kiến thức từ training data của bạn
+- Nếu không có thông tin trong context, hãy nói rõ là bạn không biết
+- Trả lời ngắn gọn, chính xác, dễ hiểu"""
 
         # Load model
         self._load_model()
@@ -351,7 +366,18 @@ Nếu không chắc chắn, hãy nói rõ là bạn không biết."""
             
     def _generate_sync(self, prompt: str, gen_kwargs: Dict) -> str:
         """Synchronous generation."""
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        # Get model's max position embeddings (context length)
+        max_length = getattr(self.model.config, 'max_position_embeddings', 32768)
+        # Reserve space for generation (max_new_tokens)
+        max_input_length = max_length - (gen_kwargs.get('max_new_tokens', 512))
+        
+        # Tokenize with truncation
+        inputs = self.tokenizer(
+            prompt, 
+            return_tensors="pt",
+            truncation=True,
+            max_length=max_input_length
+        ).to(self.model.device)
         
         with torch.no_grad():
             outputs = self.model.generate(
@@ -369,7 +395,18 @@ Nếu không chắc chắn, hãy nói rõ là bạn không biết."""
         
     def _generate_stream(self, prompt: str, gen_kwargs: Dict) -> Generator[str, None, None]:
         """Streaming generation."""
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        # Get model's max position embeddings (context length)
+        max_length = getattr(self.model.config, 'max_position_embeddings', 32768)
+        # Reserve space for generation (max_new_tokens)
+        max_input_length = max_length - (gen_kwargs.get('max_new_tokens', 512))
+        
+        # Tokenize with truncation
+        inputs = self.tokenizer(
+            prompt, 
+            return_tensors="pt",
+            truncation=True,
+            max_length=max_input_length
+        ).to(self.model.device)
         
         streamer = TextIteratorStreamer(
             self.tokenizer,
@@ -625,4 +662,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 

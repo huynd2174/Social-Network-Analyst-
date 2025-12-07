@@ -27,6 +27,13 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+# Optional: Google Gemini API
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 
 @dataclass
 class EvaluationResult:
@@ -92,6 +99,44 @@ class ChatbotComparison:
         # Initialize OpenAI client if available
         if OPENAI_AVAILABLE and self.openai_api_key:
             openai.api_key = self.openai_api_key
+        
+        # Initialize Gemini client if available
+        if GEMINI_AVAILABLE and self.google_api_key:
+            genai.configure(api_key=self.google_api_key)
+            # Try to find available model
+            try:
+                models = genai.list_models()
+                available = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+                
+                # Try preferred models (flash models are faster)
+                self.gemini_model = None
+                preferred = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-exp']
+                
+                for pref in preferred:
+                    matching = [m for m in available if pref in m]
+                    if matching:
+                        try:
+                            self.gemini_model = genai.GenerativeModel(matching[0])
+                            break
+                        except:
+                            continue
+                
+                # If still None, use first available
+                if not self.gemini_model and available:
+                    model_name = available[0]
+                    self.gemini_model = genai.GenerativeModel(model_name)
+                elif not self.gemini_model:
+                    print(f"⚠️ Warning: No available Gemini models found")
+                    self.gemini_model = None
+            except Exception as e:
+                print(f"⚠️ Warning: Could not initialize Gemini model: {e}")
+                # Fallback to gemini-pro
+                try:
+                    self.gemini_model = genai.GenerativeModel('gemini-pro')
+                except:
+                    self.gemini_model = None
+        else:
+            self.gemini_model = None
             
     def load_evaluation_dataset(
         self,
@@ -329,6 +374,194 @@ class ChatbotComparison:
             evaluated_at=datetime.now().isoformat(),
             results=results
         )
+    
+    def evaluate_gemini(
+        self,
+        questions: List[Dict],
+        max_questions: Optional[int] = None,
+        model_name: str = "gemini-pro"
+    ) -> ChatbotEvaluation:
+        """
+        Evaluate Google Gemini chatbot.
+        
+        Args:
+            questions: List of evaluation questions
+            max_questions: Limit number of questions
+            model_name: Gemini model to use
+            
+        Returns:
+            ChatbotEvaluation results
+        """
+        if not GEMINI_AVAILABLE:
+            print("⚠️ Google Generative AI library not installed.")
+            print("   Install with: pip install google-generativeai")
+            print("   ⚠️ Returning 0% accuracy (mock evaluation)")
+            return self._create_mock_evaluation("Gemini (Not Available - Library Missing)", questions)
+        
+        if not self.google_api_key:
+            print("⚠️ Google API key not found. Set GOOGLE_API_KEY env var or pass google_api_key parameter")
+            print("   ⚠️ Returning 0% accuracy (mock evaluation)")
+            return self._create_mock_evaluation("Gemini (No API Key)", questions)
+        
+        if max_questions:
+            questions = questions[:max_questions]
+        
+        print(f"🔄 Evaluating Gemini ({model_name}) on {len(questions)} questions...")
+        
+        # Initialize model
+        if not self.gemini_model:
+            genai.configure(api_key=self.google_api_key)
+            try:
+                # Try the requested model first
+                self.gemini_model = genai.GenerativeModel(model_name)
+            except Exception as e:
+                # List available models and use one
+                try:
+                    models = genai.list_models()
+                    available = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+                    
+                    # Try preferred models first
+                    preferred = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-exp']
+                    for pref in preferred:
+                        matching = [m for m in available if pref in m]
+                        if matching:
+                            try:
+                                self.gemini_model = genai.GenerativeModel(matching[0])
+                                print(f"✅ Using {matching[0]} instead")
+                                break
+                            except:
+                                continue
+                    
+                    # If still None, use first available
+                    if not self.gemini_model and available:
+                        self.gemini_model = genai.GenerativeModel(available[0])
+                        print(f"✅ Using available model: {available[0]}")
+                    else:
+                        raise Exception(f"Could not initialize any Gemini model: {e}")
+                except Exception as e2:
+                    raise Exception(f"Could not initialize any Gemini model: {e2}")
+        
+        results = []
+        correct = 0
+        total_time = 0
+        
+        for i, q in enumerate(questions):
+            if (i + 1) % 50 == 0:
+                print(f"  Progress: {i + 1}/{len(questions)}")
+            
+            start_time = time.time()
+            
+            try:
+                prompt = self._format_question_for_api(q)
+                
+                response = self.gemini_model.generate_content(prompt)
+                
+                # Handle different response formats
+                if hasattr(response, 'text'):
+                    answer_text = response.text.strip()
+                elif hasattr(response, 'candidates') and response.candidates:
+                    answer_text = response.candidates[0].content.parts[0].text.strip()
+                else:
+                    answer_text = str(response).strip()
+                
+                predicted = self._parse_api_response(answer_text, q['question_type'], q.get('choices', []))
+                confidence = 0.8
+                
+                # Debug first few responses
+                if i < 3:
+                    print(f"    📝 Q{i+1}: {q['question'][:50]}...")
+                    print(f"       Expected: {q['answer']}, Got: {predicted}, Raw: {answer_text[:100]}")
+                
+            except Exception as e:
+                predicted = "Error"
+                confidence = 0.0
+                error_msg = str(e)
+                
+                # Check for quota/billing errors
+                if "quota" in error_msg.lower() or "429" in error_msg or "billing" in error_msg.lower() or "ResourceExhausted" in error_msg:
+                    print(f"    ⚠️ Quota exceeded on question {i+1}")
+                    if i == 0:
+                        print(f"    ⚠️ Gemini API quota has been exceeded.")
+                        print(f"    💡 Solutions:")
+                        print(f"       1. Wait and retry later (rate limit resets)")
+                        print(f"       2. Check billing: https://ai.dev/usage?tab=rate-limit")
+                        print(f"       3. Upgrade API plan if needed")
+                        print(f"       4. Skip Gemini comparison for now")
+                    # Break early if quota exceeded
+                    if i == 0:
+                        print(f"    ⚠️ Stopping Gemini evaluation due to quota limit")
+                        break
+                else:
+                    print(f"    ⚠️ Error on question {i+1}: {error_msg[:100]}")
+                    # Debug first error in detail
+                    if i == 0:
+                        import traceback
+                        print(f"    Full traceback:")
+                        traceback.print_exc()
+            
+            end_time = time.time()
+            response_time = end_time - start_time
+            total_time += response_time
+            
+            is_correct = predicted == q['answer']
+            if is_correct:
+                correct += 1
+                
+            results.append(EvaluationResult(
+                question_id=q['id'],
+                question=q['question'],
+                question_type=q['question_type'],
+                correct_answer=q['answer'],
+                predicted_answer=predicted,
+                is_correct=is_correct,
+                confidence=confidence,
+                response_time=response_time,
+                hops=q['hops'],
+                category=q['category']
+            ))
+            
+            # Rate limiting
+            time.sleep(0.5)
+        
+        # If no questions were processed due to quota, return mock evaluation
+        if not results:
+            print(f"    ⚠️ No questions processed due to quota limit")
+            return self._create_mock_evaluation("Gemini (Quota Exceeded)", questions)
+        
+        accuracy = correct / len(results) if results else 0
+        
+        # Calculate metrics
+        accuracy_by_hops = {}
+        for hop in [1, 2, 3]:
+            hop_results = [r for r in results if r.hops == hop]
+            if hop_results:
+                accuracy_by_hops[hop] = sum(1 for r in hop_results if r.is_correct) / len(hop_results)
+        
+        accuracy_by_type = {}
+        for qtype in ['true_false', 'yes_no', 'multiple_choice']:
+            type_results = [r for r in results if r.question_type == qtype]
+            if type_results:
+                accuracy_by_type[qtype] = sum(1 for r in type_results if r.is_correct) / len(type_results)
+        
+        accuracy_by_category = {}
+        categories = set(r.category for r in results)
+        for cat in categories:
+            cat_results = [r for r in results if r.category == cat]
+            if cat_results:
+                accuracy_by_category[cat] = sum(1 for r in cat_results if r.is_correct) / len(cat_results)
+        
+        return ChatbotEvaluation(
+            chatbot_name=f"Gemini ({model_name})",
+            total_questions=len(questions),
+            correct_answers=correct,
+            accuracy=accuracy,
+            accuracy_by_hops=accuracy_by_hops,
+            accuracy_by_type=accuracy_by_type,
+            accuracy_by_category=accuracy_by_category,
+            avg_response_time=total_time / len(questions) if questions else 0,
+            evaluated_at=datetime.now().isoformat(),
+            results=results
+        )
         
     def evaluate_baseline(
         self,
@@ -422,23 +655,50 @@ class ChatbotComparison:
         choices: List[str] = None
     ) -> str:
         """Parse API response to standard format."""
+        if not response:
+            return "Error"
+            
         response_upper = response.upper().strip()
+        response_lower = response.lower().strip()
         
         if question_type == 'true_false':
-            if 'ĐÚNG' in response_upper or 'TRUE' in response_upper or 'CORRECT' in response_upper:
+            # More flexible matching
+            if any(word in response_upper for word in ['ĐÚNG', 'TRUE', 'CORRECT', 'ĐỒNG Ý', 'CHÍNH XÁC']):
                 return "Đúng"
-            else:
+            elif any(word in response_upper for word in ['SAI', 'FALSE', 'INCORRECT', 'KHÔNG ĐÚNG', 'KHÔNG']):
                 return "Sai"
-        elif question_type == 'yes_no':
-            if 'CÓ' in response_upper or 'YES' in response_upper:
-                return "Có"
             else:
+                # Default based on first word
+                first_word = response_upper.split()[0] if response_upper.split() else ""
+                if first_word in ['ĐÚNG', 'TRUE', 'YES']:
+                    return "Đúng"
+                else:
+                    return "Sai"
+        elif question_type == 'yes_no':
+            # More flexible matching for yes/no
+            if any(word in response_upper for word in ['CÓ', 'YES', 'ĐÚNG', 'TRUE', 'CHÍNH XÁC']):
+                return "Có"
+            elif any(word in response_upper for word in ['KHÔNG', 'NO', 'FALSE', 'SAI', 'INCORRECT']):
                 return "Không"
+            else:
+                # Check first word or first sentence
+                first_word = response_upper.split()[0] if response_upper.split() else ""
+                if first_word in ['CÓ', 'YES', 'ĐÚNG']:
+                    return "Có"
+                else:
+                    return "Không"
         else:
-            for letter in ['A', 'B', 'C', 'D']:
+            # Multiple choice - look for letter
+            for letter in ['A', 'B', 'C', 'D', 'E']:
+                # Check if letter appears as standalone or in pattern like "A." or "A)"
                 if letter in response_upper:
-                    return letter
-            return "A"  # Default
+                    # Make sure it's not part of a word
+                    import re
+                    pattern = r'\b' + letter + r'\b'
+                    if re.search(pattern, response_upper):
+                        return letter
+            # If no letter found, return first choice as default
+            return "A"
             
     def _create_mock_evaluation(
         self,
@@ -462,7 +722,8 @@ class ChatbotComparison:
     def compare_chatbots(
         self,
         questions: List[Dict],
-        include_chatgpt: bool = True,
+        include_chatgpt: bool = False,
+        include_gemini: bool = False,
         include_baseline: bool = True,
         max_questions: Optional[int] = None,
         output_path: str = "data/comparison_results.json"
@@ -500,8 +761,25 @@ class ChatbotComparison:
             eval_chatgpt = self.evaluate_chatgpt(questions)
             evaluations['chatgpt'] = eval_chatgpt
             print(f"✅ ChatGPT: {eval_chatgpt.accuracy:.2%} accuracy")
+        
+        # 3. Gemini
+        if include_gemini:
+            try:
+                eval_gemini = self.evaluate_gemini(questions)
+                evaluations['gemini'] = eval_gemini
+                if "Quota Exceeded" in eval_gemini.chatbot_name:
+                    print(f"⚠️ Gemini: Quota exceeded (skipped)")
+                else:
+                    print(f"✅ Gemini: {eval_gemini.accuracy:.2%} accuracy")
+            except Exception as e:
+                if "quota" in str(e).lower() or "429" in str(e) or "ResourceExhausted" in str(e):
+                    print(f"⚠️ Gemini: Quota exceeded (skipped)")
+                    evaluations['gemini'] = self._create_mock_evaluation("Gemini (Quota Exceeded)", questions)
+                else:
+                    print(f"⚠️ Gemini: Error - {str(e)[:100]}")
+                    evaluations['gemini'] = self._create_mock_evaluation("Gemini (Error)", questions)
             
-        # 3. Baseline
+        # 4. Baseline
         if include_baseline:
             eval_baseline = self.evaluate_baseline(questions)
             evaluations['baseline'] = eval_baseline

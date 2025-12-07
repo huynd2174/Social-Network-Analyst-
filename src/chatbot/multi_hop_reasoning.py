@@ -143,7 +143,309 @@ class MultiHopReasoner:
         Returns:
             ReasoningResult with answer and explanation
         """
-        # Detect reasoning type from query
+        query_lower = query.lower()
+        
+        # ============================================
+        # SPECIALIZED QUERY HANDLERS - ưu tiên cao nhất
+        # ============================================
+        
+        # 1a. Câu hỏi Yes/No về membership: "Jungkook có phải thành viên BTS không?" hoặc "BTS có thành viên V không?"
+        if any(kw in query_lower for kw in ['có phải', 'phải', 'là thành viên', 'is a member', 'belongs to', 'có thành viên']):
+            # Pattern 1: "X có thành viên Y không?" (group has member)
+            if 'có thành viên' in query_lower or 'has member' in query_lower:
+                # Find group entity
+                group_entity = None
+                for entity in start_entities:
+                    if self.kg.get_entity_type(entity) == 'Group':
+                        group_entity = entity
+                        break
+                
+                if group_entity:
+                    # Get all members of the group
+                    members = self.kg.get_group_members(group_entity)
+                    
+                    # Try to find artist name in query
+                    # Extract potential artist names from query
+                    query_words = query_lower.split()
+                    potential_artist = None
+                    
+                    # Check if any entity is an Artist
+                    for entity in start_entities:
+                        if self.kg.get_entity_type(entity) == 'Artist':
+                            potential_artist = entity
+                            break
+                    
+                    # If found artist entity, check membership
+                    if potential_artist:
+                        if potential_artist in members:
+                            return ReasoningResult(
+                                query=query,
+                                reasoning_type=ReasoningType.CHAIN,
+                                steps=[ReasoningStep(
+                                    hop_number=1,
+                                    operation='check_membership',
+                                    source_entities=[potential_artist],
+                                    relationship='MEMBER_OF',
+                                    target_entities=[group_entity],
+                                    explanation=f"Kiểm tra {potential_artist} có phải thành viên {group_entity}"
+                                )],
+                                answer_entities=[group_entity],
+                                answer_text=f"Có, {potential_artist} là thành viên của {group_entity}",
+                                confidence=1.0,
+                                explanation=f"1-hop: {potential_artist} → MEMBER_OF → {group_entity}"
+                            )
+                        else:
+                            return ReasoningResult(
+                                query=query,
+                                reasoning_type=ReasoningType.CHAIN,
+                                steps=[ReasoningStep(
+                                    hop_number=1,
+                                    operation='check_membership',
+                                    source_entities=[potential_artist],
+                                    relationship='MEMBER_OF',
+                                    target_entities=[],
+                                    explanation=f"Kiểm tra {potential_artist} có phải thành viên {group_entity}"
+                                )],
+                                answer_entities=[],
+                                answer_text=f"Không, {potential_artist} không phải là thành viên của {group_entity}",
+                                confidence=1.0,
+                                explanation=f"1-hop: {potential_artist} không có quan hệ MEMBER_OF với {group_entity}"
+                            )
+                    
+                    # Try fuzzy match with member names
+                    for member in members:
+                        # Check if any word from query matches member name
+                        member_words = member.lower().split()
+                        for word in query_words:
+                            if len(word) > 2 and word in member_words:
+                                return ReasoningResult(
+                                    query=query,
+                                    reasoning_type=ReasoningType.CHAIN,
+                                    steps=[ReasoningStep(
+                                        hop_number=1,
+                                        operation='check_membership',
+                                        source_entities=[member],
+                                        relationship='MEMBER_OF',
+                                        target_entities=[group_entity],
+                                        explanation=f"Kiểm tra {member} có phải thành viên {group_entity}"
+                                    )],
+                                    answer_entities=[group_entity],
+                                    answer_text=f"Có, {member} là thành viên của {group_entity}",
+                                    confidence=1.0,
+                                    explanation=f"1-hop: {member} → MEMBER_OF → {group_entity}"
+                                )
+            
+            # Pattern 2: "X có phải thành viên của Y không?" (artist is member of group)
+            # Extract artist and group names from query
+            artist_entity = None
+            group_entity = None
+            
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Artist':
+                    artist_entity = entity
+                elif entity_type == 'Group':
+                    group_entity = entity
+            
+            if artist_entity and group_entity:
+                groups = self.kg.get_artist_groups(artist_entity)
+                if group_entity in groups:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[ReasoningStep(
+                            hop_number=1,
+                            operation='check_membership',
+                            source_entities=[artist_entity],
+                            relationship='MEMBER_OF',
+                            target_entities=[group_entity],
+                            explanation=f"Kiểm tra {artist_entity} có phải thành viên {group_entity}"
+                        )],
+                        answer_entities=[group_entity],
+                        answer_text=f"Có, {artist_entity} là thành viên của {group_entity}",
+                        confidence=1.0,
+                        explanation=f"1-hop: {artist_entity} → MEMBER_OF → {group_entity}"
+                    )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[ReasoningStep(
+                            hop_number=1,
+                            operation='check_membership',
+                            source_entities=[artist_entity],
+                            relationship='MEMBER_OF',
+                            target_entities=[],
+                            explanation=f"Kiểm tra {artist_entity} có phải thành viên {group_entity}"
+                        )],
+                        answer_entities=[],
+                        answer_text=f"Không, {artist_entity} không phải thành viên của {group_entity}",
+                        confidence=1.0,
+                        explanation=f"1-hop: {artist_entity} không có quan hệ MEMBER_OF với {group_entity}"
+                    )
+        
+        # 1b. Câu hỏi về thành viên: "BTS có bao nhiêu thành viên", "Thành viên của BTS", "Ai là thành viên"
+        # Pattern: "Ai là thành viên", "Who are members", "thành viên của X", "members of X"
+        is_list_members_question = any(kw in query_lower for kw in [
+            'ai là thành viên', 'who are', 'thành viên của', 'members of', 
+            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên'
+        ]) and 'có phải' not in query_lower and 'không' not in query_lower
+        
+        if is_list_members_question:
+            # Tìm group entity từ start_entities hoặc extract từ query
+            group_entity = None
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    group_entity = entity
+                    break
+            
+            # Nếu không tìm được từ start_entities, extract từ query
+            if not group_entity:
+                extracted = self._extract_entities_from_query(query)
+                for e in extracted:
+                    if self.kg.get_entity_type(e) == 'Group':
+                        group_entity = e
+                        break
+            
+            if group_entity:
+                return self.get_group_members(group_entity)
+        
+        # Fallback: Câu hỏi về thành viên (không phải Yes/No)
+        if any(kw in query_lower for kw in ['thành viên', 'members', 'member']) and 'có phải' not in query_lower and 'không' not in query_lower:
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_group_members(entity)
+                    
+        # 2. Câu hỏi về công ty: "Công ty nào quản lý BTS", "BLACKPINK thuộc công ty nào"
+        if any(kw in query_lower for kw in ['công ty', 'company', 'label', 'hãng', 'quản lý']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_company_of_group(entity)
+                elif entity_type == 'Artist':
+                    return self.get_artist_company(entity)
+                    
+        # 3. Câu hỏi so sánh công ty: "BTS và SEVENTEEN có cùng công ty không"
+        if any(kw in query_lower for kw in ['cùng công ty', 'same company', 'cùng hãng', 'cùng label', 'cùng hãng đĩa']):
+            # Nếu không có đủ 2 entities, tự extract từ query (case-insensitive)
+            if len(start_entities) < 2:
+                # Tự extract entities từ query
+                extracted = self._extract_entities_from_query(query)
+                if len(extracted) >= 2:
+                    return self.check_same_company(extracted[0], extracted[1])
+                elif len(extracted) == 1 and len(start_entities) == 1:
+                    # Có 1 từ query, 1 từ start_entities
+                    return self.check_same_company(start_entities[0], extracted[0])
+            elif len(start_entities) >= 2:
+                return self.check_same_company(start_entities[0], start_entities[1])
+        
+        # 3.5. Câu hỏi so sánh nhóm nhạc: "Lisa và Jennie có cùng nhóm nhạc không"
+        if any(kw in query_lower for kw in ['cùng nhóm', 'cùng nhóm nhạc', 'same group', 'cùng ban nhạc']):
+            # Nếu không có đủ 2 entities, tự extract từ query
+            if len(start_entities) < 2:
+                # Tự extract entities từ query (case-insensitive)
+                extracted = self._extract_entities_from_query(query)
+                if len(extracted) >= 2:
+                    return self.check_same_group(extracted[0], extracted[1])
+                elif len(extracted) == 1 and len(start_entities) == 1:
+                    # Có 1 từ query, 1 từ start_entities
+                    return self.check_same_group(start_entities[0], extracted[0])
+            elif len(start_entities) >= 2:
+                return self.check_same_group(start_entities[0], start_entities[1])
+                
+        # 4. Câu hỏi về nhóm cùng công ty: "Các nhóm cùng công ty với BTS"
+        if any(kw in query_lower for kw in ['nhóm cùng công ty', 'groups same company', 'labelmates', 'cùng công ty với']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_labelmates(entity)
+        
+        # 5. Câu hỏi về hợp tác/collaboration: "Nhóm nhạc đã hợp tác với BTS"
+        if any(kw in query_lower for kw in ['hợp tác', 'collaborat', 'partnership', 'đã làm việc với', 'đã cộng tác']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_collaborating_groups(entity)
+        
+        # 6. Câu hỏi về bài hát: "BTS hát bài nào?", "Bài hát của BTS"
+        if any(kw in query_lower for kw in ['bài hát', 'song', 'track', 'ca khúc', 'hát bài']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_group_songs(entity)
+                elif entity_type == 'Artist':
+                    return self.get_artist_songs(entity)
+        
+        # 7. Câu hỏi về album: "Album của BTS", "BTS phát hành album nào"
+        if any(kw in query_lower for kw in ['album', 'đĩa nhạc', 'ep', 'lp']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_group_albums(entity)
+                elif entity_type == 'Artist':
+                    return self.get_artist_albums(entity)
+        
+        # 8. Câu hỏi về thể loại/genre: "Thể loại nhạc của BTS"
+        if any(kw in query_lower for kw in ['thể loại', 'genre', 'dòng nhạc']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type in ['Group', 'Artist', 'Song']:
+                    return self.get_entity_genres(entity)
+        
+        # 9. Câu hỏi về nhạc cụ: "Jungkook chơi nhạc cụ gì"
+        if any(kw in query_lower for kw in ['nhạc cụ', 'instrument', 'chơi']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Artist':
+                    return self.get_artist_instruments(entity)
+        
+        # 10. Câu hỏi về nghề nghiệp: "Vai trò của Jungkook trong BTS"
+        if any(kw in query_lower for kw in ['nghề nghiệp', 'occupation', 'vai trò', 'công việc']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Artist':
+                    return self.get_artist_occupations(entity)
+        
+        # 11. Câu hỏi về nhóm con/subunit: "Nhóm con của SM Entertainment"
+        if any(kw in query_lower for kw in ['nhóm con', 'subunit', 'sub-unit']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Group':
+                    return self.get_subunits(entity)
+        
+        # 12. Câu hỏi về sáng tác: "Ai viết bài hát này"
+        if any(kw in query_lower for kw in ['viết', 'wrote', 'sáng tác', 'compose', 'tác giả']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Song':
+                    return self.get_song_writers(entity)
+        
+        # 13. Câu hỏi về sản xuất bài hát: "Ai sản xuất bài hát này"
+        if any(kw in query_lower for kw in ['sản xuất bài hát', 'produced song', 'nhà sản xuất bài hát']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Song':
+                    return self.get_song_producers(entity)
+        
+        # 14. Câu hỏi về sản xuất album: "Ai sản xuất album này"
+        if any(kw in query_lower for kw in ['sản xuất album', 'produced album', 'nhà sản xuất album']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Album':
+                    return self.get_album_producers(entity)
+        
+        # 15. Câu hỏi về bài hát trong album: "Album này có bài hát nào"
+        if any(kw in query_lower for kw in ['bài hát trong album', 'songs in album', 'track trong']):
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Album':
+                    return self.get_album_songs(entity)
+                    
+        # ============================================
+        # FALLBACK - reasoning type detection
+        # ============================================
         reasoning_type = self._detect_reasoning_type(query)
         
         # Execute appropriate reasoning strategy
@@ -185,10 +487,27 @@ class MultiHopReasoner:
         Perform chain reasoning: A → B → C.
         
         Traverses the graph following relationships to find target entities.
+        Cải thiện: Sử dụng path finding để suy luận chính xác hơn.
         """
+        if not start_entities:
+            return ReasoningResult(
+                query=query,
+                reasoning_type=ReasoningType.CHAIN,
+                steps=[],
+                answer_entities=[],
+                answer_text="Không tìm thấy entities để bắt đầu suy luận",
+                confidence=0.0,
+                explanation="No starting entities"
+            )
+        
         steps = []
         current_entities = start_entities
+        visited = set(start_entities)
         all_paths = []
+        
+        # Detect target entity type from query (if any)
+        target_type = self._detect_target_type(query)
+        target_relationship = self._detect_target_relationship(query)
         
         for hop in range(max_hops):
             step_result = {
@@ -199,10 +518,30 @@ class MultiHopReasoner:
             }
             
             next_entities = set()
+            relationship_types = set()
+            
             for entity in current_entities[:10]:  # Limit for performance
                 neighbors = self.kg.get_neighbors(entity)
+                
                 for neighbor, rel_type, direction in neighbors:
+                    # Skip if already visited (avoid cycles)
+                    if neighbor in visited:
+                        continue
+                    
+                    # Filter by target relationship if specified
+                    if target_relationship and rel_type != target_relationship:
+                        continue
+                    
+                    # Filter by target type if specified
+                    if target_type:
+                        neighbor_type = self.kg.get_entity_type(neighbor)
+                        if neighbor_type != target_type:
+                            continue
+                    
                     next_entities.add(neighbor)
+                    visited.add(neighbor)
+                    relationship_types.add(rel_type)
+                    
                     step_result['to'].append(neighbor)
                     step_result['relationships'].append({
                         'from': entity,
@@ -217,15 +556,38 @@ class MultiHopReasoner:
             reasoning_step = ReasoningStep(
                 hop_number=hop + 1,
                 operation='traverse',
-                source_entities=current_entities,
-                relationship=', '.join(set(r['rel'] for r in step_result['relationships'])),
+                source_entities=list(current_entities),
+                relationship=', '.join(sorted(relationship_types)) if relationship_types else 'various',
                 target_entities=list(next_entities)[:20],
-                explanation=f"Hop {hop + 1}: Tìm thấy {len(next_entities)} entities liên quan"
+                explanation=f"Hop {hop + 1}: Từ {len(current_entities)} entities, tìm thấy {len(next_entities)} entities liên quan qua quan hệ {', '.join(sorted(relationship_types)[:3])}"
             )
             steps.append(reasoning_step)
             
             current_entities = list(next_entities)
             
+        # If we have multiple start entities, try to find paths between them
+        if len(start_entities) >= 2:
+            for i in range(len(start_entities) - 1):
+                for j in range(i + 1, len(start_entities)):
+                    source = start_entities[i]
+                    target = start_entities[j]
+                    paths = self.kg.find_all_paths(source, target, max_hops=max_hops)
+                    if paths:
+                        all_paths.extend(paths[:3])  # Limit paths
+                        # Add path as reasoning step
+                        for path in paths[:1]:  # Use shortest path
+                            path_details = self.kg.get_path_details(path)
+                            if path_details:
+                                rel_types = [p.get('type', '') for p in path_details if p.get('type')]
+                                steps.append(ReasoningStep(
+                                    hop_number=len(path) - 1,
+                                    operation='path_finding',
+                                    source_entities=[source],
+                                    relationship=' → '.join(rel_types) if rel_types else 'path',
+                                    target_entities=[target],
+                                    explanation=f"Tìm thấy path {len(path)-1}-hop: {' → '.join(path[:5])}"
+                                ))
+        
         # Generate answer
         answer_entities = current_entities[:20]
         answer_text = self._generate_answer_text(query, steps, answer_entities)
@@ -239,6 +601,66 @@ class MultiHopReasoner:
             confidence=self._calculate_confidence(steps),
             explanation=self._generate_explanation(steps)
         )
+    
+    def _detect_target_type(self, query: str) -> Optional[str]:
+        """Detect target entity type from query - Hỗ trợ TẤT CẢ entity types."""
+        query_lower = query.lower()
+        
+        # Entity types trong knowledge graph: Album, Artist, Company, Genre, Group, Instrument, Occupation, Song
+        
+        if any(kw in query_lower for kw in ['nhóm', 'group', 'ban nhạc']):
+            return 'Group'
+        elif any(kw in query_lower for kw in ['nghệ sĩ', 'artist', 'ca sĩ', 'singer']):
+            return 'Artist'
+        elif any(kw in query_lower for kw in ['công ty', 'company', 'label', 'hãng']):
+            return 'Company'
+        elif any(kw in query_lower for kw in ['bài hát', 'song', 'track', 'ca khúc']):
+            return 'Song'
+        elif any(kw in query_lower for kw in ['album', 'đĩa nhạc', 'ep', 'lp']):
+            return 'Album'
+        elif any(kw in query_lower for kw in ['thể loại', 'genre', 'dòng nhạc']):
+            return 'Genre'
+        elif any(kw in query_lower for kw in ['nhạc cụ', 'instrument', 'dụng cụ']):
+            return 'Instrument'
+        elif any(kw in query_lower for kw in ['nghề nghiệp', 'occupation', 'công việc', 'vai trò']):
+            return 'Occupation'
+        
+        return None
+    
+    def _detect_target_relationship(self, query: str) -> Optional[str]:
+        """Detect target relationship type from query - Hỗ trợ TẤT CẢ relationship types."""
+        query_lower = query.lower()
+        
+        # Relationship types trong knowledge graph:
+        # CONTAINS, HAS_OCCUPATION, IS_GENRE, MANAGED_BY, MEMBER_OF, PLAYS, 
+        # PRODUCED_ALBUM, PRODUCED_SONG, RELEASED, SINGS, SUBUNIT_OF, WROTE
+        
+        if any(kw in query_lower for kw in ['thành viên', 'member', 'member of', 'thuộc nhóm']):
+            return 'MEMBER_OF'
+        elif any(kw in query_lower for kw in ['quản lý', 'manages', 'managed by', 'thuộc công ty']):
+            return 'MANAGED_BY'
+        elif any(kw in query_lower for kw in ['hát', 'sings', 'performs', 'thể hiện', 'ca sĩ']):
+            return 'SINGS'
+        elif any(kw in query_lower for kw in ['phát hành', 'released', 'ra mắt', 'release']):
+            return 'RELEASED'
+        elif any(kw in query_lower for kw in ['sản xuất bài hát', 'produced song', 'sản xuất ca khúc']):
+            return 'PRODUCED_SONG'
+        elif any(kw in query_lower for kw in ['sản xuất album', 'produced album', 'sản xuất đĩa']):
+            return 'PRODUCED_ALBUM'
+        elif any(kw in query_lower for kw in ['chứa', 'contains', 'bao gồm', 'gồm']):
+            return 'CONTAINS'
+        elif any(kw in query_lower for kw in ['nhóm con', 'subunit', 'sub-unit', 'sub unit']):
+            return 'SUBUNIT_OF'
+        elif any(kw in query_lower for kw in ['chơi', 'plays', 'sử dụng nhạc cụ']):
+            return 'PLAYS'
+        elif any(kw in query_lower for kw in ['viết', 'wrote', 'sáng tác', 'compose']):
+            return 'WROTE'
+        elif any(kw in query_lower for kw in ['thuộc thể loại', 'is genre', 'dòng nhạc']):
+            return 'IS_GENRE'
+        elif any(kw in query_lower for kw in ['nghề nghiệp', 'has occupation', 'làm nghề', 'vai trò']):
+            return 'HAS_OCCUPATION'
+        
+        return None
         
     def _aggregation_reasoning(
         self,
@@ -589,28 +1011,299 @@ class MultiHopReasoner:
             confidence=0.9 if unique_companies else 0.0,
             explanation=f"2-hop: {artist_name} → MEMBER_OF → Group → MANAGED_BY → Company"
         )
+    
+    def _extract_entities_from_query(self, query: str) -> List[str]:
+        """
+        Extract entity names from query (case-insensitive).
+        Tìm tất cả artists/groups có thể có trong query.
+        """
+        entities = []
+        query_lower = query.lower()
+        
+        # Lấy tất cả artists và groups từ KG
+        all_artists = [node for node, data in self.kg.graph.nodes(data=True) 
+                      if data.get('label') == 'Artist']
+        all_groups = [node for node, data in self.kg.graph.nodes(data=True) 
+                     if data.get('label') == 'Group']
+        
+        # Tìm tất cả artists trong query (case-insensitive)
+        # QUAN TRỌNG: Xử lý node có đuôi như "Lisa (ca sĩ)"
+        query_words_list = query_lower.split()  # List để giữ thứ tự
+        
+        for artist in all_artists:
+            artist_lower = artist.lower()
+            # Extract base name (không có đuôi)
+            base_name = self._normalize_entity_name(artist)
+            base_name_lower = base_name.lower()
+            
+            # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon"
+            base_name_variants = [
+                base_name_lower,
+                base_name_lower.replace('-', ' '),  # "g-dragon" → "g dragon"
+                base_name_lower.replace('-', ''),    # "g-dragon" → "gdragon"
+                base_name_lower.replace(' ', ''),    # "black pink" → "blackpink"
+            ]
+            
+            # Check nếu base name hoặc variants là một từ trong query
+            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
+            if any(variant in query_words_list for variant in base_name_variants):
+                if artist not in entities:
+                    entities.append(artist)
+                    continue
+            
+            # Check nếu base name hoặc variants xuất hiện trong query text
+            if any(variant in query_lower for variant in base_name_variants if len(variant) >= 3):
+                if artist not in entities:
+                    entities.append(artist)
+                    continue
+            
+            # Check từng word trong query với base name và variants
+            for word in query_words_list:
+                if len(word) < 3:  # Skip short words
+                    continue
+                # Exact match với base name hoặc variants
+                if word in base_name_variants or word == base_name_lower:
+                    if artist not in entities:
+                        entities.append(artist)
+                        break
+                # Partial match: word là một phần của base name hoặc ngược lại
+                elif (word in base_name_lower and len(word) >= 3) or (base_name_lower in word and len(base_name_lower) >= 3):
+                    if artist not in entities:
+                        entities.append(artist)
+                        break
+                # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
+                elif '-' in base_name_lower:
+                    base_parts = base_name_lower.split('-')
+                    if word in base_parts and len(word) >= 3:
+                        # Check xem có part khác cũng trong query không
+                        other_parts = [p for p in base_parts if p != word]
+                        if any(p in query_lower for p in other_parts):
+                            if artist not in entities:
+                                entities.append(artist)
+                                break
+        
+        # Tìm tất cả groups trong query (case-insensitive)
+        for group in all_groups:
+            group_lower = group.lower()
+            if group_lower in query_lower:
+                query_words = set(query_lower.split())
+                group_words = set(group_lower.split())
+                if group_words.intersection(query_words) or group_lower in query_lower:
+                    if group not in entities:
+                        entities.append(group)
+        
+        # Nếu chưa đủ, try fuzzy match với từng word (bao gồm base name)
+        if len(entities) < 2:
+            words = query_lower.split()
+            for word in words:
+                if len(word) < 3:
+                    continue
+                # Try exact match với full name hoặc base name
+                for node in self.kg.graph.nodes():
+                    node_lower = node.lower()
+                    base_name = self._normalize_entity_name(node).lower()
+                    
+                    # Exact match với full name hoặc base name
+                    if node_lower == word or base_name == word:
+                        if node not in entities:
+                            node_data = self.kg.get_entity(node)
+                            if node_data and node_data.get('label') in ['Artist', 'Group']:
+                                entities.append(node)
+                        break
+                    # Partial match
+                    elif (word in base_name and len(word) >= 3) or (base_name in word and len(base_name) >= 3):
+                        if node not in entities:
+                            node_data = self.kg.get_entity(node)
+                            if node_data and node_data.get('label') in ['Artist', 'Group']:
+                                entities.append(node)
+                        break
+        
+        return entities[:10]  # Return max 10
+    
+    def _normalize_entity_name(self, entity_name: str) -> str:
+        """
+        Normalize entity name bằng cách remove suffixes trong parentheses.
+        
+        Ví dụ:
+        - "Lisa (ca sĩ)" → "Lisa"
+        - "BLACKPINK (nhóm nhạc)" → "BLACKPINK"
+        
+        Args:
+            entity_name: Entity name có thể có đuôi
+            
+        Returns:
+            Base name (không có đuôi)
+        """
+        import re
+        # Remove suffixes trong parentheses
+        normalized = re.sub(r'\s*\([^)]+\)\s*$', '', entity_name)
+        return normalized.strip()
+        
+    def check_same_group(self, entity1: str, entity2: str) -> ReasoningResult:
+        """Check if two artists are in the same group (1-hop comparison)."""
+        steps = []
+        
+        # Get groups for entity1
+        if self.kg.get_entity_type(entity1) == 'Artist':
+            groups1 = self.kg.get_artist_groups(entity1)
+        else:
+            # If entity1 is a Group, check if entity2 is a member
+            groups1 = [entity1] if self.kg.get_entity_type(entity1) == 'Group' else []
+            
+        # Get groups for entity2
+        if self.kg.get_entity_type(entity2) == 'Artist':
+            groups2 = self.kg.get_artist_groups(entity2)
+        else:
+            # If entity2 is a Group, check if entity1 is a member
+            groups2 = [entity2] if self.kg.get_entity_type(entity2) == 'Group' else []
+        
+        # If one is a group and the other is an artist, check membership
+        if self.kg.get_entity_type(entity1) == 'Group' and self.kg.get_entity_type(entity2) == 'Artist':
+            members = self.kg.get_group_members(entity1)
+            if entity2 in members:
+                return ReasoningResult(
+                    query=f"{entity2} có cùng nhóm nhạc với {entity1} không?",
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[ReasoningStep(
+                        hop_number=1,
+                        operation='check_membership',
+                        source_entities=[entity2],
+                        relationship='MEMBER_OF',
+                        target_entities=[entity1],
+                        explanation=f"{entity2} là thành viên của {entity1}"
+                    )],
+                    answer_entities=[entity1],
+                    answer_text=f"Có, {entity2} là thành viên của {entity1}",
+                    confidence=1.0,
+                    explanation=f"1-hop: {entity2} → MEMBER_OF → {entity1}"
+                )
+            else:
+                return ReasoningResult(
+                    query=f"{entity2} có cùng nhóm nhạc với {entity1} không?",
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[ReasoningStep(
+                        hop_number=1,
+                        operation='check_membership',
+                        source_entities=[entity2],
+                        relationship='MEMBER_OF',
+                        target_entities=[],
+                        explanation=f"{entity2} không phải thành viên của {entity1}"
+                    )],
+                    answer_entities=[],
+                    answer_text=f"Không, {entity2} không phải thành viên của {entity1}",
+                    confidence=1.0,
+                    explanation=f"1-hop: {entity2} không có quan hệ MEMBER_OF với {entity1}"
+                )
+        
+        if self.kg.get_entity_type(entity2) == 'Group' and self.kg.get_entity_type(entity1) == 'Artist':
+            members = self.kg.get_group_members(entity2)
+            if entity1 in members:
+                return ReasoningResult(
+                    query=f"{entity1} có cùng nhóm nhạc với {entity2} không?",
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[ReasoningStep(
+                        hop_number=1,
+                        operation='check_membership',
+                        source_entities=[entity1],
+                        relationship='MEMBER_OF',
+                        target_entities=[entity2],
+                        explanation=f"{entity1} là thành viên của {entity2}"
+                    )],
+                    answer_entities=[entity2],
+                    answer_text=f"Có, {entity1} là thành viên của {entity2}",
+                    confidence=1.0,
+                    explanation=f"1-hop: {entity1} → MEMBER_OF → {entity2}"
+                )
+            else:
+                return ReasoningResult(
+                    query=f"{entity1} có cùng nhóm nhạc với {entity2} không?",
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[ReasoningStep(
+                        hop_number=1,
+                        operation='check_membership',
+                        source_entities=[entity1],
+                        relationship='MEMBER_OF',
+                        target_entities=[],
+                        explanation=f"{entity1} không phải thành viên của {entity2}"
+                    )],
+                    answer_entities=[],
+                    answer_text=f"Không, {entity1} không phải thành viên của {entity2}",
+                    confidence=1.0,
+                    explanation=f"1-hop: {entity1} không có quan hệ MEMBER_OF với {entity2}"
+                )
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[entity1],
+            relationship='MEMBER_OF',
+            target_entities=groups1,
+            explanation=f"Lấy nhóm nhạc của {entity1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[entity2],
+            relationship='MEMBER_OF',
+            target_entities=groups2,
+            explanation=f"Lấy nhóm nhạc của {entity2}"
+        ))
+        
+        # Compare groups
+        common_groups = set(groups1).intersection(set(groups2))
+        
+        if common_groups:
+            group_list = list(common_groups)
+            return ReasoningResult(
+                query=f"{entity1} và {entity2} có cùng nhóm nhạc không?",
+                reasoning_type=ReasoningType.COMPARISON,
+                steps=steps,
+                answer_entities=group_list,
+                answer_text=f"Có, {entity1} và {entity2} đều là thành viên của {', '.join(group_list)}",
+                confidence=1.0,
+                explanation=f"1-hop: Cả {entity1} và {entity2} đều có quan hệ MEMBER_OF với {', '.join(group_list)}"
+            )
+        else:
+            return ReasoningResult(
+                query=f"{entity1} và {entity2} có cùng nhóm nhạc không?",
+                reasoning_type=ReasoningType.COMPARISON,
+                steps=steps,
+                answer_entities=[],
+                answer_text=f"Không, {entity1} và {entity2} không cùng nhóm nhạc. {entity1} thuộc {', '.join(groups1) if groups1 else 'không có nhóm'}, còn {entity2} thuộc {', '.join(groups2) if groups2 else 'không có nhóm'}",
+                confidence=1.0,
+                explanation=f"1-hop: {entity1} thuộc {', '.join(groups1) if groups1 else 'không có nhóm'}, {entity2} thuộc {', '.join(groups2) if groups2 else 'không có nhóm'}"
+            )
         
     def check_same_company(self, entity1: str, entity2: str) -> ReasoningResult:
         """Check if two groups/artists are under same company (2-hop comparison)."""
         steps = []
         
-        # Get company for entity1
+        # Get ALL companies for entity1 (một entity có thể có nhiều companies)
         if self.kg.get_entity_type(entity1) == 'Artist':
             groups1 = self.kg.get_artist_groups(entity1)
-            companies1 = [self.kg.get_group_company(g) for g in groups1]
-            companies1 = [c for c in companies1 if c]
+            companies1 = []
+            for g in groups1:
+                # Lấy TẤT CẢ companies của group này
+                group_companies = self.kg.get_group_companies(g)
+                companies1.extend(group_companies)
+            companies1 = list(set(companies1))  # Remove duplicates
         else:
-            companies1 = [self.kg.get_group_company(entity1)]
-            companies1 = [c for c in companies1 if c]
+            # Group có thể có nhiều companies
+            companies1 = self.kg.get_group_companies(entity1)
             
-        # Get company for entity2
+        # Get ALL companies for entity2 (một entity có thể có nhiều companies)
         if self.kg.get_entity_type(entity2) == 'Artist':
             groups2 = self.kg.get_artist_groups(entity2)
-            companies2 = [self.kg.get_group_company(g) for g in groups2]
-            companies2 = [c for c in companies2 if c]
+            companies2 = []
+            for g in groups2:
+                # Lấy TẤT CẢ companies của group này
+                group_companies = self.kg.get_group_companies(g)
+                companies2.extend(group_companies)
+            companies2 = list(set(companies2))  # Remove duplicates
         else:
-            companies2 = [self.kg.get_group_company(entity2)]
-            companies2 = [c for c in companies2 if c]
+            # Group có thể có nhiều companies
+            companies2 = self.kg.get_group_companies(entity2)
             
         steps.append(ReasoningStep(
             hop_number=1,
@@ -652,14 +1345,18 @@ class MultiHopReasoner:
         """Get all labelmates (same company) of an artist/group (3-hop)."""
         steps = []
         
-        # Step 1: Get company
+        # Step 1: Get ALL companies (một entity có thể có nhiều companies)
         if self.kg.get_entity_type(artist_or_group) == 'Artist':
             groups = self.kg.get_artist_groups(artist_or_group)
-            companies = [self.kg.get_group_company(g) for g in groups]
-            companies = [c for c in companies if c]
+            companies = []
+            for g in groups:
+                # Lấy TẤT CẢ companies của group này
+                group_companies = self.kg.get_group_companies(g)
+                companies.extend(group_companies)
+            companies = list(set(companies))  # Remove duplicates
         else:
-            companies = [self.kg.get_group_company(artist_or_group)]
-            companies = [c for c in companies if c]
+            # Group có thể có nhiều companies
+            companies = self.kg.get_group_companies(artist_or_group)
             
         steps.append(ReasoningStep(
             hop_number=1,
@@ -696,6 +1393,416 @@ class MultiHopReasoner:
             answer_text=f"Có {len(all_groups)} nhóm cùng công ty: {', '.join(list(all_groups)[:10])}{'...' if len(all_groups) > 10 else ''}",
             confidence=0.95,
             explanation=f"3-hop: {artist_or_group} → Company → Other Groups"
+        )
+    
+    def get_collaborating_groups(self, group_name: str) -> ReasoningResult:
+        """
+        Get groups that have collaborated with the given group.
+        
+        Strategy: Find groups that share songs (collaboration songs).
+        In the graph: Song → SINGS → Group (song is sung by group)
+        """
+        steps = []
+        collaborating_groups = set()
+        
+        # Step 1: Get all songs by this group
+        # In graph: Song has in_edge to Group with type='SINGS'
+        songs = self.kg.get_group_songs(group_name)
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_songs',
+            source_entities=[group_name],
+            relationship='SINGS',
+            target_entities=songs[:10],  # Limit for display
+            explanation=f"Lấy các bài hát của {group_name}"
+        ))
+        
+        # Step 2: For each song, find other groups that also sing it (collaboration)
+        # Check all in_edges to the song with type='SINGS'
+        for song in songs[:100]:  # Limit to avoid too many iterations
+            # Get all groups/artists that also sing this song
+            # In graph: song has in_edges from other groups with type='SINGS'
+            for source, _, data in self.kg.graph.in_edges(song, data=True):
+                if data.get('type') == 'SINGS':
+                    source_type = self.kg.get_entity_type(source)
+                    # If it's a Group and not the original group, it's a collaborator
+                    if source_type == 'Group' and source != group_name:
+                        collaborating_groups.add(source)
+                    # If it's an Artist, get their groups
+                    elif source_type == 'Artist':
+                        artist_groups = self.kg.get_artist_groups(source)
+                        for ag in artist_groups:
+                            if ag != group_name:
+                                collaborating_groups.add(ag)
+        
+        # Step 3: Also check for direct collaboration relationships
+        relationships = self.kg.get_relationships(group_name)
+        for rel in relationships:
+            if rel['type'] in ['COLLABORATES_WITH', 'FEATURED', 'FEATURES']:
+                target = rel['target']
+                target_type = self.kg.get_entity_type(target)
+                if target_type == 'Group':
+                    collaborating_groups.add(target)
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='find_collaborators',
+            source_entities=songs[:10],
+            relationship='COLLABORATION',
+            target_entities=list(collaborating_groups)[:10],
+            explanation=f"Tìm các nhóm hợp tác qua bài hát chung"
+        ))
+        
+        if collaborating_groups:
+            groups_list = list(collaborating_groups)
+            answer_text = f"Có {len(groups_list)} nhóm nhạc đã hợp tác với {group_name}: {', '.join(groups_list[:10])}"
+            if len(groups_list) > 10:
+                answer_text += f" và {len(groups_list) - 10} nhóm khác"
+        else:
+            answer_text = f"Không tìm thấy thông tin về các nhóm nhạc đã hợp tác với {group_name} trong đồ thị tri thức."
+        
+        return ReasoningResult(
+            query=f"Các nhóm nhạc đã hợp tác với {group_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=steps,
+            answer_entities=list(collaborating_groups),
+            answer_text=answer_text,
+            confidence=0.8 if collaborating_groups else 0.0,
+            explanation=f"2-hop: {group_name} → Songs → Other Groups"
+        )
+    
+    def get_group_songs(self, group_name: str) -> ReasoningResult:
+        """Get all songs by a group (1-hop: Group → SINGS → Song)."""
+        songs = self.kg.get_group_songs(group_name)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_songs',
+            source_entities=[group_name],
+            relationship='SINGS',
+            target_entities=songs,
+            explanation=f"Lấy các bài hát của {group_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Bài hát của {group_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=songs,
+            answer_text=f"{group_name} có {len(songs)} bài hát: {', '.join(songs[:10])}{'...' if len(songs) > 10 else ''}",
+            confidence=1.0 if songs else 0.0,
+            explanation=f"1-hop: {group_name} → SINGS → Song"
+        )
+    
+    def get_artist_songs(self, artist_name: str) -> ReasoningResult:
+        """Get all songs by an artist (1-hop: Artist → SINGS → Song)."""
+        songs = []
+        for _, target, data in self.kg.graph.out_edges(artist_name, data=True):
+            if data.get('type') == 'SINGS':
+                songs.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_songs',
+            source_entities=[artist_name],
+            relationship='SINGS',
+            target_entities=songs,
+            explanation=f"Lấy các bài hát của {artist_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Bài hát của {artist_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=songs,
+            answer_text=f"{artist_name} có {len(songs)} bài hát: {', '.join(songs[:10])}{'...' if len(songs) > 10 else ''}",
+            confidence=1.0 if songs else 0.0,
+            explanation=f"1-hop: {artist_name} → SINGS → Song"
+        )
+    
+    def get_group_albums(self, group_name: str) -> ReasoningResult:
+        """Get all albums by a group (1-hop: Group → RELEASED → Album)."""
+        albums = []
+        for _, target, data in self.kg.graph.out_edges(group_name, data=True):
+            if data.get('type') == 'RELEASED':
+                if self.kg.get_entity_type(target) == 'Album':
+                    albums.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_albums',
+            source_entities=[group_name],
+            relationship='RELEASED',
+            target_entities=albums,
+            explanation=f"Lấy các album của {group_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Album của {group_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=albums,
+            answer_text=f"{group_name} có {len(albums)} album: {', '.join(albums[:10])}{'...' if len(albums) > 10 else ''}",
+            confidence=1.0 if albums else 0.0,
+            explanation=f"1-hop: {group_name} → RELEASED → Album"
+        )
+    
+    def get_artist_albums(self, artist_name: str) -> ReasoningResult:
+        """Get all albums by an artist (2-hop: Artist → Group → RELEASED → Album)."""
+        steps = []
+        
+        # Step 1: Get groups
+        groups = self.kg.get_artist_groups(artist_name)
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist_name],
+            relationship='MEMBER_OF',
+            target_entities=groups,
+            explanation=f"Lấy nhóm của {artist_name}"
+        ))
+        
+        # Step 2: Get albums from groups
+        albums = []
+        for group in groups:
+            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                if data.get('type') == 'RELEASED':
+                    if self.kg.get_entity_type(target) == 'Album':
+                        albums.append(target)
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='get_albums',
+            source_entities=groups,
+            relationship='RELEASED',
+            target_entities=albums,
+            explanation=f"Lấy album từ các nhóm"
+        ))
+        
+        unique_albums = list(set(albums))
+        
+        return ReasoningResult(
+            query=f"Album của {artist_name}",
+            reasoning_type=ReasoningType.CHAIN,
+            steps=steps,
+            answer_entities=unique_albums,
+            answer_text=f"{artist_name} có {len(unique_albums)} album: {', '.join(unique_albums[:10])}{'...' if len(unique_albums) > 10 else ''}",
+            confidence=0.9 if unique_albums else 0.0,
+            explanation=f"2-hop: {artist_name} → MEMBER_OF → Group → RELEASED → Album"
+        )
+    
+    def get_entity_genres(self, entity_name: str) -> ReasoningResult:
+        """Get genres of an entity (1-hop: Entity → IS_GENRE → Genre)."""
+        genres = []
+        for _, target, data in self.kg.graph.out_edges(entity_name, data=True):
+            if data.get('type') == 'IS_GENRE':
+                if self.kg.get_entity_type(target) == 'Genre':
+                    genres.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_genres',
+            source_entities=[entity_name],
+            relationship='IS_GENRE',
+            target_entities=genres,
+            explanation=f"Lấy thể loại của {entity_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Thể loại của {entity_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=genres,
+            answer_text=f"{entity_name} thuộc thể loại: {', '.join(genres) if genres else 'Không xác định'}",
+            confidence=1.0 if genres else 0.0,
+            explanation=f"1-hop: {entity_name} → IS_GENRE → Genre"
+        )
+    
+    def get_artist_instruments(self, artist_name: str) -> ReasoningResult:
+        """Get instruments played by an artist (1-hop: Artist → PLAYS → Instrument)."""
+        instruments = []
+        for _, target, data in self.kg.graph.out_edges(artist_name, data=True):
+            if data.get('type') == 'PLAYS':
+                if self.kg.get_entity_type(target) == 'Instrument':
+                    instruments.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_instruments',
+            source_entities=[artist_name],
+            relationship='PLAYS',
+            target_entities=instruments,
+            explanation=f"Lấy nhạc cụ của {artist_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Nhạc cụ của {artist_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=instruments,
+            answer_text=f"{artist_name} chơi: {', '.join(instruments) if instruments else 'Không có thông tin'}",
+            confidence=1.0 if instruments else 0.0,
+            explanation=f"1-hop: {artist_name} → PLAYS → Instrument"
+        )
+    
+    def get_artist_occupations(self, artist_name: str) -> ReasoningResult:
+        """Get occupations of an artist (1-hop: Artist → HAS_OCCUPATION → Occupation)."""
+        occupations = []
+        for _, target, data in self.kg.graph.out_edges(artist_name, data=True):
+            if data.get('type') == 'HAS_OCCUPATION':
+                if self.kg.get_entity_type(target) == 'Occupation':
+                    occupations.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_occupations',
+            source_entities=[artist_name],
+            relationship='HAS_OCCUPATION',
+            target_entities=occupations,
+            explanation=f"Lấy nghề nghiệp của {artist_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Nghề nghiệp của {artist_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=occupations,
+            answer_text=f"{artist_name} có vai trò: {', '.join(occupations) if occupations else 'Không có thông tin'}",
+            confidence=1.0 if occupations else 0.0,
+            explanation=f"1-hop: {artist_name} → HAS_OCCUPATION → Occupation"
+        )
+    
+    def get_subunits(self, group_name: str) -> ReasoningResult:
+        """Get subunits of a group (1-hop: Group → SUBUNIT_OF → Subunit)."""
+        subunits = []
+        for _, target, data in self.kg.graph.out_edges(group_name, data=True):
+            if data.get('type') == 'SUBUNIT_OF':
+                if self.kg.get_entity_type(target) == 'Group':
+                    subunits.append(target)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_subunits',
+            source_entities=[group_name],
+            relationship='SUBUNIT_OF',
+            target_entities=subunits,
+            explanation=f"Lấy nhóm con của {group_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Nhóm con của {group_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=subunits,
+            answer_text=f"{group_name} có {len(subunits)} nhóm con: {', '.join(subunits) if subunits else 'Không có'}",
+            confidence=1.0 if subunits else 0.0,
+            explanation=f"1-hop: {group_name} → SUBUNIT_OF → Subunit"
+        )
+    
+    def get_song_writers(self, song_name: str) -> ReasoningResult:
+        """Get writers of a song (1-hop: Song ← WROTE ← Artist)."""
+        writers = []
+        for source, _, data in self.kg.graph.in_edges(song_name, data=True):
+            if data.get('type') == 'WROTE':
+                if self.kg.get_entity_type(source) == 'Artist':
+                    writers.append(source)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_writers',
+            source_entities=[song_name],
+            relationship='WROTE',
+            target_entities=writers,
+            explanation=f"Lấy tác giả của {song_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Tác giả của {song_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=writers,
+            answer_text=f"{song_name} được viết bởi: {', '.join(writers) if writers else 'Không có thông tin'}",
+            confidence=1.0 if writers else 0.0,
+            explanation=f"1-hop: Song ← WROTE ← Artist"
+        )
+    
+    def get_album_songs(self, album_name: str) -> ReasoningResult:
+        """Get songs in an album (1-hop: Album ← CONTAINS ← Song)."""
+        songs = []
+        for source, _, data in self.kg.graph.in_edges(album_name, data=True):
+            if data.get('type') == 'CONTAINS':
+                if self.kg.get_entity_type(source) == 'Song':
+                    songs.append(source)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_songs',
+            source_entities=[album_name],
+            relationship='CONTAINS',
+            target_entities=songs,
+            explanation=f"Lấy các bài hát trong album {album_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Bài hát trong album {album_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=songs,
+            answer_text=f"Album {album_name} có {len(songs)} bài hát: {', '.join(songs[:10])}{'...' if len(songs) > 10 else ''}",
+            confidence=1.0 if songs else 0.0,
+            explanation=f"1-hop: Album ← CONTAINS ← Song"
+        )
+    
+    def get_song_producers(self, song_name: str) -> ReasoningResult:
+        """Get producers of a song (1-hop: Song ← PRODUCED_SONG ← Artist/Group)."""
+        producers = []
+        for source, _, data in self.kg.graph.in_edges(song_name, data=True):
+            if data.get('type') == 'PRODUCED_SONG':
+                producers.append(source)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_producers',
+            source_entities=[song_name],
+            relationship='PRODUCED_SONG',
+            target_entities=producers,
+            explanation=f"Lấy nhà sản xuất của {song_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Nhà sản xuất của {song_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=producers,
+            answer_text=f"{song_name} được sản xuất bởi: {', '.join(producers) if producers else 'Không có thông tin'}",
+            confidence=1.0 if producers else 0.0,
+            explanation=f"1-hop: Song ← PRODUCED_SONG ← Producer"
+        )
+    
+    def get_album_producers(self, album_name: str) -> ReasoningResult:
+        """Get producers of an album (1-hop: Album ← PRODUCED_ALBUM ← Artist/Group)."""
+        producers = []
+        for source, _, data in self.kg.graph.in_edges(album_name, data=True):
+            if data.get('type') == 'PRODUCED_ALBUM':
+                producers.append(source)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_producers',
+            source_entities=[album_name],
+            relationship='PRODUCED_ALBUM',
+            target_entities=producers,
+            explanation=f"Lấy nhà sản xuất của album {album_name}"
+        )
+        
+        return ReasoningResult(
+            query=f"Nhà sản xuất của album {album_name}",
+            reasoning_type=ReasoningType.AGGREGATION,
+            steps=[step],
+            answer_entities=producers,
+            answer_text=f"Album {album_name} được sản xuất bởi: {', '.join(producers) if producers else 'Không có thông tin'}",
+            confidence=1.0 if producers else 0.0,
+            explanation=f"1-hop: Album ← PRODUCED_ALBUM ← Producer"
         )
 
 

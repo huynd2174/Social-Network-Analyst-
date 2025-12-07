@@ -163,14 +163,14 @@ def merge_data(
                     })
                 else:
                     # Node không phải từ BFS -> cập nhật như bình thường
-                    if "properties" not in existing_node:
-                        existing_node["properties"] = {}
-                    existing_node["properties"].update({
-                        "ner_method": entity.get("method", "unknown"),
-                        "ner_confidence": entity.get("confidence", 0.0),
-                        "ner_source_node": entity.get("source_node", ""),
-                        "ner_sources": entity.get("sources", [])
-                    })
+                if "properties" not in existing_node:
+                    existing_node["properties"] = {}
+                existing_node["properties"].update({
+                    "ner_method": entity.get("method", "unknown"),
+                    "ner_confidence": entity.get("confidence", 0.0),
+                    "ner_source_node": entity.get("source_node", ""),
+                    "ner_sources": entity.get("sources", [])
+                })
                 existing_entities_count += 1
             else:
                 # Tên giống nhưng type khác -> cho phép cả hai cùng tồn tại
@@ -198,18 +198,18 @@ def merge_data(
                     new_entities_count += 1
                 else:
                     # Chưa có node với tên này -> tạo node mới với tên gốc
-                    merged["nodes"][entity_id] = {
-                        "label": entity_type,
-                        "title": entity_id,
-                        "properties": {
-                            "method": entity.get("method", "unknown"),
-                            "confidence": entity.get("confidence", 0.0),
-                            "source_node": entity.get("source_node", ""),
-                            "sources": entity.get("sources", [])
-                        }
+                merged["nodes"][entity_id] = {
+                    "label": entity_type,
+                    "title": entity_id,
+                    "properties": {
+                        "method": entity.get("method", "unknown"),
+                        "confidence": entity.get("confidence", 0.0),
+                        "source_node": entity.get("source_node", ""),
+                        "sources": entity.get("sources", [])
                     }
-                    normalized_to_original[key] = entity_id
-                    new_entities_count += 1
+                }
+                normalized_to_original[key] = entity_id
+                new_entities_count += 1
         else:
             # Node chưa tồn tại với key (normalized_name, type) này
             # Kiểm tra xem có node nào với cùng tên (entity_id) nhưng type khác không
@@ -236,18 +236,18 @@ def merge_data(
                 new_entities_count += 1
             else:
                 # Chưa có node với tên này -> tạo node mới với tên gốc
-                merged["nodes"][entity_id] = {
-                    "label": entity_type,
-                    "title": entity_id,
-                    "properties": {
-                        "method": entity.get("method", "unknown"),
-                        "confidence": entity.get("confidence", 0.0),
-                        "source_node": entity.get("source_node", ""),
-                        "sources": entity.get("sources", [])
-                    }
+            merged["nodes"][entity_id] = {
+                "label": entity_type,
+                "title": entity_id,
+                "properties": {
+                    "method": entity.get("method", "unknown"),
+                    "confidence": entity.get("confidence", 0.0),
+                    "source_node": entity.get("source_node", ""),
+                    "sources": entity.get("sources", [])
                 }
-                normalized_to_original[key] = entity_id
-                new_entities_count += 1
+            }
+            normalized_to_original[key] = entity_id
+            new_entities_count += 1
     
     print(f"  ✓ Đã thêm {new_entities_count} entities mới")
     print(f"  ✓ Đã cập nhật {existing_entities_count} entities đã tồn tại")

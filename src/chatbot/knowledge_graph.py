@@ -231,11 +231,54 @@ class KpopKnowledgeGraph:
         return self.graph.subgraph(nodes_to_include).copy()
         
     def get_group_members(self, group_name: str) -> List[str]:
-        """Get all members of a K-pop group."""
+        """
+        Get all members of a K-pop group.
+        
+        Strategy:
+        1. First try to get from infobox (most accurate)
+        2. Fallback to MEMBER_OF edges (filtered by type and confidence)
+        """
+        # Try to get from infobox first (most accurate)
+        group_data = self.get_entity(group_name)
+        if group_data and group_data.get('infobox'):
+            infobox = group_data['infobox']
+            members_str = infobox.get('Thành viên', '')
+            if members_str and members_str.strip():
+                # Parse members from infobox (format: "Jin, Suga, J-Hope, ...")
+                members_list = [m.strip() for m in members_str.split(',') if m.strip()]
+                if members_list:
+                    # Try to match with actual entities in graph
+                    matched_members = []
+                    for member_name in members_list:
+                        # Try exact match first
+                        if member_name in self.graph:
+                            if self.get_entity_type(member_name) == 'Artist':
+                                matched_members.append(member_name)
+                        else:
+                            # Try fuzzy match (remove suffixes like "(ca sĩ)", "(rapper)")
+                            base_name = member_name.split('(')[0].strip()
+                            for node_id in self.graph.nodes():
+                                if base_name.lower() in node_id.lower() or node_id.lower() in base_name.lower():
+                                    if self.get_entity_type(node_id) == 'Artist':
+                                        matched_members.append(node_id)
+                                        break
+                    if matched_members:
+                        return matched_members
+        
+        # Fallback: Get from MEMBER_OF edges (with strict filtering)
         members = []
         for source, _, data in self.graph.in_edges(group_name, data=True):
             if data.get('type') == 'MEMBER_OF':
-                members.append(source)
+                # Only include if source is actually an Artist
+                source_type = self.get_entity_type(source)
+                if source_type == 'Artist':
+                    # Check confidence if available
+                    confidence = data.get('confidence', 1.0)
+                    if confidence >= 0.7:  # Stricter threshold
+                        # Exclude obvious non-members (check if name looks like a member name)
+                        # Members usually don't have suffixes like "(Album)", "(Song)", etc.
+                        if '(' not in source or any(kw in source.lower() for kw in ['rapper', 'ca sĩ', 'singer']):
+                            members.append(source)
         return members
         
     def get_artist_groups(self, artist_name: str) -> List[str]:
@@ -255,11 +298,17 @@ class KpopKnowledgeGraph:
         return songs
         
     def get_group_company(self, group_name: str) -> Optional[str]:
-        """Get the company managing a group."""
+        """Get the company managing a group (returns first one for backward compatibility)."""
+        companies = self.get_group_companies(group_name)
+        return companies[0] if companies else None
+    
+    def get_group_companies(self, group_name: str) -> List[str]:
+        """Get ALL companies managing a group (a group can have multiple companies)."""
+        companies = []
         for _, target, data in self.graph.out_edges(group_name, data=True):
             if data.get('type') == 'MANAGED_BY':
-                return target
-        return None
+                companies.append(target)
+        return companies
         
     def get_company_groups(self, company_name: str) -> List[str]:
         """Get all groups under a company."""

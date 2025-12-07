@@ -26,25 +26,79 @@ from chatbot.evaluation import EvaluationDatasetGenerator
 from chatbot.comparison import ChatbotComparison
 
 
-def run_cli_mode():
-    """Run interactive CLI chatbot."""
+def run_cli_mode(chat_mode: str = 'standard'):
+    """
+    Run interactive CLI chatbot.
+    
+    ✅ YÊU CẦU BÀI TẬP: Phải LUÔN dùng Small LLM (≤1B params)
+    
+    LLM nhỏ được dùng cho 2 nhiệm vụ:
+    1. Hiểu câu hỏi (phân tích, xác định thực thể, nhận ra loại câu hỏi)
+    2. GENERATION: Tạo câu trả lời tự nhiên từ context (triples, paths, reasoning results)
+    
+    ⚠️ QUAN TRỌNG: LLM KHÔNG làm multi-hop reasoning
+    - Multi-hop reasoning do Reasoner thực hiện (graph algorithm: tìm đường đi, tính scoring, xâu chuỗi path)
+    - LLM chỉ đọc kết quả reasoning và format thành câu trả lời tự nhiên
+    
+    Args:
+        chat_mode: 'standard' (luôn dùng LLM - đáp ứng yêu cầu) hoặc 'optimized' (tối ưu context)
+    """
     print("\n" + "="*60)
     print("🎤 K-pop Knowledge Graph Chatbot - Interactive Mode")
     print("="*60)
-    print("Nhập câu hỏi về K-pop hoặc gõ 'quit' để thoát.\n")
+    
+    # Show mode info
+    if chat_mode == 'optimized':
+        print("⚡ Chế độ: OPTIMIZED MODE (Tối ưu context, vẫn dùng LLM)")
+        print("   - Nhanh hơn: Giảm context size khi reasoning confident")
+        print("   - Vẫn dùng Small LLM: Đáp ứng yêu cầu bài tập")
+    else:  # standard
+        print("🔄 Chế độ: STANDARD MODE (Luôn dùng Small LLM)")
+        print("   - LLM nhỏ (≤1B params) dùng cho:")
+        print("     • Hiểu câu hỏi (phân tích, extract entities, detect intent)")
+        print("     • GENERATION: Tạo câu trả lời tự nhiên từ context")
+        print("   - Multi-hop reasoning: Do Reasoner thực hiện (graph algorithm)")
+    
+    print("\nNhập câu hỏi về K-pop hoặc gõ 'quit' để thoát.\n")
     print("💡 Tip: Dùng lệnh nhanh để tránh chờ LLM:")
     print("   - 'members BTS' hoặc 'BTS members'")
     print("   - 'company BLACKPINK'")
     print("   - 'same BTS SEVENTEEN'")
+    print("   - 'mode standard' hoặc 'mode optimized' để đổi chế độ")
+    print("")
+    print("📌 Lưu ý: Chatbot LUÔN dùng Small LLM (≤1B params) để:")
+    print("   1. Hiểu câu hỏi (GraphRAG + LLM understanding)")
+    print("   2. GENERATION: Tạo câu trả lời tự nhiên (format context)")
+    print("   ⚠️ Multi-hop reasoning: Do Reasoner thực hiện (graph algorithm)")
     print("")
     
     # Initialize
-    chatbot = KpopChatbot(verbose=True)
+    # Check if Neo4j should be used
+    use_neo4j = os.getenv("USE_NEO4J", "false").lower() == "true"
+    neo4j_password = os.getenv("NEO4J_PASSWORD")
+    
+    if use_neo4j:
+        if not neo4j_password:
+            print("⚠️ USE_NEO4J=true but NEO4J_PASSWORD not set!")
+            print("   Falling back to JSON file mode...")
+            use_neo4j = False
+    
+    if use_neo4j:
+        print("📊 Using Neo4j Knowledge Graph...")
+        chatbot = KpopChatbot(
+            use_neo4j=True,
+            neo4j_uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            neo4j_user=os.getenv("NEO4J_USER", "neo4j"),
+            neo4j_password=neo4j_password,
+            neo4j_database=os.getenv("NEO4J_DATABASE", None),
+            verbose=True
+        )
+    else:
+        print("📊 Using JSON file Knowledge Graph...")
+        chatbot = KpopChatbot(verbose=True)
     session_id = chatbot.create_session()
     
     print("\n✅ Sẵn sàng! Hãy đặt câu hỏi về K-pop.\n")
-    print("⚠️  Lưu ý: Câu hỏi thường sẽ chậm (5-30 giây) vì LLM chạy trên CPU.")
-    print("   Dùng lệnh đặc biệt để nhanh hơn!\n")
     
     while True:
         try:
@@ -65,8 +119,30 @@ def run_cli_mode():
 - 'same <group1> <group2>': Kiểm tra cùng công ty
 - 'path <entity1> <entity2>': Tìm đường đi
 - 'stats': Xem thống kê
+- 'mode standard': Chuyển sang Standard Mode (luôn dùng Small LLM)
+- 'mode optimized': Chuyển sang Optimized Mode (tối ưu context, vẫn dùng LLM)
 - 'quit': Thoát
+
+📌 Lưu ý: Chatbot LUÔN dùng Small LLM (≤1B params) để:
+   1. Hiểu câu hỏi (GraphRAG + LLM understanding)
+   2. GENERATION: Tạo câu trả lời tự nhiên (format context)
+   ⚠️ Multi-hop reasoning: Do Reasoner thực hiện (graph algorithm)
                 """)
+                continue
+            
+            # Handle mode switching
+            if query.lower().startswith('mode '):
+                new_mode = query[5:].strip().lower()
+                if new_mode in ['standard', 'optimized']:
+                    chat_mode = new_mode
+                    mode_names = {
+                        'standard': '🔄 STANDARD MODE (Luôn dùng Small LLM)',
+                        'optimized': '⚡ OPTIMIZED MODE (Tối ưu context, vẫn dùng LLM)'
+                    }
+                    print(f"\n✅ Đã chuyển sang: {mode_names[chat_mode]}\n")
+                    print("📌 Lưu ý: Cả 2 chế độ đều dùng Small LLM (đáp ứng yêu cầu bài tập)\n")
+                else:
+                    print(f"\n❌ Chế độ không hợp lệ. Dùng: standard hoặc optimized\n")
                 continue
                 
             if query.lower() == 'stats':
@@ -108,43 +184,36 @@ def run_cli_mode():
                     print(f"\n🤖 {result['description']}\n")
                 continue
                 
-            # Normal chat - smart routing based on query type
+            # Normal chat - use selected mode
             print("🔄 Đang xử lý...")
             
-            # Check if it's a simple query that should use reasoning only
-            simple_keywords = ['members', 'thành viên', 'member', 'company', 'công ty', 
-                             'cùng công ty', 'same company', 'labelmate']
-            is_simple = any(kw in query.lower() for kw in simple_keywords)
+            # ✅ YÊU CẦU BÀI TẬP: LUÔN dùng Small LLM (≤1B params)
+            # LLM nhỏ được dùng cho 2 nhiệm vụ:
+            # 1. Hiểu câu hỏi (GraphRAG + LLM understanding)
+            # 2. GENERATION: Tạo câu trả lời tự nhiên (format context thành câu văn)
+            # 
+            # ⚠️ QUAN TRỌNG: LLM KHÔNG làm multi-hop reasoning
+            # - Multi-hop reasoning do Reasoner thực hiện (graph algorithm)
+            # - LLM chỉ đọc kết quả reasoning và format thành câu trả lời
+            use_llm = True  # LUÔN True - đáp ứng yêu cầu bài tập
             
-            if is_simple:
-                # Simple queries: Use reasoning only (fast and accurate)
-                result = chatbot.chat(
-                    query, 
-                    session_id, 
-                    use_multi_hop=True,
-                    return_details=True,
-                    use_llm=False  # Skip LLM for simple queries
-                )
-            else:
-                # Complex queries: Try reasoning first, then LLM if needed
-                result = chatbot.chat(
-                    query, 
-                    session_id, 
-                    use_multi_hop=True,
-                    return_details=True,
-                    use_llm=False  # Try reasoning first
-                )
-                
-                # Only use LLM if reasoning didn't give good answer
-                if not result['response'] or len(result['response']) < 20 or 'không tìm thấy' in result['response'].lower():
-                    print("   (Đang dùng LLM cho câu hỏi phức tạp... có thể mất 10-30 giây)")
-                    result = chatbot.chat(
-                        query, 
-                        session_id, 
-                        use_multi_hop=True,
-                        return_details=True,
-                        use_llm=True  # Use LLM for complex queries
-                    )
+            if chat_mode == 'optimized':
+                print("   ⚡ Optimized mode: Dùng Small LLM với context tối ưu (có thể mất 10-30 giây)")
+            else:  # standard
+                print("   🔄 Standard mode: Dùng Small LLM với context đầy đủ (có thể mất 10-30 giây)")
+            
+            # Pipeline hoạt động (4 bước):
+            # 1. User Query → LLM nhỏ hiểu câu hỏi (extract entities, detect intent)
+            # 2. GraphRAG → Truy xuất thông tin từ đồ thị (entities, relationships, paths)
+            # 3. Multi-hop Reasoning (Reasoner) → Suy luận từ paths (graph algorithm: tìm đường đi, tính scoring, xâu chuỗi)
+            # 4. LLM nhỏ (GENERATION) → Tạo câu trả lời tự nhiên từ context (triples, paths, reasoning results)
+            result = chatbot.chat(
+                query, 
+                session_id, 
+                use_multi_hop=True,
+                return_details=True,
+                use_llm=use_llm  # LUÔN True - đáp ứng yêu cầu bài tập
+            )
             
             print(f"\n🤖 {result['response']}")
             print(f"   [Entities: {result['entities_found']}, Hops: {result['reasoning_hops']}]\n")
@@ -156,22 +225,67 @@ def run_cli_mode():
             print(f"\n❌ Lỗi: {e}\n")
 
 
-def run_ui_mode():
-    """Run Gradio web UI."""
-    from chatbot.app import main as run_app
-    run_app()
+def run_ui_mode(use_streamlit: bool = False):
+    """
+    Run web UI.
+    
+    Args:
+        use_streamlit: If True, use Streamlit instead of Gradio
+    """
+    if use_streamlit:
+        try:
+            import streamlit.web.cli as stcli
+            import sys
+            import os
+            
+            # Get streamlit app path
+            streamlit_app_path = os.path.join(
+                os.path.dirname(__file__),
+                "chatbot",
+                "streamlit_app.py"
+            )
+            
+            print("🚀 Launching Streamlit UI...")
+            print(f"   App: {streamlit_app_path}")
+            print("   URL: http://localhost:8501\n")
+            
+            # Run streamlit
+            sys.argv = ["streamlit", "run", streamlit_app_path]
+            stcli.main()
+        except ImportError:
+            print("❌ Streamlit not installed. Install with: pip install streamlit")
+            print("   Falling back to Gradio...")
+            use_streamlit = False
+    
+    if not use_streamlit:
+        from chatbot.app import main as run_app
+        run_app()
 
 
-def run_eval_mode(num_questions: int = 2000):
-    """Generate evaluation dataset."""
+def run_eval_mode(num_questions: int = 2000, use_chatgpt: bool = False, chatgpt_ratio: float = 0.2):
+    """
+    Generate evaluation dataset.
+    
+    Args:
+        num_questions: Target number of questions
+        use_chatgpt: Whether to use ChatGPT for some questions
+        chatgpt_ratio: Ratio of questions from ChatGPT (0.0-1.0)
+    """
     print("\n" + "="*60)
     print("📝 Evaluation Dataset Generator")
     print("="*60)
     
+    if use_chatgpt:
+        print("\n💡 Using ChatGPT for some questions")
+        print(f"   Distribution: {int(num_questions * (1 - chatgpt_ratio))} from graph, {int(num_questions * chatgpt_ratio)} from ChatGPT")
+        print("   ⚠️  Make sure OPENAI_API_KEY is set!")
+    
     generator = EvaluationDatasetGenerator()
     stats = generator.generate_full_dataset(
         target_count=num_questions,
-        output_path="data/evaluation_dataset.json"
+        output_path="data/evaluation_dataset.json",
+        use_chatgpt=use_chatgpt,
+        chatgpt_ratio=chatgpt_ratio
     )
     
     print("\n📊 Dataset Statistics:")
@@ -179,14 +293,43 @@ def run_eval_mode(num_questions: int = 2000):
         print(f"  {key}: {value}")
 
 
-def run_compare_mode(max_questions: int = 500):
-    """Run chatbot comparison."""
+def run_compare_mode(max_questions: int = 500, include_gemini: bool = False, gemini_api_key: str = None):
+    """
+    Run chatbot comparison.
+    
+    Args:
+        max_questions: Maximum number of questions to evaluate
+        include_gemini: Whether to include Gemini in comparison
+        gemini_api_key: Gemini API key (or set GOOGLE_API_KEY env var)
+    """
     print("\n" + "="*60)
     print("🔬 Chatbot Comparison Mode")
     print("="*60)
     
     # Initialize chatbot
-    chatbot = KpopChatbot(verbose=True)
+    # Check if Neo4j should be used
+    use_neo4j = os.getenv("USE_NEO4J", "false").lower() == "true"
+    neo4j_password = os.getenv("NEO4J_PASSWORD")
+    
+    if use_neo4j:
+        if not neo4j_password:
+            print("⚠️ USE_NEO4J=true but NEO4J_PASSWORD not set!")
+            print("   Falling back to JSON file mode...")
+            use_neo4j = False
+    
+    if use_neo4j:
+        print("📊 Using Neo4j Knowledge Graph...")
+        chatbot = KpopChatbot(
+            use_neo4j=True,
+            neo4j_uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            neo4j_user=os.getenv("NEO4J_USER", "neo4j"),
+            neo4j_password=neo4j_password,
+            neo4j_database=os.getenv("NEO4J_DATABASE", None),
+            verbose=True
+        )
+    else:
+        print("📊 Using JSON file Knowledge Graph...")
+        chatbot = KpopChatbot(verbose=True)
     
     # Check if dataset exists
     dataset_path = "data/evaluation_dataset.json"
@@ -196,12 +339,16 @@ def run_compare_mode(max_questions: int = 500):
         generator.generate_full_dataset(output_path=dataset_path)
         
     # Run comparison
-    comparison = ChatbotComparison(kpop_chatbot=chatbot)
+    comparison = ChatbotComparison(
+        kpop_chatbot=chatbot,
+        google_api_key=gemini_api_key
+    )
     questions = comparison.load_evaluation_dataset(dataset_path)
     
     results = comparison.compare_chatbots(
         questions,
-        include_chatgpt=False,  # Set True if API key available
+        include_chatgpt=False,  # Set True if OpenAI API key available
+        include_gemini=include_gemini,
         include_baseline=True,
         max_questions=max_questions
     )
@@ -217,9 +364,9 @@ def main():
     
     parser.add_argument(
         '--mode',
-        choices=['cli', 'ui', 'eval', 'compare'],
+        choices=['cli', 'ui', 'streamlit', 'eval', 'compare'],
         default='cli',
-        help='Chế độ chạy: cli (command line), ui (web), eval (tạo dataset), compare (so sánh)'
+        help='Chế độ chạy: cli (command line), ui (Gradio web), streamlit (Streamlit web), eval (tạo dataset), compare (so sánh)'
     )
     
     parser.add_argument(
@@ -236,16 +383,51 @@ def main():
         help='Số câu hỏi tối đa cho compare mode (mặc định: 500)'
     )
     
+    parser.add_argument(
+        '--chat-mode',
+        choices=['standard', 'optimized'],
+        default='standard',
+        help='Chế độ chatbot: standard (luôn dùng LLM - đáp ứng yêu cầu) hoặc optimized (tối ưu context)'
+    )
+    
+    parser.add_argument(
+        '--use-chatgpt',
+        action='store_true',
+        help='Sử dụng ChatGPT để generate một phần questions (cần OPENAI_API_KEY)'
+    )
+    
+    parser.add_argument(
+        '--chatgpt-ratio',
+        type=float,
+        default=0.2,
+        help='Tỷ lệ questions từ ChatGPT (0.0-1.0, mặc định: 0.2 = 20%%)'
+    )
+    
+    parser.add_argument(
+        '--include-gemini',
+        action='store_true',
+        help='Bao gồm Gemini trong comparison (cần GOOGLE_API_KEY hoặc --gemini-key)'
+    )
+    
+    parser.add_argument(
+        '--gemini-key',
+        type=str,
+        default=None,
+        help='Google API key cho Gemini (hoặc set GOOGLE_API_KEY env var)'
+    )
+    
     args = parser.parse_args()
     
     if args.mode == 'cli':
-        run_cli_mode()
+        run_cli_mode(chat_mode=args.chat_mode)
     elif args.mode == 'ui':
-        run_ui_mode()
+        run_ui_mode(use_streamlit=False)
+    elif args.mode == 'streamlit':
+        run_ui_mode(use_streamlit=True)
     elif args.mode == 'eval':
-        run_eval_mode(args.num_questions)
+        run_eval_mode(args.num_questions, args.use_chatgpt, args.chatgpt_ratio)
     elif args.mode == 'compare':
-        run_compare_mode(args.max_compare)
+        run_compare_mode(args.max_compare, args.include_gemini, args.gemini_key)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ Target: 2000+ evaluation questions
 - 700+ 1-hop questions
 - 700+ 2-hop questions  
 - 600+ 3-hop questions
+
+Optional: Can use ChatGPT/OpenAI API to generate additional questions.
 """
 
 import json
@@ -23,6 +25,13 @@ from dataclasses import dataclass, asdict
 import os
 
 from .knowledge_graph import KpopKnowledgeGraph
+
+# Optional: ChatGPT support
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 
 @dataclass
@@ -675,10 +684,152 @@ class EvaluationDatasetGenerator:
         
     # =========== MAIN GENERATION ===========
     
+    def generate_with_chatgpt(
+        self,
+        num_questions: int = 500,
+        api_key: Optional[str] = None,
+        model: str = "gpt-3.5-turbo"
+    ) -> List[EvaluationQuestion]:
+        """
+        Generate questions using ChatGPT (optional).
+        
+        Args:
+            num_questions: Number of questions to generate
+            api_key: OpenAI API key (or set OPENAI_API_KEY env var)
+            model: Model to use
+            
+        Returns:
+            List of generated questions
+        """
+        if not OPENAI_AVAILABLE:
+            print("⚠️ OpenAI library not installed. Install with: pip install openai")
+            return []
+        
+        api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            print("⚠️ OpenAI API key not found. Set OPENAI_API_KEY env var or pass api_key parameter")
+            return []
+        
+        openai.api_key = api_key
+        
+        # Prepare knowledge graph info
+        stats = self.kg.get_statistics()
+        sample_groups = list(self.kg.get_entities_by_type("Group"))[:10]
+        sample_artists = list(self.kg.get_entities_by_type("Artist"))[:10]
+        
+        context = f"""
+        Knowledge Graph về K-pop:
+        - Tổng số entities: {stats['total_nodes']}
+        - Entity types: {', '.join(list(stats['entity_types'].keys())[:5])}
+        - Relationship types: {', '.join(list(stats['relationship_types'].keys())[:5])}
+        - Sample groups: {', '.join(sample_groups)}
+        - Sample artists: {', '.join(sample_artists)}
+        """
+        
+        questions = []
+        batch_size = 20  # Smaller batches for better quality
+        
+        print(f"  🤖 Generating {num_questions} questions with ChatGPT...")
+        
+        for i in range(0, num_questions, batch_size):
+            current_batch = min(batch_size, num_questions - i)
+            
+            prompt = f"""
+            {context}
+            
+            Tạo {current_batch} câu hỏi đánh giá về K-pop với yêu cầu:
+            1. Câu hỏi phải dựa trên thông tin trong knowledge graph trên
+            2. Câu hỏi phải yêu cầu multi-hop reasoning (1-hop, 2-hop, hoặc 3-hop)
+            3. Các loại câu hỏi:
+               - True/False: "Jungkook là thành viên của BTS." → Đúng/Sai
+               - Yes/No: "Jungkook có phải thành viên của BTS không?" → Có/Không
+               - Multiple Choice: "Jungkook thuộc công ty nào?" với 4 lựa chọn → A/B/C/D
+            
+            4. Phân bố hops: 40% 1-hop, 40% 2-hop, 20% 3-hop
+            
+            Trả về JSON format (chỉ JSON, không có markdown):
+            {{
+                "questions": [
+                    {{
+                        "question": "...",
+                        "question_type": "true_false|yes_no|multiple_choice",
+                        "answer": "Đúng|Sai|Có|Không|A|B|C|D",
+                        "choices": ["option1", "option2", "option3", "option4"] (chỉ cho multiple_choice),
+                        "hops": 1 hoặc 2 hoặc 3,
+                        "explanation": "...",
+                        "category": "membership|company|song|...",
+                        "difficulty": "easy|medium|hard"
+                    }}
+                ]
+            }}
+            """
+            
+            try:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "Bạn là chuyên gia tạo câu hỏi đánh giá về K-pop. Trả về JSON format."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                
+                content = response.choices[0].message.content.strip()
+                
+                # Extract JSON from response
+                if "```json" in content:
+                    json_start = content.find("```json") + 7
+                    json_end = content.find("```", json_start)
+                    content = content[json_start:json_end].strip()
+                elif "```" in content:
+                    json_start = content.find("```") + 3
+                    json_end = content.find("```", json_start)
+                    content = content[json_start:json_end].strip()
+                
+                data = json.loads(content)
+                batch_questions = data.get("questions", [])
+                
+                # Convert to EvaluationQuestion
+                for q_data in batch_questions:
+                    try:
+                        q = EvaluationQuestion(
+                            id=self._next_id(),
+                            question=q_data.get("question", ""),
+                            question_type=q_data.get("question_type", "true_false"),
+                            answer=q_data.get("answer", ""),
+                            choices=q_data.get("choices", []),
+                            hops=q_data.get("hops", 1),
+                            entities=[],  # Will be extracted later
+                            relationships=[],  # Will be extracted later
+                            explanation=q_data.get("explanation", ""),
+                            difficulty=q_data.get("difficulty", "medium"),
+                            category=q_data.get("category", "general")
+                        )
+                        questions.append(q)
+                    except Exception as e:
+                        print(f"    ⚠️ Skipping invalid question: {e}")
+                        continue
+                
+                print(f"    Generated {len(questions)}/{num_questions} questions...")
+                
+                # Rate limiting
+                import time
+                time.sleep(1)
+                
+            except Exception as e:
+                print(f"    ⚠️ Error generating batch {i//batch_size + 1}: {e}")
+                continue
+        
+        print(f"  ✅ Generated {len(questions)} questions with ChatGPT")
+        return questions
+    
     def generate_full_dataset(
         self,
         target_count: int = 2000,
-        output_path: str = "data/evaluation_dataset.json"
+        output_path: str = "data/evaluation_dataset.json",
+        use_chatgpt: bool = False,
+        chatgpt_ratio: float = 0.2  # 20% from ChatGPT, 80% from graph
     ) -> Dict:
         """
         Generate full evaluation dataset.
@@ -686,6 +837,8 @@ class EvaluationDatasetGenerator:
         Args:
             target_count: Target number of questions (minimum 2000)
             output_path: Path to save dataset
+            use_chatgpt: Whether to use ChatGPT for some questions
+            chatgpt_ratio: Ratio of questions from ChatGPT (0.0-1.0)
             
         Returns:
             Dataset statistics
@@ -694,36 +847,69 @@ class EvaluationDatasetGenerator:
         
         all_questions = []
         
-        # 1-hop questions (700+)
-        print("  📝 Generating 1-hop questions...")
-        all_questions.extend(self.generate_1hop_membership_tf(100))
-        all_questions.extend(self.generate_1hop_membership_yn(100))
-        all_questions.extend(self.generate_1hop_membership_mc(100))
-        all_questions.extend(self.generate_1hop_company_tf(100))
-        all_questions.extend(self.generate_1hop_company_mc(100))
-        all_questions.extend(self.generate_1hop_member_count(100))
+        # Calculate distribution
+        if use_chatgpt and OPENAI_AVAILABLE:
+            chatgpt_count = int(target_count * chatgpt_ratio)
+            graph_count = target_count - chatgpt_count
+            print(f"  📊 Distribution: {graph_count} from graph, {chatgpt_count} from ChatGPT")
+        else:
+            graph_count = target_count
+            chatgpt_count = 0
+            if use_chatgpt:
+                print("  ⚠️ ChatGPT requested but not available. Using graph-only generation.")
         
-        # Additional 1-hop to reach ~700
-        all_questions.extend(self.generate_1hop_membership_tf(50))
-        all_questions.extend(self.generate_1hop_membership_yn(50))
+        # Generate questions from graph
+        # Adjust counts to reach graph_count
+        if graph_count >= 2000:
+            # Full generation
+            print("  📝 Generating 1-hop questions...")
+            all_questions.extend(self.generate_1hop_membership_tf(120))
+            all_questions.extend(self.generate_1hop_membership_yn(120))
+            all_questions.extend(self.generate_1hop_membership_mc(120))
+            all_questions.extend(self.generate_1hop_company_tf(120))
+            all_questions.extend(self.generate_1hop_company_mc(120))
+            all_questions.extend(self.generate_1hop_member_count(120))
+            all_questions.extend(self.generate_1hop_membership_tf(60))
+            all_questions.extend(self.generate_1hop_membership_yn(60))
+            
+            print("  📝 Generating 2-hop questions...")
+            all_questions.extend(self.generate_2hop_artist_company_tf(180))
+            all_questions.extend(self.generate_2hop_same_company_yn(180))
+            all_questions.extend(self.generate_2hop_labelmates_mc(180))
+            all_questions.extend(self.generate_2hop_same_group_yn(180))
+            all_questions.extend(self.generate_2hop_artist_company_tf(120))
+            
+            print("  📝 Generating 3-hop questions...")
+            all_questions.extend(self.generate_3hop_artist_labelmate_tf(250))
+            all_questions.extend(self.generate_3hop_company_of_artist_mc(250))
+            all_questions.extend(self.generate_3hop_artist_labelmate_tf(250))
+        else:
+            # Proportional generation
+            ratio_1hop = 0.35
+            ratio_2hop = 0.35
+            ratio_3hop = 0.30
+            
+            print("  📝 Generating questions from graph...")
+            all_questions.extend(self.generate_1hop_membership_tf(int(graph_count * ratio_1hop * 0.2)))
+            all_questions.extend(self.generate_1hop_membership_yn(int(graph_count * ratio_1hop * 0.2)))
+            all_questions.extend(self.generate_1hop_membership_mc(int(graph_count * ratio_1hop * 0.2)))
+            all_questions.extend(self.generate_1hop_company_tf(int(graph_count * ratio_1hop * 0.15)))
+            all_questions.extend(self.generate_1hop_company_mc(int(graph_count * ratio_1hop * 0.15)))
+            all_questions.extend(self.generate_1hop_member_count(int(graph_count * ratio_1hop * 0.1)))
+            
+            all_questions.extend(self.generate_2hop_artist_company_tf(int(graph_count * ratio_2hop * 0.25)))
+            all_questions.extend(self.generate_2hop_same_company_yn(int(graph_count * ratio_2hop * 0.25)))
+            all_questions.extend(self.generate_2hop_labelmates_mc(int(graph_count * ratio_2hop * 0.25)))
+            all_questions.extend(self.generate_2hop_same_group_yn(int(graph_count * ratio_2hop * 0.25)))
+            
+            all_questions.extend(self.generate_3hop_artist_labelmate_tf(int(graph_count * ratio_3hop * 0.5)))
+            all_questions.extend(self.generate_3hop_company_of_artist_mc(int(graph_count * ratio_3hop * 0.5)))
         
-        # 2-hop questions (700+)
-        print("  📝 Generating 2-hop questions...")
-        all_questions.extend(self.generate_2hop_artist_company_tf(150))
-        all_questions.extend(self.generate_2hop_same_company_yn(150))
-        all_questions.extend(self.generate_2hop_labelmates_mc(150))
-        all_questions.extend(self.generate_2hop_same_group_yn(150))
-        
-        # Additional 2-hop to reach ~700
-        all_questions.extend(self.generate_2hop_artist_company_tf(100))
-        
-        # 3-hop questions (600+)
-        print("  📝 Generating 3-hop questions...")
-        all_questions.extend(self.generate_3hop_artist_labelmate_tf(200))
-        all_questions.extend(self.generate_3hop_company_of_artist_mc(200))
-        
-        # Additional 3-hop
-        all_questions.extend(self.generate_3hop_artist_labelmate_tf(200))
+        # Generate with ChatGPT if requested
+        if chatgpt_count > 0:
+            chatgpt_questions = self.generate_with_chatgpt(num_questions=chatgpt_count)
+            all_questions.extend(chatgpt_questions)
+            print(f"  ✅ Added {len(chatgpt_questions)} questions from ChatGPT")
         
         # Shuffle
         random.shuffle(all_questions)
