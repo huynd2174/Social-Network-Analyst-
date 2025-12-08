@@ -1202,8 +1202,7 @@ class KpopChatbot:
                                 words_in_matched_full_names.update(normalized_name.split())
                             matched_in_ngram = True
                             break
-                    # QUAN TRỌNG: Xử lý tên có dash trước khi check substring
-                    # Normalize cả 2 về cùng format để so sánh chính xác hơn
+                    # QUAN TRỌNG: Xử lý tên có dash - normalize cả 2 về cùng format để so sánh
                     elif '-' in variant or '-' in ngram:
                         # Normalize cả 2 về cùng format (space) để so sánh
                         variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
@@ -1327,60 +1326,18 @@ class KpopChatbot:
                         found_artists.append(artist)
                         normalized_seen.add(base_name_lower)
                         break
-                # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
+                # Xử lý tên có dấu gạch ngang: yêu cầu có đủ ≥2 phần trong query
                 elif '-' in base_name_lower:
                     base_parts = base_name_lower.split('-')
                     if word in base_parts and len(word) >= 3:
+                        # Check xem có part khác cũng trong query không (phải có ít nhất 2 parts)
                         other_parts = [p for p in base_parts if p != word and len(p) >= 2]
                         if any(p in query_words_list for p in other_parts) or any(p in query_lower for p in other_parts):
-                            if base_name_lower not in normalized_seen:
+                            # Verify: phải có ít nhất 2 parts trong query để match
+                            matched_parts = sum(1 for p in base_parts if p in query_lower)
+                            if matched_parts >= 2 and base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
-                                break
-                        # Normalize cả 2 về cùng format (space) để so sánh exact match
-                        variant_normalized = variant.replace(' ', ' ').strip()
-                        ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
-                        if variant_normalized == ngram_normalized:
-                            if base_name_lower not in normalized_seen:
-                                found_artists.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
-                                break
-                        # So sánh parts
-                        variant_parts = set(variant.split(' '))
-                        ngram_parts = set(ngram.split('-'))
-                        if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if base_name_lower not in normalized_seen:
-                                found_artists.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
-                                break
-                    elif '-' in variant and ' ' in ngram:
-                        # Normalize cả 2 về cùng format (space) để so sánh exact match
-                        variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
-                        ngram_normalized = ngram.replace(' ', ' ').strip()
-                        if variant_normalized == ngram_normalized:
-                            if base_name_lower not in normalized_seen:
-                                found_artists.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
-                                break
-                        # So sánh parts
-                        variant_parts = set(variant.split('-'))
-                        ngram_parts = set(ngram.split(' '))
-                        if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if base_name_lower not in normalized_seen:
-                                found_artists.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                 if base_name_lower in normalized_seen:
                     break
