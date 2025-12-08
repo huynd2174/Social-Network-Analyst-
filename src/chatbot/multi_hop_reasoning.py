@@ -1104,37 +1104,54 @@ class MultiHopReasoner:
         )
         
     def get_artist_company(self, artist_name: str) -> ReasoningResult:
-        """Get company of an artist (2-hop: Artist → Group → Company)."""
+        """Get company of an artist (1-hop: Artist → Company, or 2-hop: Artist → Group → Company)."""
         steps = []
-        
-        # Step 1: Get groups
-        groups = self.kg.get_artist_groups(artist_name)
-        steps.append(ReasoningStep(
-            hop_number=1,
-            operation='get_groups',
-            source_entities=[artist_name],
-            relationship='MEMBER_OF',
-            target_entities=groups,
-            explanation=f"Lấy nhóm nhạc của {artist_name}"
-        ))
-        
-        # Step 2: Get companies of those groups
         companies = []
-        for group in groups:
-            company = self.kg.get_group_company(group)
-            if company:
-                companies.append(company)
-                
-        steps.append(ReasoningStep(
-            hop_number=2,
-            operation='get_companies',
-            source_entities=groups,
-            relationship='MANAGED_BY',
-            target_entities=list(set(companies)),
-            explanation=f"Lấy công ty quản lý các nhóm"
-        ))
+        
+        # Step 1: Check direct relationship Artist → Company (1-hop)
+        direct_companies = self.kg.get_artist_companies(artist_name)
+        if direct_companies:
+            companies.extend(direct_companies)
+            steps.append(ReasoningStep(
+                hop_number=1,
+                operation='get_direct_companies',
+                source_entities=[artist_name],
+                relationship='MANAGED_BY',
+                target_entities=direct_companies,
+                explanation=f"Lấy công ty quản lý trực tiếp của {artist_name}"
+            ))
+        
+        # Step 2: Get companies through groups (2-hop: Artist → Group → Company)
+        groups = self.kg.get_artist_groups(artist_name)
+        if groups:
+            steps.append(ReasoningStep(
+                hop_number=1 if not direct_companies else 2,
+                operation='get_groups',
+                source_entities=[artist_name],
+                relationship='MEMBER_OF',
+                target_entities=groups,
+                explanation=f"Lấy nhóm nhạc của {artist_name}"
+            ))
+            
+            # Get companies of those groups
+            group_companies = []
+            for group in groups:
+                group_company_list = self.kg.get_group_companies(group)
+                group_companies.extend(group_company_list)
+            
+            if group_companies:
+                companies.extend(group_companies)
+                steps.append(ReasoningStep(
+                    hop_number=2 if not direct_companies else 3,
+                    operation='get_companies',
+                    source_entities=groups,
+                    relationship='MANAGED_BY',
+                    target_entities=list(set(group_companies)),
+                    explanation=f"Lấy công ty quản lý các nhóm"
+                ))
         
         unique_companies = list(set(companies))
+        hops = 1 if direct_companies else (2 if groups else 0)
         
         return ReasoningResult(
             query=f"Công ty của {artist_name}",
@@ -1143,7 +1160,7 @@ class MultiHopReasoner:
             answer_entities=unique_companies,
             answer_text=f"{artist_name} thuộc công ty: {', '.join(unique_companies)}" if unique_companies else f"Không tìm thấy công ty của {artist_name}",
             confidence=0.9 if unique_companies else 0.0,
-            explanation=f"2-hop: {artist_name} → MEMBER_OF → Group → MANAGED_BY → Company"
+            explanation=f"{hops}-hop: {artist_name} → MANAGED_BY → Company" if direct_companies else f"{hops}-hop: {artist_name} → MEMBER_OF → Group → MANAGED_BY → Company"
         )
     
     def _extract_entities_with_llm_fallback(self, query: str, existing_entities: List[str]) -> List[str]:
@@ -1789,13 +1806,15 @@ class MultiHopReasoner:
             )
         
     def check_same_company(self, entity1: str, entity2: str) -> ReasoningResult:
-        """Check if two groups/artists are under same company (2-hop comparison)."""
+        """Check if two groups/artists are under same company (1-hop or 2-hop comparison)."""
         steps = []
         
         # Get ALL companies for entity1 (một entity có thể có nhiều companies)
         if self.kg.get_entity_type(entity1) == 'Artist':
+            # Check direct relationship first (1-hop)
+            companies1 = self.kg.get_artist_companies(entity1)
+            # Then check through groups (2-hop)
             groups1 = self.kg.get_artist_groups(entity1)
-            companies1 = []
             for g in groups1:
                 # Lấy TẤT CẢ companies của group này
                 group_companies = self.kg.get_group_companies(g)
@@ -1807,8 +1826,10 @@ class MultiHopReasoner:
             
         # Get ALL companies for entity2 (một entity có thể có nhiều companies)
         if self.kg.get_entity_type(entity2) == 'Artist':
+            # Check direct relationship first (1-hop)
+            companies2 = self.kg.get_artist_companies(entity2)
+            # Then check through groups (2-hop)
             groups2 = self.kg.get_artist_groups(entity2)
-            companies2 = []
             for g in groups2:
                 # Lấy TẤT CẢ companies của group này
                 group_companies = self.kg.get_group_companies(g)

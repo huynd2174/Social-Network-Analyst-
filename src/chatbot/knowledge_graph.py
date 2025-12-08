@@ -292,10 +292,15 @@ class KpopKnowledgeGraph:
     def get_group_songs(self, group_name: str) -> List[str]:
         """Get all songs by a group."""
         songs = []
+        # Check in_edges: Song → SINGS → Group
         for source, _, data in self.graph.in_edges(group_name, data=True):
             if data.get('type') == 'SINGS':
                 songs.append(source)
-        return songs
+        # Also check out_edges: Group → SINGS → Song (if direction is reversed)
+        for _, target, data in self.graph.out_edges(group_name, data=True):
+            if data.get('type') == 'SINGS':
+                songs.append(target)
+        return list(set(songs))  # Remove duplicates
         
     def get_group_company(self, group_name: str) -> Optional[str]:
         """Get the company managing a group (returns first one for backward compatibility)."""
@@ -308,6 +313,16 @@ class KpopKnowledgeGraph:
         for _, target, data in self.graph.out_edges(group_name, data=True):
             if data.get('type') == 'MANAGED_BY':
                 companies.append(target)
+        return companies
+    
+    def get_artist_companies(self, artist_name: str) -> List[str]:
+        """Get ALL companies managing an artist directly (Artist → Company)."""
+        companies = []
+        for _, target, data in self.graph.out_edges(artist_name, data=True):
+            if data.get('type') == 'MANAGED_BY':
+                # Check if target is a Company
+                if self.get_entity_type(target) == 'Company':
+                    companies.append(target)
         return companies
         
     def get_company_groups(self, company_name: str) -> List[str]:

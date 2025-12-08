@@ -104,28 +104,57 @@ class EvaluationDatasetGenerator:
             if company:
                 self.groups_with_companies[group] = company
                 
+        # Artists with companies (direct relationship)
+        self.artists_with_companies = {}
+        for artist in self.kg.get_entities_by_type("Artist"):
+            companies = self.kg.get_artist_companies(artist)
+            if companies:
+                # Store first company for backward compatibility
+                self.artists_with_companies[artist] = companies[0]
+        
         # Companies with groups
         self.companies_with_groups = defaultdict(list)
         for group, company in self.groups_with_companies.items():
             self.companies_with_groups[company].append(group)
             
-        # Filter companies with multiple groups
+        # Companies with artists (direct)
+        self.companies_with_artists = defaultdict(list)
+        for artist, company in self.artists_with_companies.items():
+            self.companies_with_artists[company].append(artist)
+            
+        # Filter companies with multiple groups or artists
         self.companies_with_groups = {
             c: g for c, g in self.companies_with_groups.items()
             if len(g) >= 2
         }
+        self.companies_with_artists = {
+            c: a for c, a in self.companies_with_artists.items()
+            if len(a) >= 2
+        }
         
         # Songs by groups/artists
         self.entity_songs = defaultdict(list)
+        # First, get songs directly linked to artists/groups via SINGS edges
         for edge in self.kg.edges:
             if edge.get('type') == 'SINGS':
                 song = edge.get('source')
-                artist = edge.get('target')
-                if song and artist:
-                    self.entity_songs[artist].append(song)
+                entity = edge.get('target')  # Can be Artist or Group
+                if song and entity:
+                    self.entity_songs[entity].append(song)
+        
+        # Also get songs for artists through their groups
+        # This is important because many songs are linked to Groups, not Artists
+        for artist in self.kg.get_entities_by_type("Artist"):
+            artist_groups = self.kg.get_artist_groups(artist)
+            for group in artist_groups:
+                group_songs = self.kg.get_group_songs(group)
+                for song in group_songs:
+                    if song not in self.entity_songs[artist]:
+                        self.entity_songs[artist].append(song)
                     
         print(f"✅ Cached: {len(self.groups_with_members)} groups, "
-              f"{len(self.companies_with_groups)} companies, "
+              f"{len(self.companies_with_groups)} companies with groups, "
+              f"{len(self.companies_with_artists)} companies with artists, "
               f"{len(self.entity_songs)} entities with songs")
               
     def _next_id(self) -> str:
@@ -136,49 +165,102 @@ class EvaluationDatasetGenerator:
     # =========== 2-HOP QUESTIONS ===========
     
     def generate_2hop_artist_company_tf(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 2-hop True/False: Artist → Group → Company."""
+        """Generate 2-hop True/False: Artist → Group → Company or Artist → Company (direct)."""
         questions = []
         
+        # Collect all artists with companies (through groups or direct)
+        artists_with_company_info = []
+        
+        # Artists through groups (2-hop)
+        for group in self.groups_with_companies.keys():
+            if group in self.groups_with_members:
+                members = self.groups_with_members[group]
+                company = self.groups_with_companies[group]
+                for member in members:
+                    artists_with_company_info.append({
+                        'artist': member,
+                        'company': company,
+                        'group': group,
+                        'hops': 2,
+                        'direct': False
+                    })
+        
+        # Artists with direct company relationship (1-hop)
+        for artist, company in self.artists_with_companies.items():
+            artists_with_company_info.append({
+                'artist': artist,
+                'company': company,
+                'group': None,
+                'hops': 1,
+                'direct': True
+            })
+        
+        if not artists_with_company_info:
+            return questions
+        
         for _ in range(count):
-            # Find artist with known group and company
-            groups = list(self.groups_with_companies.keys())
-            groups_with_both = [g for g in groups if g in self.groups_with_members and self.groups_with_members[g]]
-            
-            if not groups_with_both:
-                break
-                
-            group = random.choice(groups_with_both)
-            members = self.groups_with_members[group]
-            company = self.groups_with_companies[group]
-            member = random.choice(members)
+            info = random.choice(artists_with_company_info)
+            member = info['artist']
+            company = info['company']
+            group = info['group']
+            is_direct = info['direct']
             
             # Templating cho câu hỏi
-            true_templates = [
-                lambda: f"{member} thuộc công ty {company}.",
-                lambda: f"{member} có phải trực thuộc {company} qua nhóm {group} không?",
-                lambda: f"{member} (nhóm {group}) do {company} quản lý.",
-            ]
-            false_templates = [
-                lambda wc: f"{member} thuộc công ty {wc}.",
-                lambda wc: f"{member} có phải trực thuộc {wc} qua nhóm {group} không?",
-                lambda wc: f"{member} (nhóm {group}) do {wc} quản lý.",
-            ]
+            if is_direct:
+                true_templates = [
+                    lambda: f"{member} thuộc công ty {company}.",
+                    lambda: f"{member} có phải trực thuộc {company} không?",
+                    lambda: f"{member} do {company} quản lý.",
+                    lambda: f"{member} được quản lý bởi {company}.",
+                ]
+                false_templates = [
+                    lambda wc: f"{member} thuộc công ty {wc}.",
+                    lambda wc: f"{member} có phải trực thuộc {wc} không?",
+                    lambda wc: f"{member} do {wc} quản lý.",
+                    lambda wc: f"{member} được quản lý bởi {wc}.",
+                ]
+            else:
+                true_templates = [
+                    lambda: f"{member} thuộc công ty {company}.",
+                    lambda: f"{member} có phải trực thuộc {company} qua nhóm {group} không?",
+                    lambda: f"{member} (nhóm {group}) do {company} quản lý.",
+                    lambda: f"{member} là thành viên {group} thuộc {company}.",
+                ]
+                false_templates = [
+                    lambda wc: f"{member} thuộc công ty {wc}.",
+                    lambda wc: f"{member} có phải trực thuộc {wc} qua nhóm {group} không?",
+                    lambda wc: f"{member} (nhóm {group}) do {wc} quản lý.",
+                    lambda wc: f"{member} là thành viên {group} thuộc {wc}.",
+                ]
             
             if random.random() > 0.5:
                 # True
                 question = random.choice(true_templates)()
                 answer = "Đúng"
-                explanation = f"{member} là thành viên của {group}, và {group} thuộc {company}."
+                if is_direct:
+                    explanation = f"{member} trực thuộc {company}."
+                else:
+                    explanation = f"{member} là thành viên của {group}, và {group} thuộc {company}."
             else:
                 # False
-                other_companies = [c for c in self.companies_with_groups.keys() if c != company]
+                all_companies = list(set(list(self.companies_with_groups.keys()) + list(self.companies_with_artists.keys())))
+                other_companies = [c for c in all_companies if c != company]
                 if other_companies:
                     wrong_company = random.choice(other_companies)
                     question = random.choice(false_templates)(wrong_company)
                     answer = "Sai"
-                    explanation = f"{member} thuộc {group} → {company}, không phải {wrong_company}."
+                    if is_direct:
+                        explanation = f"{member} thuộc {company}, không phải {wrong_company}."
+                    else:
+                        explanation = f"{member} thuộc {group} → {company}, không phải {wrong_company}."
                 else:
                     continue
+                    
+            entities = [member, company]
+            relationships = ["MANAGED_BY"]
+            if group:
+                entities.insert(1, group)
+                relationships = ["MEMBER_OF", "MANAGED_BY"]
                     
             questions.append(EvaluationQuestion(
                 id=self._next_id(),
@@ -186,9 +268,9 @@ class EvaluationDatasetGenerator:
                 question_type="true_false",
                 answer=answer,
                 choices=[],
-                hops=2,
-                entities=[member, group, company],
-                relationships=["MEMBER_OF", "MANAGED_BY"],
+                hops=info['hops'],
+                entities=entities,
+                relationships=relationships,
                 explanation=explanation,
                 difficulty="medium",
                 category="artist_company"
@@ -364,17 +446,66 @@ class EvaluationDatasetGenerator:
         
         # Chuẩn bị candidates: song, artist, group, company
         candidates = []
+        
+        # Method 1: Artists with songs (direct or through groups)
         for artist, songs in self.entity_songs.items():
+            # Check if this entity is actually an artist in a group
             for group, members in self.groups_with_members.items():
                 if artist in members and group in self.groups_with_companies:
                     company = self.groups_with_companies[group]
                     for song in songs:
                         candidates.append((song, artist, group, company))
         
+        # Method 2: Groups with songs directly (get songs from graph)
+        for group in self.groups_with_companies.keys():
+            if group in self.groups_with_members:
+                company = self.groups_with_companies[group]
+                members = self.groups_with_members[group]
+                # Get songs for this group from graph
+                group_songs = self.kg.get_group_songs(group)
+                for member in members:
+                    for song in group_songs:
+                        candidates.append((song, member, group, company))
+        
+        # Remove duplicates
+        candidates = list(set(candidates))
+        
         if not candidates:
+            # Debug: Check why no candidates
+            artists_in_groups = set()
+            for group, members in self.groups_with_members.items():
+                artists_in_groups.update(members)
+            artists_with_songs = set(self.entity_songs.keys())
+            intersection = artists_in_groups & artists_with_songs
+            print(f"    ⚠️ No 3-hop candidates found")
+            print(f"      - Entities with songs: {len(artists_with_songs)}")
+            print(f"      - Artists in groups: {len(artists_in_groups)}")
+            print(f"      - Intersection: {len(intersection)}")
+            # Try alternative: groups with songs
+            groups_with_songs = [e for e in self.entity_songs.keys() if e in self.groups_with_members]
+            print(f"      - Groups with songs: {len(groups_with_songs)}")
+            if len(groups_with_songs) > 0:
+                sample_group = groups_with_songs[0]
+                print(f"      - Sample group: {sample_group}, has company: {sample_group in self.groups_with_companies}")
+            # Try getting songs directly from graph for groups
+            groups_with_songs_from_graph = 0
+            total_songs_from_graph = 0
+            for group in list(self.groups_with_companies.keys())[:5]:  # Check first 5
+                songs = self.kg.get_group_songs(group)
+                if songs:
+                    groups_with_songs_from_graph += 1
+                    total_songs_from_graph += len(songs)
+            print(f"      - Groups with songs (from graph, sample 5): {groups_with_songs_from_graph}, total songs: {total_songs_from_graph}")
             return questions
         
-        for _ in range(count):
+        print(f"    ✅ Found {len(candidates)} candidates for 3-hop TF questions")
+        
+        # Limit count to available candidates
+        actual_count = min(count, len(candidates))
+        if actual_count < count:
+            print(f"    ⚠️ Only {actual_count} candidates available, generating {actual_count} questions instead of {count}")
+        
+        for _ in range(actual_count):
             song, artist, group, company = random.choice(candidates)
             true_templates = [
                 lambda: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {company}.",
@@ -425,19 +556,44 @@ class EvaluationDatasetGenerator:
         questions = []
         
         candidates = []
+        
+        # Method 1: Artists with songs (direct or through groups)
         for artist, songs in self.entity_songs.items():
+            # Check if this entity is actually an artist in a group
             for group, members in self.groups_with_members.items():
                 if artist in members and group in self.groups_with_companies:
                     company = self.groups_with_companies[group]
                     for song in songs:
                         candidates.append((song, artist, group, company))
         
+        # Method 2: Groups with songs directly (get songs from graph)
+        for group in self.groups_with_companies.keys():
+            if group in self.groups_with_members:
+                company = self.groups_with_companies[group]
+                members = self.groups_with_members[group]
+                # Get songs for this group from graph
+                group_songs = self.kg.get_group_songs(group)
+                for member in members:
+                    for song in group_songs:
+                        candidates.append((song, member, group, company))
+        
+        # Remove duplicates
+        candidates = list(set(candidates))
+        
         if not candidates:
+            print(f"    ⚠️ No 3-hop candidates found for MC questions")
             return questions
+        
+        print(f"    ✅ Found {len(candidates)} candidates for 3-hop MC questions")
         
         companies = list(self.companies_with_groups.keys())
         
-        for _ in range(count):
+        # Limit count to available candidates
+        actual_count = min(count, len(candidates))
+        if actual_count < count:
+            print(f"    ⚠️ Only {actual_count} candidates available, generating {actual_count} questions instead of {count}")
+        
+        for _ in range(actual_count):
             song, artist, group, company = random.choice(candidates)
             wrong_companies = [c for c in companies if c != company]
             if len(wrong_companies) < 3:
@@ -652,14 +808,14 @@ class EvaluationDatasetGenerator:
         if graph_count >= 2000:
             # Full generation: ưu tiên 2-hop nhiều hơn 3-hop
             print("  📝 Generating 2-hop questions...")
-            all_questions.extend(self.generate_2hop_artist_company_tf(500))
-            all_questions.extend(self.generate_2hop_same_company_yn(400))
-            all_questions.extend(self.generate_2hop_labelmates_mc(400))
-            all_questions.extend(self.generate_2hop_same_group_yn(400))
+            all_questions.extend(self.generate_2hop_artist_company_tf(1200))
+            all_questions.extend(self.generate_2hop_same_company_yn(900))
+            all_questions.extend(self.generate_2hop_labelmates_mc(900))
+            all_questions.extend(self.generate_2hop_same_group_yn(800))
             
             print("  📝 Generating 3-hop questions (chuỗi Song→Artist→Group→Company)...")
-            all_questions.extend(self.generate_3hop_song_company_tf(200))
-            all_questions.extend(self.generate_3hop_song_company_mc(200))
+            all_questions.extend(self.generate_3hop_song_company_tf(500))
+            all_questions.extend(self.generate_3hop_song_company_mc(500))
         else:
             # Proportional generation
             ratio_2hop = 0.75
@@ -731,7 +887,8 @@ class EvaluationDatasetGenerator:
 def main():
     """Generate evaluation dataset."""
     generator = EvaluationDatasetGenerator()
-    stats = generator.generate_full_dataset(target_count=2000)
+    # Tăng target_count để tạo nhiều câu hỏi hơn
+    stats = generator.generate_full_dataset(target_count=4800, output_path="data/kpop_eval_2000_multihop_max3hop.json")
     
     print("\n📊 Dataset Statistics:")
     for key, value in stats.items():
