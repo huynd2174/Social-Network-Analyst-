@@ -6,12 +6,11 @@ This module generates a comprehensive evaluation dataset with:
 - Yes/No questions
 - Multiple choice questions
 
-All questions require multi-hop reasoning over the knowledge graph.
+All questions require multi-hop reasoning (≥2 hops) over the knowledge graph.
 
-Target: 2000+ evaluation questions
-- 700+ 1-hop questions
-- 700+ 2-hop questions  
-- 600+ 3-hop questions
+Target: 2000+ evaluation questions (ưu tiên 2-hop và 3-hop)
+- ~60% 2-hop
+- ~40% 3-hop
 
 Optional: Can use ChatGPT/OpenAI API to generate additional questions.
 """
@@ -23,8 +22,20 @@ from collections import defaultdict
 from datetime import datetime
 from dataclasses import dataclass, asdict
 import os
+import sys
 
-from .knowledge_graph import KpopKnowledgeGraph
+# Allow running as script: add project root and src to path
+CURR_DIR = os.path.dirname(__file__)
+SRC_DIR = os.path.abspath(os.path.join(CURR_DIR, ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURR_DIR, "..", ".."))
+for p in [PROJECT_ROOT, SRC_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+try:
+    from .knowledge_graph import KpopKnowledgeGraph
+except ImportError:
+    from knowledge_graph import KpopKnowledgeGraph
 
 # Optional: ChatGPT support
 try:
@@ -122,276 +133,6 @@ class EvaluationDatasetGenerator:
         self.question_counter += 1
         return f"Q{self.question_counter:05d}"
         
-    # =========== 1-HOP QUESTIONS ===========
-    
-    def generate_1hop_membership_tf(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 1-hop True/False questions about group membership."""
-        questions = []
-        groups = list(self.groups_with_members.keys())
-        
-        for _ in range(count):
-            if len(groups) < 2:
-                break
-                
-            group = random.choice(groups)
-            members = self.groups_with_members[group]
-            
-            if random.random() > 0.5 and len(members) > 0:
-                # True statement
-                member = random.choice(members)
-                question = f"{member} là thành viên của {group}."
-                answer = "Đúng"
-                explanation = f"{member} thực sự là thành viên của nhóm nhạc {group}."
-            else:
-                # False statement - pick member from different group
-                other_groups = [g for g in groups if g != group and self.groups_with_members.get(g)]
-                if other_groups:
-                    other_group = random.choice(other_groups)
-                    other_member = random.choice(self.groups_with_members[other_group])
-                    question = f"{other_member} là thành viên của {group}."
-                    answer = "Sai"
-                    explanation = f"{other_member} không phải thành viên của {group}, mà là thành viên của {other_group}."
-                else:
-                    continue
-                    
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="true_false",
-                answer=answer,
-                choices=[],
-                hops=1,
-                entities=[group],
-                relationships=["MEMBER_OF"],
-                explanation=explanation,
-                difficulty="easy",
-                category="membership"
-            ))
-            
-        return questions
-        
-    def generate_1hop_membership_yn(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 1-hop Yes/No questions about group membership."""
-        questions = []
-        groups = list(self.groups_with_members.keys())
-        
-        for _ in range(count):
-            if len(groups) < 2:
-                break
-                
-            group = random.choice(groups)
-            members = self.groups_with_members[group]
-            
-            if random.random() > 0.5 and len(members) > 0:
-                member = random.choice(members)
-                question = f"{member} có phải là thành viên của {group} không?"
-                answer = "Có"
-                explanation = f"Có, {member} là thành viên của {group}."
-            else:
-                other_groups = [g for g in groups if g != group and self.groups_with_members.get(g)]
-                if other_groups:
-                    other_group = random.choice(other_groups)
-                    other_member = random.choice(self.groups_with_members[other_group])
-                    question = f"{other_member} có phải là thành viên của {group} không?"
-                    answer = "Không"
-                    explanation = f"Không, {other_member} thuộc {other_group}, không phải {group}."
-                else:
-                    continue
-                    
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="yes_no",
-                answer=answer,
-                choices=[],
-                hops=1,
-                entities=[group],
-                relationships=["MEMBER_OF"],
-                explanation=explanation,
-                difficulty="easy",
-                category="membership"
-            ))
-            
-        return questions
-        
-    def generate_1hop_membership_mc(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 1-hop multiple choice about group membership."""
-        questions = []
-        groups = list(self.groups_with_members.keys())
-        
-        for _ in range(count):
-            if len(groups) < 4:
-                break
-                
-            # Select a member and their group
-            group = random.choice(groups)
-            members = self.groups_with_members.get(group, [])
-            if not members:
-                continue
-                
-            member = random.choice(members)
-            
-            # Create wrong choices (other groups)
-            other_groups = [g for g in groups if g != group]
-            if len(other_groups) < 3:
-                continue
-                
-            wrong_choices = random.sample(other_groups, 3)
-            
-            # Shuffle choices
-            all_choices = [group] + wrong_choices
-            random.shuffle(all_choices)
-            correct_index = all_choices.index(group)
-            
-            question = f"{member} là thành viên của nhóm nhạc nào?"
-            
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="multiple_choice",
-                answer=chr(65 + correct_index),
-                choices=all_choices,
-                hops=1,
-                entities=[member, group],
-                relationships=["MEMBER_OF"],
-                explanation=f"{member} là thành viên của {group}.",
-                difficulty="easy",
-                category="membership"
-            ))
-            
-        return questions
-        
-    def generate_1hop_company_tf(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 1-hop True/False about group-company relationship."""
-        questions = []
-        groups = list(self.groups_with_companies.keys())
-        
-        for _ in range(count):
-            if len(groups) < 2:
-                break
-                
-            group = random.choice(groups)
-            company = self.groups_with_companies[group]
-            
-            if random.random() > 0.5:
-                # True
-                question = f"{group} thuộc công ty {company}."
-                answer = "Đúng"
-                explanation = f"{group} thực sự được quản lý bởi {company}."
-            else:
-                # False - different company
-                other_companies = [c for c in self.companies_with_groups.keys() if c != company]
-                if other_companies:
-                    wrong_company = random.choice(other_companies)
-                    question = f"{group} thuộc công ty {wrong_company}."
-                    answer = "Sai"
-                    explanation = f"{group} thuộc {company}, không phải {wrong_company}."
-                else:
-                    continue
-                    
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="true_false",
-                answer=answer,
-                choices=[],
-                hops=1,
-                entities=[group, company],
-                relationships=["MANAGED_BY"],
-                explanation=explanation,
-                difficulty="easy",
-                category="company"
-            ))
-            
-        return questions
-        
-    def generate_1hop_company_mc(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 1-hop multiple choice about group company."""
-        questions = []
-        groups = list(self.groups_with_companies.keys())
-        companies = list(self.companies_with_groups.keys())
-        
-        for _ in range(count):
-            if len(companies) < 4:
-                break
-                
-            group = random.choice(groups)
-            correct_company = self.groups_with_companies.get(group)
-            if not correct_company:
-                continue
-                
-            wrong_companies = [c for c in companies if c != correct_company]
-            if len(wrong_companies) < 3:
-                continue
-                
-            wrong_choices = random.sample(wrong_companies, 3)
-            all_choices = [correct_company] + wrong_choices
-            random.shuffle(all_choices)
-            correct_index = all_choices.index(correct_company)
-            
-            question = f"Công ty nào quản lý {group}?"
-            
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="multiple_choice",
-                answer=chr(65 + correct_index),
-                choices=all_choices,
-                hops=1,
-                entities=[group, correct_company],
-                relationships=["MANAGED_BY"],
-                explanation=f"{group} được quản lý bởi {correct_company}.",
-                difficulty="easy",
-                category="company"
-            ))
-            
-        return questions
-        
-    def generate_1hop_member_count(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate questions about member count."""
-        questions = []
-        groups = list(self.groups_with_members.keys())
-        
-        for _ in range(count):
-            group = random.choice(groups)
-            members = self.groups_with_members[group]
-            correct_count = len(members)
-            
-            if correct_count < 2:
-                continue
-                
-            # Multiple choice with different counts
-            wrong_counts = []
-            for offset in [-2, -1, 1, 2]:
-                if correct_count + offset > 0:
-                    wrong_counts.append(correct_count + offset)
-                    
-            if len(wrong_counts) < 3:
-                continue
-                
-            all_counts = [correct_count] + random.sample(wrong_counts, 3)
-            all_choices = [str(c) for c in all_counts]
-            random.shuffle(all_choices)
-            correct_index = all_choices.index(str(correct_count))
-            
-            question = f"{group} có bao nhiêu thành viên?"
-            
-            questions.append(EvaluationQuestion(
-                id=self._next_id(),
-                question=question,
-                question_type="multiple_choice",
-                answer=chr(65 + correct_index),
-                choices=all_choices,
-                hops=1,
-                entities=[group],
-                relationships=["MEMBER_OF"],
-                explanation=f"{group} có {correct_count} thành viên.",
-                difficulty="medium",
-                category="membership"
-            ))
-            
-        return questions
-        
     # =========== 2-HOP QUESTIONS ===========
     
     def generate_2hop_artist_company_tf(self, count: int = 100) -> List[EvaluationQuestion]:
@@ -411,9 +152,21 @@ class EvaluationDatasetGenerator:
             company = self.groups_with_companies[group]
             member = random.choice(members)
             
+            # Templating cho câu hỏi
+            true_templates = [
+                lambda: f"{member} thuộc công ty {company}.",
+                lambda: f"{member} có phải trực thuộc {company} qua nhóm {group} không?",
+                lambda: f"{member} (nhóm {group}) do {company} quản lý.",
+            ]
+            false_templates = [
+                lambda wc: f"{member} thuộc công ty {wc}.",
+                lambda wc: f"{member} có phải trực thuộc {wc} qua nhóm {group} không?",
+                lambda wc: f"{member} (nhóm {group}) do {wc} quản lý.",
+            ]
+            
             if random.random() > 0.5:
                 # True
-                question = f"{member} thuộc công ty {company}."
+                question = random.choice(true_templates)()
                 answer = "Đúng"
                 explanation = f"{member} là thành viên của {group}, và {group} thuộc {company}."
             else:
@@ -421,7 +174,7 @@ class EvaluationDatasetGenerator:
                 other_companies = [c for c in self.companies_with_groups.keys() if c != company]
                 if other_companies:
                     wrong_company = random.choice(other_companies)
-                    question = f"{member} thuộc công ty {wrong_company}."
+                    question = random.choice(false_templates)(wrong_company)
                     answer = "Sai"
                     explanation = f"{member} thuộc {group} → {company}, không phải {wrong_company}."
                 else:
@@ -456,7 +209,12 @@ class EvaluationDatasetGenerator:
                 if len(groups) < 2:
                     continue
                 group1, group2 = random.sample(groups, 2)
-                question = f"{group1} và {group2} có cùng công ty quản lý không?"
+                templates_yes = [
+                    lambda: f"{group1} và {group2} có cùng công ty quản lý không?",
+                    lambda: f"{group1} và {group2} đều trực thuộc {company} phải không?",
+                    lambda: f"Cả {group1} và {group2} có chung công ty {company} chứ?",
+                ]
+                question = random.choice(templates_yes)()
                 answer = "Có"
                 explanation = f"Có, cả {group1} và {group2} đều thuộc {company}."
             else:
@@ -466,7 +224,12 @@ class EvaluationDatasetGenerator:
                 company1, company2 = random.sample(companies, 2)
                 group1 = random.choice(self.companies_with_groups[company1])
                 group2 = random.choice(self.companies_with_groups[company2])
-                question = f"{group1} và {group2} có cùng công ty quản lý không?"
+                templates_no = [
+                    lambda: f"{group1} và {group2} có cùng công ty quản lý không?",
+                    lambda: f"{group1} có chung công ty với {group2} chứ?",
+                    lambda: f"{group1} và {group2} cùng thuộc một công ty phải không?",
+                ]
+                question = random.choice(templates_no)()
                 answer = "Không"
                 explanation = f"Không, {group1} thuộc {company1}, còn {group2} thuộc {company2}."
                 
@@ -514,7 +277,12 @@ class EvaluationDatasetGenerator:
             random.shuffle(all_choices)
             correct_index = all_choices.index(correct_labelmate)
             
-            question = f"Nhóm nào cùng công ty với {group1}?"
+            templates_mc = [
+                lambda: f"Nhóm nào cùng công ty với {group1}?",
+                lambda: f"Nhóm nào là đồng công ty với {group1} dưới {company}?",
+                lambda: f"Nhóm nào khác cũng thuộc {company} giống {group1}?",
+            ]
+            question = random.choice(templates_mc)()
             
             questions.append(EvaluationQuestion(
                 id=self._next_id(),
@@ -545,7 +313,12 @@ class EvaluationDatasetGenerator:
                 if len(members) < 2:
                     continue
                 member1, member2 = random.sample(members, 2)
-                question = f"{member1} và {member2} có cùng nhóm nhạc không?"
+                templates_yes = [
+                    lambda: f"{member1} và {member2} có cùng nhóm nhạc không?",
+                    lambda: f"{member1} và {member2} đều thuộc nhóm {group} phải không?",
+                    lambda: f"Cả {member1} và {member2} đều là thành viên của {group}, đúng không?",
+                ]
+                question = random.choice(templates_yes)()
                 answer = "Có"
                 explanation = f"Có, cả {member1} và {member2} đều là thành viên của {group}."
             else:
@@ -556,7 +329,12 @@ class EvaluationDatasetGenerator:
                 group1, group2 = random.sample(groups_with_members, 2)
                 member1 = random.choice(self.groups_with_members[group1])
                 member2 = random.choice(self.groups_with_members[group2])
-                question = f"{member1} và {member2} có cùng nhóm nhạc không?"
+                templates_no = [
+                    lambda: f"{member1} và {member2} có cùng nhóm nhạc không?",
+                    lambda: f"{member1} có chung nhóm với {member2} không?",
+                    lambda: f"{member1} và {member2} thuộc cùng một nhóm chứ?",
+                ]
+                question = random.choice(templates_no)()
                 answer = "Không"
                 explanation = f"Không, {member1} thuộc {group1}, còn {member2} thuộc {group2}."
                 
@@ -578,49 +356,52 @@ class EvaluationDatasetGenerator:
         
     # =========== 3-HOP QUESTIONS ===========
     
-    def generate_3hop_artist_labelmate_tf(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 3-hop TF: Are two artists labelmates? (Artist→Group→Company←Group←Artist)"""
+    def generate_3hop_song_company_tf(self, count: int = 100) -> List[EvaluationQuestion]:
+        """
+        Generate TF: Chuỗi Song→Artist→Group→Company (3 cạnh).
+        """
         questions = []
-        companies = list(self.companies_with_groups.keys())
+        
+        # Chuẩn bị candidates: song, artist, group, company
+        candidates = []
+        for artist, songs in self.entity_songs.items():
+            for group, members in self.groups_with_members.items():
+                if artist in members and group in self.groups_with_companies:
+                    company = self.groups_with_companies[group]
+                    for song in songs:
+                        candidates.append((song, artist, group, company))
+        
+        if not candidates:
+            return questions
         
         for _ in range(count):
+            song, artist, group, company = random.choice(candidates)
+            true_templates = [
+                lambda: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {company}.",
+                lambda: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {company}.",
+                lambda: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {company}.",
+                lambda: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {company}.",
+            ]
+            false_templates = [
+                lambda wc: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {wc}.",
+                lambda wc: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {wc}.",
+                lambda wc: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {wc}.",
+                lambda wc: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {wc}.",
+            ]
+            
             if random.random() > 0.5:
-                # Same company - True
-                company = random.choice(companies)
-                groups = self.companies_with_groups[company]
-                groups_with_members = [g for g in groups if self.groups_with_members.get(g)]
-                
-                if len(groups_with_members) < 2:
-                    continue
-                    
-                group1, group2 = random.sample(groups_with_members, 2)
-                member1 = random.choice(self.groups_with_members[group1])
-                member2 = random.choice(self.groups_with_members[group2])
-                
-                question = f"{member1} và {member2} thuộc cùng công ty quản lý."
+                question = random.choice(true_templates)()
                 answer = "Đúng"
-                explanation = f"{member1} ({group1}) và {member2} ({group2}) đều thuộc {company}."
+                explanation = f"Bài hát {song} do {artist} (nhóm {group}) trình bày; nhóm {group} thuộc công ty {company}."
             else:
-                # Different company - False
-                if len(companies) < 2:
+                other_companies = [c for c in self.companies_with_groups.keys() if c != company]
+                if not other_companies:
                     continue
-                    
-                company1, company2 = random.sample(companies, 2)
-                groups1 = [g for g in self.companies_with_groups[company1] if self.groups_with_members.get(g)]
-                groups2 = [g for g in self.companies_with_groups[company2] if self.groups_with_members.get(g)]
-                
-                if not groups1 or not groups2:
-                    continue
-                    
-                group1 = random.choice(groups1)
-                group2 = random.choice(groups2)
-                member1 = random.choice(self.groups_with_members[group1])
-                member2 = random.choice(self.groups_with_members[group2])
-                
-                question = f"{member1} và {member2} thuộc cùng công ty quản lý."
+                wrong_company = random.choice(other_companies)
+                question = random.choice(false_templates)(wrong_company)
                 answer = "Sai"
-                explanation = f"{member1} ({group1}) thuộc {company1}, còn {member2} ({group2}) thuộc {company2}."
-                
+                explanation = f"Bài hát {song} do {artist} (nhóm {group}) trình bày; nhóm {group} thuộc {company}, không phải {wrong_company}."
+            
             questions.append(EvaluationQuestion(
                 id=self._next_id(),
                 question=question,
@@ -628,43 +409,51 @@ class EvaluationDatasetGenerator:
                 answer=answer,
                 choices=[],
                 hops=3,
-                entities=[member1, member2],
-                relationships=["MEMBER_OF", "MANAGED_BY"],
+                entities=[song, artist, group, company],
+                relationships=["SINGS", "MEMBER_OF", "MANAGED_BY"],
                 explanation=explanation,
-                difficulty="hard",
-                category="artist_labelmate"
+                difficulty="medium",
+                category="artist_company"
             ))
-            
+        
         return questions
         
-    def generate_3hop_company_of_artist_mc(self, count: int = 100) -> List[EvaluationQuestion]:
-        """Generate 3-hop MC: Which company does artist X belong to?"""
+    def generate_3hop_song_company_mc(self, count: int = 100) -> List[EvaluationQuestion]:
+        """
+        Generate MC: Công ty nào liên quan đến bài hát X qua Artist→Group→Company (3 cạnh).
+        """
         questions = []
+        
+        candidates = []
+        for artist, songs in self.entity_songs.items():
+            for group, members in self.groups_with_members.items():
+                if artist in members and group in self.groups_with_companies:
+                    company = self.groups_with_companies[group]
+                    for song in songs:
+                        candidates.append((song, artist, group, company))
+        
+        if not candidates:
+            return questions
+        
         companies = list(self.companies_with_groups.keys())
         
         for _ in range(count):
-            # Find artist with known path to company
-            company = random.choice(companies)
-            groups = self.companies_with_groups[company]
-            groups_with_members = [g for g in groups if self.groups_with_members.get(g)]
-            
-            if not groups_with_members:
-                continue
-                
-            group = random.choice(groups_with_members)
-            member = random.choice(self.groups_with_members[group])
-            
-            # Wrong choices
+            song, artist, group, company = random.choice(candidates)
             wrong_companies = [c for c in companies if c != company]
             if len(wrong_companies) < 3:
                 continue
-                
             wrong_choices = random.sample(wrong_companies, 3)
             all_choices = [company] + wrong_choices
             random.shuffle(all_choices)
             correct_index = all_choices.index(company)
             
-            question = f"{member} thuộc công ty nào?"
+            templates_mc = [
+                lambda: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty nào?",
+                lambda: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc công ty nào?",
+                lambda: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc hãng nào?",
+                lambda: f"{artist} của nhóm {group} hát {song}; {group} do công ty nào quản lý?",
+            ]
+            question = random.choice(templates_mc)()
             
             questions.append(EvaluationQuestion(
                 id=self._next_id(),
@@ -673,13 +462,13 @@ class EvaluationDatasetGenerator:
                 answer=chr(65 + correct_index),
                 choices=all_choices,
                 hops=3,
-                entities=[member, group, company],
-                relationships=["MEMBER_OF", "MANAGED_BY"],
-                explanation=f"{member} → {group} → {company}.",
+                entities=[song, artist, group, company],
+                relationships=["SINGS", "MEMBER_OF", "MANAGED_BY"],
+                explanation=f"Bài hát {song} do {artist} (nhóm {group}) trình bày; nhóm {group} thuộc công ty {company}.",
                 difficulty="hard",
                 category="artist_company"
             ))
-            
+        
         return questions
         
     # =========== MAIN GENERATION ===========
@@ -861,49 +650,29 @@ class EvaluationDatasetGenerator:
         # Generate questions from graph
         # Adjust counts to reach graph_count
         if graph_count >= 2000:
-            # Full generation
-            print("  📝 Generating 1-hop questions...")
-            all_questions.extend(self.generate_1hop_membership_tf(120))
-            all_questions.extend(self.generate_1hop_membership_yn(120))
-            all_questions.extend(self.generate_1hop_membership_mc(120))
-            all_questions.extend(self.generate_1hop_company_tf(120))
-            all_questions.extend(self.generate_1hop_company_mc(120))
-            all_questions.extend(self.generate_1hop_member_count(120))
-            all_questions.extend(self.generate_1hop_membership_tf(60))
-            all_questions.extend(self.generate_1hop_membership_yn(60))
-            
+            # Full generation: ưu tiên 2-hop nhiều hơn 3-hop
             print("  📝 Generating 2-hop questions...")
-            all_questions.extend(self.generate_2hop_artist_company_tf(180))
-            all_questions.extend(self.generate_2hop_same_company_yn(180))
-            all_questions.extend(self.generate_2hop_labelmates_mc(180))
-            all_questions.extend(self.generate_2hop_same_group_yn(180))
-            all_questions.extend(self.generate_2hop_artist_company_tf(120))
+            all_questions.extend(self.generate_2hop_artist_company_tf(500))
+            all_questions.extend(self.generate_2hop_same_company_yn(400))
+            all_questions.extend(self.generate_2hop_labelmates_mc(400))
+            all_questions.extend(self.generate_2hop_same_group_yn(400))
             
-            print("  📝 Generating 3-hop questions...")
-            all_questions.extend(self.generate_3hop_artist_labelmate_tf(250))
-            all_questions.extend(self.generate_3hop_company_of_artist_mc(250))
-            all_questions.extend(self.generate_3hop_artist_labelmate_tf(250))
+            print("  📝 Generating 3-hop questions (chuỗi Song→Artist→Group→Company)...")
+            all_questions.extend(self.generate_3hop_song_company_tf(200))
+            all_questions.extend(self.generate_3hop_song_company_mc(200))
         else:
             # Proportional generation
-            ratio_1hop = 0.35
-            ratio_2hop = 0.35
-            ratio_3hop = 0.30
+            ratio_2hop = 0.75
+            ratio_3hop = 0.25
             
             print("  📝 Generating questions from graph...")
-            all_questions.extend(self.generate_1hop_membership_tf(int(graph_count * ratio_1hop * 0.2)))
-            all_questions.extend(self.generate_1hop_membership_yn(int(graph_count * ratio_1hop * 0.2)))
-            all_questions.extend(self.generate_1hop_membership_mc(int(graph_count * ratio_1hop * 0.2)))
-            all_questions.extend(self.generate_1hop_company_tf(int(graph_count * ratio_1hop * 0.15)))
-            all_questions.extend(self.generate_1hop_company_mc(int(graph_count * ratio_1hop * 0.15)))
-            all_questions.extend(self.generate_1hop_member_count(int(graph_count * ratio_1hop * 0.1)))
+            all_questions.extend(self.generate_2hop_artist_company_tf(int(graph_count * ratio_2hop * 0.35)))
+            all_questions.extend(self.generate_2hop_same_company_yn(int(graph_count * ratio_2hop * 0.30)))
+            all_questions.extend(self.generate_2hop_labelmates_mc(int(graph_count * ratio_2hop * 0.20)))
+            all_questions.extend(self.generate_2hop_same_group_yn(int(graph_count * ratio_2hop * 0.15)))
             
-            all_questions.extend(self.generate_2hop_artist_company_tf(int(graph_count * ratio_2hop * 0.25)))
-            all_questions.extend(self.generate_2hop_same_company_yn(int(graph_count * ratio_2hop * 0.25)))
-            all_questions.extend(self.generate_2hop_labelmates_mc(int(graph_count * ratio_2hop * 0.25)))
-            all_questions.extend(self.generate_2hop_same_group_yn(int(graph_count * ratio_2hop * 0.25)))
-            
-            all_questions.extend(self.generate_3hop_artist_labelmate_tf(int(graph_count * ratio_3hop * 0.5)))
-            all_questions.extend(self.generate_3hop_company_of_artist_mc(int(graph_count * ratio_3hop * 0.5)))
+            all_questions.extend(self.generate_3hop_song_company_tf(int(graph_count * ratio_3hop * 0.5)))
+            all_questions.extend(self.generate_3hop_song_company_mc(int(graph_count * ratio_3hop * 0.5)))
         
         # Generate with ChatGPT if requested
         if chatgpt_count > 0:

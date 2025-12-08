@@ -18,8 +18,20 @@ from collections import defaultdict
 from dataclasses import dataclass, asdict
 from datetime import datetime
 import os
+import sys
 
-from .knowledge_graph import KpopKnowledgeGraph
+# Allow running as script: add project root and src to path
+CURR_DIR = os.path.dirname(__file__)
+SRC_DIR = os.path.abspath(os.path.join(CURR_DIR, ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURR_DIR, "..", ".."))
+for p in [PROJECT_ROOT, SRC_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+try:
+    from .knowledge_graph import KpopKnowledgeGraph
+except ImportError:
+    from knowledge_graph import KpopKnowledgeGraph
 
 
 @dataclass
@@ -173,6 +185,50 @@ class EnhancedEvaluationGenerator:
         
         return two_hop_paths
     
+    def find_three_hop_paths(self) -> List[Dict[str, Any]]:
+        """
+        Tìm tất cả các đường đi three-hop (3 bước, 4 nodes).
+        Nhằm tạo câu hỏi multi-hop rõ ràng hơn (>=3 nodes, 3 cạnh).
+        """
+        graph = defaultdict(list)
+        # Build forward graph
+        for edge in self.edges:
+            source = edge['source']
+            target = edge['target']
+            if source and target:
+                graph[source].append(edge)
+        
+        three_hop_paths = []
+        node_set = set(self.nodes.keys())
+        
+        for start in node_set:
+            if start not in graph:
+                continue
+            for e1 in graph[start]:
+                mid1 = e1['target']
+                if mid1 not in node_set or mid1 not in graph:
+                    continue
+                for e2 in graph[mid1]:
+                    mid2 = e2['target']
+                    if mid2 not in node_set or mid2 not in graph or mid2 == start:
+                        continue
+                    for e3 in graph[mid2]:
+                        end = e3['target']
+                        if end not in node_set or end == start or end == mid1:
+                            continue
+                        path = {
+                            'nodes': [start, mid1, mid2, end],
+                            'edges': [e1, e2, e3],
+                            'labels': [
+                                self.nodes[start].get('label', 'Unknown'),
+                                self.nodes[mid1].get('label', 'Unknown'),
+                                self.nodes[mid2].get('label', 'Unknown'),
+                                self.nodes[end].get('label', 'Unknown'),
+                            ]
+                        }
+                        three_hop_paths.append(path)
+        return three_hop_paths
+    
     def score_path(self, path: Dict[str, Any]) -> int:
         """
         Đánh giá độ thú vị của path (cao hơn = thú vị hơn).
@@ -244,64 +300,124 @@ class EnhancedEvaluationGenerator:
         clean_middle = self.clean_name(middle)
         clean_end = self.clean_name(end)
         
-        # Mapping các pattern quan hệ → câu hỏi
-        question_templates = {
+        # Mapping các pattern quan hệ → câu hỏi (đa dạng biến thể)
+        question_variants = {
             # Nghệ sĩ cùng nhóm
             ('MEMBER_OF', 'MEMBER_OF'): {
                 'yes_no': [
-                    f"(2-hop) {start} và {end} có cùng nhóm nhạc thông qua {clean_middle} không?",
-                    f"(2-hop) {start} và {end} đều MEMBER_OF nhóm {clean_middle}, đúng không?",
-                    f"(2-hop) {start} và {end} có thuộc cùng nhóm nhạc {clean_middle} qua quan hệ thành viên không?",
+                    lambda: f"(2-hop) {start} và {end} có cùng nhóm nhạc thông qua {clean_middle} không?",
+                    lambda: f"(2-hop) {start} và {end} đều thuộc nhóm {clean_middle}, đúng không?",
+                    lambda: f"(2-hop) {start} và {end} có thuộc cùng nhóm nhạc {clean_middle} qua quan hệ thành viên không?",
                 ],
                 'true_false': [
-                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} và {end} → MEMBER_OF → {clean_middle}.",
-                    f"(2-hop) {start} và {end} thuộc cùng một nhóm nhạc {clean_middle}.",
+                    lambda: f"(2-hop) {start} và {end} đều là thành viên của nhóm nhạc {clean_middle}.",
+                    lambda: f"(2-hop) {start} và {end} thuộc cùng một nhóm nhạc {clean_middle}.",
                 ],
                 'multiple_choice': [
-                    f"(2-hop) Nghệ sĩ nào cũng MEMBER_OF nhóm {clean_middle} giống như {start}?",
-                    f"(2-hop) Ai là thành viên khác của {clean_middle} cùng với {start}?",
+                    lambda: f"Ai là thành viên khác của nhóm nhạc {clean_middle} cùng với {start}?",
+                    lambda: f"Nghệ sĩ nào khác cũng là thành viên của nhóm nhạc {clean_middle} giống như {start}?",
+                    lambda: f"Bên cạnh {start}, nghệ sĩ nào khác cũng thuộc nhóm nhạc {clean_middle}?",
                 ]
             },
             
             # Nhóm cùng công ty
             ('MANAGED_BY', 'MANAGED_BY'): {
                 'yes_no': [
-                    f"(2-hop) {start} và {end} có cùng công ty quản lý {clean_middle} không?",
-                    f"(2-hop) {start} và {end} đều MANAGED_BY {clean_middle}, đúng không?",
+                    lambda: f"(2-hop) {start} và {end} có cùng công ty {clean_middle} quản lý không?",
+                    lambda: f"(2-hop) {start} và {end} đều do {clean_middle} quản lý, đúng không?",
                 ],
                 'true_false': [
-                    f"(2-hop) {start} → MANAGED_BY → {clean_middle} và {end} → MANAGED_BY → {clean_middle}.",
-                    f"(2-hop) {start} và {end} thuộc cùng công ty quản lý {clean_middle}.",
+                    lambda: f"(2-hop) {start} và {end} đều được công ty {clean_middle} quản lý.",
+                    lambda: f"(2-hop) {start} và {end} thuộc cùng một công ty quản lý là {clean_middle}.",
                 ],
                 'multiple_choice': [
-                    f"(2-hop) Nhóm nào cũng MANAGED_BY {clean_middle} giống như {start}?",
-                    f"(2-hop) Ngoài {start}, nhóm nào khác được quản lý bởi {clean_middle}?",
+                    lambda: f"Nhóm nhạc nào khác cũng được quản lý bởi công ty {clean_middle} giống như {start}?",
+                    lambda: f"Cùng được quản lý bởi {clean_middle}, nhóm nhạc nào khác ngoài {start}?",
+                    lambda: f"Nhóm nhạc nào khác cũng thuộc công ty {clean_middle} như {start}?",
+                ]
+            },
+            
+            # Nhóm cùng thể loại
+            ('IS_GENRE', 'IS_GENRE'): {
+                'multiple_choice': [
+                    lambda: f"Nhóm nhạc nào khác cũng thuộc thể loại {clean_middle} giống như {start}?",
+                    lambda: f"Cùng thể loại {clean_middle}, nhóm nhạc nào khác ngoài {start}?",
+                    lambda: f"Nhóm nhạc nào khác cũng chơi nhạc {clean_middle} như {start}?",
                 ]
             },
             
             # Nghệ sĩ trình bày bài hát qua nhóm
             ('MEMBER_OF', 'SINGS'): {
                 'yes_no': [
-                    f"(2-hop) {start} (MEMBER_OF {clean_middle}) có trình bày bài hát {clean_end} không?",
+                    lambda: f"(2-hop) {start} (thành viên {clean_middle}) có trình bày bài hát {clean_end} không?",
                 ],
                 'true_false': [
-                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} → SINGS → {clean_end}.",
+                    lambda: f"(2-hop) {start} là thành viên {clean_middle} và trình bày bài hát {clean_end}.",
                 ],
                 'multiple_choice': [
-                    f"(2-hop) Bài hát nào {start} trình bày qua nhóm {clean_middle}?",
+                    lambda: f"Bài hát nào mà nghệ sĩ {start} trình bày thông qua nhóm nhạc {clean_middle}?",
+                    lambda: f"Qua nhóm nhạc {clean_middle}, nghệ sĩ {start} đã trình bày bài hát nào?",
+                    lambda: f"Bài hát nào của nhóm nhạc {clean_middle} có sự tham gia của nghệ sĩ {start}?",
+                ]
+            },
+            
+            # Nghệ sĩ phát hành album qua nhóm
+            ('MEMBER_OF', 'RELEASED'): {
+                'multiple_choice': [
+                    lambda: f"Album nào mà nghệ sĩ {start} phát hành thông qua nhóm nhạc {clean_middle}?",
+                    lambda: f"Qua nhóm nhạc {clean_middle}, nghệ sĩ {start} đã phát hành album nào?",
+                    lambda: f"Album nào của nhóm nhạc {clean_middle} có sự tham gia của nghệ sĩ {start}?",
+                ]
+            },
+            
+            # Nghệ sĩ liên quan đến thể loại qua nhóm
+            ('MEMBER_OF', 'IS_GENRE'): {
+                'multiple_choice': [
+                    lambda: f"Thể loại nhạc nào mà nghệ sĩ {start} liên quan đến thông qua nhóm nhạc {clean_middle}?",
+                    lambda: f"Qua nhóm nhạc {clean_middle}, nghệ sĩ {start} liên quan đến thể loại nhạc nào?",
+                    lambda: f"Nhóm nhạc {clean_middle} mà {start} là thành viên thuộc thể loại nhạc nào?",
                 ]
             },
             
             # Nghệ sĩ liên quan đến công ty qua nhóm
             ('MEMBER_OF', 'MANAGED_BY'): {
                 'yes_no': [
-                    f"(2-hop) {start} (MEMBER_OF {clean_middle}) có được {clean_end} quản lý không?",
+                    lambda: f"(2-hop) {start} (thành viên {clean_middle}) có được {clean_end} quản lý không?",
                 ],
                 'true_false': [
-                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} → MANAGED_BY → {clean_end}.",
+                    lambda: f"(2-hop) {start} là thành viên {clean_middle} và {clean_middle} do {clean_end} quản lý.",
                 ],
                 'multiple_choice': [
-                    f"(2-hop) Công ty nào quản lý {start} thông qua nhóm {clean_middle}?",
+                    lambda: f"Công ty nào quản lý nghệ sĩ {start} thông qua nhóm nhạc {clean_middle}?",
+                    lambda: f"Qua nhóm nhạc {clean_middle}, nghệ sĩ {start} được quản lý bởi công ty nào?",
+                    lambda: f"Công ty nào quản lý nhóm nhạc {clean_middle} mà {start} là thành viên?",
+                ]
+            },
+            
+            # Nghệ sĩ cùng nghề nghiệp
+            ('HAS_OCCUPATION', 'HAS_OCCUPATION'): {
+                'multiple_choice': [
+                    lambda: f"Nghệ sĩ nào khác cũng có nghề nghiệp {clean_middle} giống như {start}?",
+                    lambda: f"Ai là nghệ sĩ khác cũng làm nghề {clean_middle} như {start}?",
+                    lambda: f"Cùng nghề nghiệp {clean_middle}, nghệ sĩ nào khác ngoài {start}?",
+                ]
+            },
+            
+            # Bài hát trong album của nhóm
+            ('RELEASED', 'CONTAINS'): {
+                'multiple_choice': [
+                    lambda: f"Bài hát nào được chứa trong album {clean_middle} mà nhóm nhạc {start} phát hành?",
+                    lambda: f"Album {clean_middle} của nhóm nhạc {start} chứa bài hát nào?",
+                    lambda: f"Bài hát nào nằm trong album {clean_middle} do nhóm nhạc {start} phát hành?",
+                ]
+            },
+            
+            # Album chứa bài hát -> nhóm trình bày
+            ('CONTAINS', 'SINGS'): {
+                'multiple_choice': [
+                    lambda: f"Nhóm nhạc nào trình bày bài hát {clean_middle} trong album {start}?",
+                    lambda: f"Bài hát {clean_middle} trong album {start} được trình bày bởi nhóm nhạc nào?",
+                    lambda: f"Ai là nhóm nhạc trình bày bài hát {clean_middle} từ album {start}?",
                 ]
             },
         }
@@ -309,10 +425,9 @@ class EnhancedEvaluationGenerator:
         key = (edge1_type, edge2_type)
         
         # Tạo câu hỏi dựa trên type
-        if key in question_templates and question_type in question_templates[key]:
-            templates = question_templates[key][question_type]
-            path_hash = hash((start, middle, end))
-            question_text = templates[abs(path_hash) % len(templates)]
+        if key in question_variants and question_type in question_variants[key]:
+            variants = question_variants[key][question_type]
+            question_text = random.choice(variants)()
         else:
             # Fallback: tạo câu hỏi tổng quát
             if question_type == 'yes_no':
@@ -364,6 +479,109 @@ class EnhancedEvaluationGenerator:
                 'start': {'id': start, 'label': start_label},
                 'middle': {'id': middle, 'label': middle_label},
                 'end': {'id': end, 'label': end_label}
+            }
+        )
+    
+    def generate_question_from_three_hop(
+        self,
+        path: Dict[str, Any],
+        question_type: str = 'yes_no'
+    ) -> Optional[EvaluationQuestion]:
+        """
+        Tạo câu hỏi từ một three-hop path (3 cạnh, 4 node) để thể hiện rõ multi-hop.
+        """
+        nodes = path.get('nodes', [])
+        edges = path.get('edges', [])
+        labels = path.get('labels', [])
+        if len(nodes) != 4 or len(edges) != 3:
+            return None
+        
+        a, b, c, d = nodes
+        e1, e2, e3 = edges
+        l1, l2, l3, l4 = labels
+        
+        clean_b = self.clean_name(b)
+        clean_c = self.clean_name(c)
+        clean_d = self.clean_name(d)
+        
+        # Mô tả ngắn theo label để hỏi tự nhiên hơn
+        label_desc = {
+            'Artist': 'nghệ sĩ',
+            'Group': 'nhóm nhạc',
+            'Company': 'công ty',
+            'Song': 'bài hát',
+            'Album': 'album',
+            'Genre': 'thể loại',
+            'Occupation': 'nghề nghiệp'
+        }
+        def desc(name, label):
+            t = label_desc.get(label, '').strip()
+            return f"{t} {name}" if t else name
+        
+        db = desc(clean_b, l2)
+        dc = desc(clean_c, l3)
+        dd = desc(clean_d, l4)
+        
+        question_variants_3 = {
+            'yes_no': [
+                lambda: f"(3-hop) {desc(a,l1)} có liên quan tới {dd} qua {db} rồi {dc} không?",
+                lambda: f"(3-hop) {desc(a,l1)} đi qua {db} và {dc} để tới {dd} phải không?",
+                lambda: f"(3-hop) {desc(a,l1)} có kết nối đến {dd} thông qua {db} và {dc} chứ?",
+            ],
+            'true_false': [
+                lambda: f"(3-hop) {desc(a,l1)} liên hệ tới {dd} thông qua {db} rồi {dc}.",
+                lambda: f"(3-hop) {desc(a,l1)} nối với {dd} qua {db} và {dc}.",
+                lambda: f"(3-hop) {desc(a,l1)} đi qua {db}, {dc} để tới {dd}.",
+            ],
+            'multiple_choice': [
+                lambda: f"(3-hop) Thực thể nào liên quan đến {desc(a,l1)} thông qua {db} rồi {dc}?",
+                lambda: f"(3-hop) Ai/cái gì được nối với {desc(a,l1)} qua {db} và {dc}?",
+                lambda: f"(3-hop) Thực thể nào đến được {dd} khi xuất phát từ {desc(a,l1)} qua {db} và {dc}?",
+            ]
+        }
+        
+        if question_type in question_variants_3:
+            question_text = random.choice(question_variants_3[question_type])()
+        else:
+            question_text = f"(3-hop) {a} có liên quan tới {clean_d} qua {clean_b} và {clean_c} không?"
+        
+        if question_type == 'yes_no':
+            answer = "Có"
+            explanation = f"Có, chuỗi 3-hop: {a} → {clean_b} → {clean_c} → {clean_d}."
+        elif question_type == 'true_false':
+            answer = "Đúng"
+            explanation = f"Đúng, chuỗi 3-hop: {a} → {clean_b} → {clean_c} → {clean_d}."
+        else:  # multiple_choice
+            answer = "A"
+            explanation = f"Chuỗi 3-hop: {a} → {clean_b} → {clean_c} → {clean_d}."
+        
+        choices = []
+        if question_type == 'multiple_choice':
+            same_type_entities = [
+                node_id for node_id, data in self.nodes.items()
+                if data.get('label') == l4 and node_id != d
+            ]
+            random.shuffle(same_type_entities)
+            distractors = same_type_entities[:3]
+            choices = [clean_d] + [self.clean_name(x) for x in distractors]
+            random.shuffle(choices)
+            answer = chr(65 + choices.index(clean_d))
+        
+        return EvaluationQuestion(
+            id=self._next_id(),
+            question=question_text,
+            question_type=question_type,
+            answer=answer,
+            choices=choices,
+            hops=3,
+            entities=nodes,
+            relationships=[e1.get('type',''), e2.get('type',''), e3.get('type','')],
+            explanation=explanation,
+            difficulty="medium",
+            category="multi_hop",
+            path={
+                "nodes": nodes,
+                "edges": [e1.get('type',''), e2.get('type',''), e3.get('type','')]
             }
         )
     
@@ -434,59 +652,89 @@ class EnhancedEvaluationGenerator:
         
         tf_count = int(target_count * tf_ratio)
         yn_count = int(target_count * yn_ratio)
-        mc_count = int(target_count * mc_ratio)
+        mc_count = target_count - tf_count - yn_count
+        
+        # Phân bổ 2-hop / 3-hop (ưu tiên 2-hop ~70%, 3-hop ~30%)
+        two_hop_target = int(target_count * 0.7)
+        three_hop_target = target_count - two_hop_target
+
+        # Chuẩn bị trước danh sách three-hop paths (giới hạn để tránh quá lớn)
+        three_hop_paths = self.find_three_hop_paths()
+        random.shuffle(three_hop_paths)
+        three_hop_paths = three_hop_paths[: max(three_hop_target * 3, three_hop_target + 1000)]
         
         seen_paths_tf = set()
         seen_paths_yn = set()
         seen_paths_mc = set()
         
-        # Generate True/False questions
-        for path in filtered_paths:
-            if len(questions) >= target_count:
+        # Helper to pick paths (2-hop or 3-hop)
+        def pick_two_hop():
+            for path in filtered_paths:
+                yield path
+        
+        def pick_three_hop():
+            for path in three_hop_paths[:max(three_hop_target * 3, three_hop_target + 1000)]:  # limit
+                yield path
+        
+        # Generate True/False (prioritize 2-hop then 3-hop)
+        for path in pick_two_hop():
+            if len([q for q in questions if q.question_type == 'true_false']) >= tf_count * 0.7:
                 break
-            
             path_key = (path['start_node'], path['end_node'])
             if path_key in seen_paths_tf:
                 continue
-            
-            question = self.generate_question_from_path(path, 'true_false')
-            if question:
-                questions.append(question)
-                seen_paths_tf.add(path_key)
-                if len([q for q in questions if q.question_type == 'true_false']) >= tf_count:
-                    break
-        
-        # Generate Yes/No questions
-        for path in filtered_paths:
-            if len(questions) >= target_count:
+            q = self.generate_question_from_path(path, 'true_false')
+            if q:
+                questions.append(q); seen_paths_tf.add(path_key)
+        for path in pick_three_hop():
+            if len([q for q in questions if q.question_type == 'true_false']) >= tf_count:
                 break
-            
+            key = tuple(path.get('nodes', []))
+            if key in seen_paths_tf:
+                continue
+            q = self.generate_question_from_three_hop(path, 'true_false')
+            if q:
+                questions.append(q); seen_paths_tf.add(key)
+        
+        # Generate Yes/No
+        for path in pick_two_hop():
+            if len([q for q in questions if q.question_type == 'yes_no']) >= yn_count * 0.7:
+                break
             path_key = (path['start_node'], path['end_node'])
             if path_key in seen_paths_yn:
                 continue
-            
-            question = self.generate_question_from_path(path, 'yes_no')
-            if question:
-                questions.append(question)
-                seen_paths_yn.add(path_key)
-                if len([q for q in questions if q.question_type == 'yes_no']) >= yn_count:
-                    break
-        
-        # Generate Multiple Choice questions
-        for path in filtered_paths:
-            if len(questions) >= target_count:
+            q = self.generate_question_from_path(path, 'yes_no')
+            if q:
+                questions.append(q); seen_paths_yn.add(path_key)
+        for path in pick_three_hop():
+            if len([q for q in questions if q.question_type == 'yes_no']) >= yn_count:
                 break
-            
+            key = tuple(path.get('nodes', []))
+            if key in seen_paths_yn:
+                continue
+            q = self.generate_question_from_three_hop(path, 'yes_no')
+            if q:
+                questions.append(q); seen_paths_yn.add(key)
+        
+        # Generate Multiple Choice
+        for path in pick_two_hop():
+            if len([q for q in questions if q.question_type == 'multiple_choice']) >= mc_count * 0.7:
+                break
             path_key = (path['start_node'], path['end_node'])
             if path_key in seen_paths_mc:
                 continue
-            
-            question = self.generate_question_from_path(path, 'multiple_choice')
-            if question:
-                questions.append(question)
-                seen_paths_mc.add(path_key)
-                if len([q for q in questions if q.question_type == 'multiple_choice']) >= mc_count:
-                    break
+            q = self.generate_question_from_path(path, 'multiple_choice')
+            if q:
+                questions.append(q); seen_paths_mc.add(path_key)
+        for path in pick_three_hop():
+            if len([q for q in questions if q.question_type == 'multiple_choice']) >= mc_count:
+                break
+            key = tuple(path.get('nodes', []))
+            if key in seen_paths_mc:
+                continue
+            q = self.generate_question_from_three_hop(path, 'multiple_choice')
+            if q:
+                questions.append(q); seen_paths_mc.add(key)
         
         print(f"  ✓ Generated {len(questions)} questions")
         print(f"    - True/False: {len([q for q in questions if q.question_type == 'true_false'])}")
