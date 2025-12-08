@@ -222,6 +222,29 @@ class MultiHopReasoner:
                     explanation="Không extract được entities từ query"
                 )
         
+        # 3. Câu hỏi 3-hop: Song → Artist → Group → Company hoặc các chuỗi 3-hop khác
+        # Pattern: "qua... rồi...", "thông qua... sau đó...", "(3-hop)", "bài hát... công ty..."
+        is_three_hop_question = (
+            ('qua' in query_lower and 'rồi' in query_lower) or
+            ('thông qua' in query_lower and 'sau đó' in query_lower) or
+            '(3-hop)' in query_lower or
+            ('bài hát' in query_lower and ('công ty' in query_lower or 'label' in query_lower)) or
+            ('qua' in query_lower and 'nhóm' in query_lower and 'công ty' in query_lower) or
+            ('album' in query_lower and 'bài hát' in query_lower and 'nhóm' in query_lower)
+        )
+        
+        if is_three_hop_question:
+            # Extract entities với LLM fallback để đảm bảo có đủ entities cho 3-hop chain
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=[])
+            
+            if len(all_entities) >= 1:
+                # Sử dụng chain reasoning với max_hops=3 để tìm đường đi 3-hop
+                return self._chain_reasoning(query, all_entities, max_hops=3)
+            else:
+                # Nếu không extract được entity, vẫn thử chain reasoning với start_entities
+                if start_entities:
+                    return self._chain_reasoning(query, start_entities, max_hops=3)
+        
         # ============================================
         # SINGLE-HOP QUESTIONS (ƯU TIÊN THẤP HƠN)
         # ============================================
@@ -1174,30 +1197,41 @@ class MultiHopReasoner:
         """
         # 1. Bắt đầu với start_entities
         all_entities = list(start_entities)
+        # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
+        normalized_seen = set()
+        for e in start_entities:
+            normalized = self._normalize_entity_name(e).lower()
+            normalized_seen.add(normalized)
         
         # 2. Rule-based extraction từ query
         extracted = self._extract_entities_from_query(query)
-        # Combine với start_entities (không trùng)
+        # Combine với start_entities (không trùng, normalize để tránh "Rosé" và "Rosé (ca sĩ)")
         for e in extracted:
-            if e not in all_entities:
+            normalized = self._normalize_entity_name(e).lower()
+            # Check duplicate bằng normalized name
+            if normalized not in normalized_seen:
                 # Filter theo expected_types nếu có
                 if expected_types:
                     entity_type = self.kg.get_entity_type(e)
                     if entity_type not in expected_types:
                         continue
                 all_entities.append(e)
+                normalized_seen.add(normalized)
         
         # 3. Nếu vẫn thiếu, dùng LLM để vá
         if len(all_entities) < min_count:
             llm_entities = self._extract_entities_with_llm_fallback(query, all_entities)
             for e in llm_entities:
-                if e not in all_entities:
+                normalized = self._normalize_entity_name(e).lower()
+                # Check duplicate bằng normalized name
+                if normalized not in normalized_seen:
                     # Filter theo expected_types nếu có
                     if expected_types:
                         entity_type = self.kg.get_entity_type(e)
                         if entity_type not in expected_types:
                             continue
                     all_entities.append(e)
+                    normalized_seen.add(normalized)
         
         return all_entities
     
@@ -1250,11 +1284,18 @@ class MultiHopReasoner:
         # Loại bỏ trùng lặp
         query_ngrams = list(dict.fromkeys(query_ngrams))
         
+        # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
+        normalized_seen = set()
+        
         for artist in all_artists:
             artist_lower = artist.lower()
             # Extract base name (không có đuôi)
             base_name = self._normalize_entity_name(artist)
             base_name_lower = base_name.lower()
+            
+            # Check duplicate bằng normalized name TRƯỚC khi match
+            if base_name_lower in normalized_seen:
+                continue  # Đã có entity với cùng normalized name
             
             # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
@@ -1270,9 +1311,9 @@ class MultiHopReasoner:
             # Method 1: Check nếu base name hoặc variants là một từ trong query
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
             if any(variant in query_words_list for variant in base_name_variants):
-                if artist not in entities:
-                    entities.append(artist)
-                    continue
+                entities.append(artist)
+                normalized_seen.add(base_name_lower)
+                continue
             
             # Method 2: Check n-gram matching (2-4 words) để bắt tên phức tạp như "Cho Seung-youn"
             for ngram in query_ngrams:
@@ -1281,8 +1322,9 @@ class MultiHopReasoner:
                 for variant in base_name_variants:
                     # Exact match hoặc substring match
                     if variant == ngram or variant in ngram or ngram in variant:
-                        if artist not in entities:
+                        if base_name_lower not in normalized_seen:
                             entities.append(artist)
+                            normalized_seen.add(base_name_lower)
                             break
                     # QUAN TRỌNG: Xử lý tên có cả space và dash như "Cho Seung-youn"
                     # So sánh parts: "cho seung-youn" vs "cho seung youn" hoặc "cho-seung-youn"
@@ -1295,10 +1337,11 @@ class MultiHopReasoner:
                         ngram_parts = set(ngram_normalized.split())
                         # Nếu có ít nhất 2 parts giống nhau → match
                         if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if artist not in entities:
+                            if base_name_lower not in normalized_seen:
                                 entities.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
-                if artist in entities:
+                if base_name_lower in normalized_seen:
                     break
             
             if artist in entities:
@@ -1313,21 +1356,24 @@ class MultiHopReasoner:
                         if len(variant_words) >= 2:
                             matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
                             if matched_words >= 2:
-                                if artist not in entities:
+                                if base_name_lower not in normalized_seen:
                                     entities.append(artist)
+                                    normalized_seen.add(base_name_lower)
                                     break
                         elif len(variant_words) == 1 and variant in query_lower:
                             if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
-                                if artist not in entities:
+                                if base_name_lower not in normalized_seen:
                                     entities.append(artist)
+                                    normalized_seen.add(base_name_lower)
                                     break
-                if artist in entities:
+                if base_name_lower in normalized_seen:
                     continue
             
             # Method 4: Check nếu base name hoặc variants xuất hiện trong query text
             if any(variant in query_lower for variant in base_name_variants if len(variant) >= 3):
-                if artist not in entities:
+                if base_name_lower not in normalized_seen:
                     entities.append(artist)
+                    normalized_seen.add(base_name_lower)
                     continue
             
             # Method 5: Check từng word trong query với base name và variants
@@ -1336,13 +1382,15 @@ class MultiHopReasoner:
                     continue
                 # Exact match với base name hoặc variants
                 if word in base_name_variants or word == base_name_lower:
-                    if artist not in entities:
+                    if base_name_lower not in normalized_seen:
                         entities.append(artist)
+                        normalized_seen.add(base_name_lower)
                         break
                 # Partial match: word là một phần của base name hoặc ngược lại
                 elif (word in base_name_lower and len(word) >= 3) or (base_name_lower in word and len(base_name_lower) >= 3):
-                    if artist not in entities:
+                    if base_name_lower not in normalized_seen:
                         entities.append(artist)
+                        normalized_seen.add(base_name_lower)
                         break
                 # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
                 elif '-' in base_name_lower:
@@ -1351,19 +1399,26 @@ class MultiHopReasoner:
                         # Check xem có part khác cũng trong query không
                         other_parts = [p for p in base_parts if p != word]
                         if any(p in query_lower for p in other_parts):
-                            if artist not in entities:
+                            if base_name_lower not in normalized_seen:
                                 entities.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
         
         # Tìm tất cả groups trong query (case-insensitive)
         for group in all_groups:
             group_lower = group.lower()
+            base_name = self._normalize_entity_name(group).lower()
+            
+            # Check duplicate bằng normalized name
+            if base_name in normalized_seen:
+                continue
+            
             if group_lower in query_lower:
                 query_words = set(query_lower.split())
                 group_words = set(group_lower.split())
                 if group_words.intersection(query_words) or group_lower in query_lower:
-                    if group not in entities:
-                        entities.append(group)
+                    entities.append(group)
+                    normalized_seen.add(base_name)
         
         # Nếu chưa đủ, try fuzzy match với từng word (bao gồm base name)
         if len(entities) < 2:
@@ -1376,19 +1431,23 @@ class MultiHopReasoner:
                     node_lower = node.lower()
                     base_name = self._normalize_entity_name(node).lower()
                     
+                    # Check duplicate bằng normalized name
+                    if base_name in normalized_seen:
+                        continue
+                    
                     # Exact match với full name hoặc base name
                     if node_lower == word or base_name == word:
-                        if node not in entities:
-                            node_data = self.kg.get_entity(node)
-                            if node_data and node_data.get('label') in ['Artist', 'Group']:
-                                entities.append(node)
+                        node_data = self.kg.get_entity(node)
+                        if node_data and node_data.get('label') in ['Artist', 'Group']:
+                            entities.append(node)
+                            normalized_seen.add(base_name)
                         break
                     # Partial match
                     elif (word in base_name and len(word) >= 3) or (base_name in word and len(base_name) >= 3):
-                        if node not in entities:
-                            node_data = self.kg.get_entity(node)
-                            if node_data and node_data.get('label') in ['Artist', 'Group']:
-                                entities.append(node)
+                        node_data = self.kg.get_entity(node)
+                        if node_data and node_data.get('label') in ['Artist', 'Group']:
+                            entities.append(node)
+                            normalized_seen.add(base_name)
                         break
         
         return entities[:10]  # Return max 10

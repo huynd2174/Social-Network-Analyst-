@@ -991,6 +991,9 @@ class KpopChatbot:
         candidate_scores = []  # list of (name, score, label)
         token_set = set(tokens)
 
+        # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
+        normalized_seen = set()
+
         # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
         # QUAN TRỌNG: Normalize và lookup với nhiều variants để cover mọi trường hợp
         seen_entities = set()  # Tránh trùng lặp
@@ -1009,8 +1012,10 @@ class KpopChatbot:
                     for ent in variant_map[lookup_key]:
                         if ent["label"] in ['Artist', 'Group']:
                             entity_name = ent["name"]
-                            # Tránh trùng lặp
-                            if entity_name not in seen_entities:
+                            normalized = self._normalize_entity_name(entity_name).lower()
+                            # Tránh trùng lặp bằng normalized name
+                            if normalized not in normalized_seen:
+                                normalized_seen.add(normalized)
                                 seen_entities.add(entity_name)
                                 candidate_scores.append((entity_name, ent.get("score", 1.5)))
                                 matched_from_graph.append({"name": entity_name, "score": ent.get("score", 1.5)})
@@ -1018,6 +1023,11 @@ class KpopChatbot:
         # Search for group/company/song/album/genre/occupation in query (case-insensitive) - ưu tiên match exact/variant
         def _match_list(nodes: List[str], score_val: float, label: str):
             for node in nodes:
+                normalized = self._normalize_entity_name(node).lower()
+                # Check duplicate bằng normalized name
+                if normalized in normalized_seen:
+                    continue
+                
                 variants = _variants(node)
                 hit = False
                 for variant in variants:
@@ -1032,6 +1042,7 @@ class KpopChatbot:
                         break
                 if hit:
                     entities.append(node)
+                    normalized_seen.add(normalized)
                     # không break để có thể thêm nhiều thực thể, nhưng tránh trùng lặp
         
         _match_list(all_groups, 1.6, 'Group')
@@ -1059,6 +1070,10 @@ class KpopChatbot:
             base_name = self._normalize_entity_name(artist)
             base_name_lower = base_name.lower()
             
+            # Check duplicate bằng normalized name TRƯỚC khi match
+            if base_name_lower in normalized_seen:
+                continue
+            
             # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
                 base_name_lower,  # Original
@@ -1073,9 +1088,9 @@ class KpopChatbot:
             # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
             if any(variant in query_words_list for variant in base_name_variants):
-                if artist not in found_artists:
-                    found_artists.append(artist)
-                    continue
+                found_artists.append(artist)
+                normalized_seen.add(base_name_lower)
+                continue
             
             # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp như "Cho Seung-youn"
             # Tạo n-grams từ query (2-3 words)
@@ -1100,8 +1115,9 @@ class KpopChatbot:
                 for variant in base_name_variants:
                     # Exact match hoặc substring match
                     if variant == ngram or variant in ngram or ngram in variant:
-                        if artist not in found_artists:
+                        if base_name_lower not in normalized_seen:
                             found_artists.append(artist)
+                            normalized_seen.add(base_name_lower)
                             break
                     # QUAN TRỌNG: Nếu cả 2 đều có dấu gạch ngang, so sánh parts
                     elif '-' in variant and '-' in ngram:
@@ -1109,25 +1125,28 @@ class KpopChatbot:
                         ngram_parts = set(ngram.split('-'))
                         # Nếu có ít nhất 2 parts giống nhau → match (cho tên như "yoo-jeong-yeon")
                         if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if artist not in found_artists:
+                            if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
                     # Tương tự với space: "yoo jeong yeon" vs "yoo jeong-yeon"
                     elif ' ' in variant and '-' in ngram:
                         variant_parts = set(variant.split(' '))
                         ngram_parts = set(ngram.split('-'))
                         if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if artist not in found_artists:
+                            if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
                     elif '-' in variant and ' ' in ngram:
                         variant_parts = set(variant.split('-'))
                         ngram_parts = set(ngram.split(' '))
                         if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if artist not in found_artists:
+                            if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
-                if artist in found_artists:
+                if base_name_lower in normalized_seen:
                     break
             
             if artist in found_artists:
@@ -1144,16 +1163,18 @@ class KpopChatbot:
                             # Check xem có ít nhất 2 từ trong variant xuất hiện trong query không
                             matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
                             if matched_words >= 2:
-                                if artist not in found_artists:
+                                if base_name_lower not in normalized_seen:
                                     found_artists.append(artist)
+                                    normalized_seen.add(base_name_lower)
                                     break
                         elif len(variant_words) == 1 and variant in query_lower:
                             # Single word variant: check exact match hoặc trong từ đầy đủ
                             if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
-                                if artist not in found_artists:
+                                if base_name_lower not in normalized_seen:
                                     found_artists.append(artist)
+                                    normalized_seen.add(base_name_lower)
                                     break
-                if artist in found_artists:
+                if base_name_lower in normalized_seen:
                     continue
             
             # Method 4: Check từng word trong query với base name và variants (strict, tránh match nhầm)
@@ -1162,8 +1183,9 @@ class KpopChatbot:
                     continue
                 # Exact match với base name hoặc variants
                 if word in base_name_variants or word == base_name_lower:
-                    if artist not in found_artists:
+                    if base_name_lower not in normalized_seen:
                         found_artists.append(artist)
+                        normalized_seen.add(base_name_lower)
                         break
                 # Xử lý tên có dấu gạch ngang: yêu cầu có đủ ≥2 phần trong query
                 elif '-' in base_name_lower:
@@ -1171,8 +1193,9 @@ class KpopChatbot:
                     if word in base_parts and len(word) >= 3:
                         other_parts = [p for p in base_parts if p != word and len(p) >= 2]
                         if any(p in query_lower.split() for p in other_parts) or any(p in query_lower for p in other_parts):
-                            if artist not in found_artists:
+                            if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
                                 break
         
         # Thêm tất cả artists tìm được (không chỉ 1)
@@ -1208,6 +1231,11 @@ class KpopChatbot:
                 for artist in all_artists:
                     base_name = self._normalize_entity_name(artist)
                     base_name_lower = base_name.lower()
+                    
+                    # Check duplicate bằng normalized name
+                    if base_name_lower in normalized_seen:
+                        continue
+                    
                     # Exact match với base name hoặc variants (xử lý dấu gạch ngang)
                     base_name_variants = [
                         base_name_lower,
@@ -1216,10 +1244,10 @@ class KpopChatbot:
                         base_name_lower.replace(' ', ''),
                     ]
                     if word in base_name_variants or base_name_lower == word:
-                        if artist not in entities:
-                            entities.append(artist)
-                            candidate_scores.append((artist, 1.0))
-                            break
+                        entities.append(artist)
+                        candidate_scores.append((artist, 1.0))
+                        normalized_seen.add(base_name_lower)
+                        break
                     # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
                     if '-' in base_name_lower:
                         base_parts = base_name_lower.split('-')
@@ -1227,14 +1255,20 @@ class KpopChatbot:
                             # Check xem có part khác cũng trong query không
                             other_parts = [p for p in base_parts if p != word]
                             if any(p in query_lower for p in other_parts):
-                                if artist not in entities:
-                                    entities.append(artist)
-                                    candidate_scores.append((artist, 1.0))
-                                    break
+                                entities.append(artist)
+                                candidate_scores.append((artist, 1.0))
+                                normalized_seen.add(base_name_lower)
+                                break
                 
                 # Try exact match với groups (cũng xử lý variants)
                 for group in all_groups:
                     group_lower = group.lower()
+                    group_normalized = self._normalize_entity_name(group).lower()
+                    
+                    # Check duplicate bằng normalized name
+                    if group_normalized in normalized_seen:
+                        continue
+                    
                     group_variants = [
                         group_lower,
                         group_lower.replace('-', ' '),
@@ -1242,10 +1276,9 @@ class KpopChatbot:
                         group_lower.replace(' ', ''),
                     ]
                     if word in group_variants or group_lower == word:
-                        if group not in entities:
-                            entities.append(group)
-                            candidate_scores.append((group, 1.0))
-                            break
+                        entities.append(group)
+                        candidate_scores.append((group, 1.0))
+                        normalized_seen.add(group_normalized)
                         break
         
         # Ưu tiên các entity có điểm cao nhất (từ n-gram/alias/exact)
