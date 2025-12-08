@@ -12,9 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from chatbot import KpopChatbot, ChatbotComparison, EvaluationDatasetGenerator
 
-# ⚠️ LƯU Ý BẢO MẬT: API key được hardcode ở đây chỉ để test
-# Trong production, nên dùng environment variable
-GEMINI_API_KEY = "AIzaSyCMnCqOqWOUN7XVb8Mzt0HtPLid1I3JXpc"
+# ⚠️ BẢO MẬT: KHÔNG hardcode API key. Lấy từ env hoặc tham số.
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 def main():
     """Run comparison with Gemini."""
@@ -22,7 +21,12 @@ def main():
     print("  🔬 CHATBOT COMPARISON: K-pop Chatbot vs Gemini")
     print("="*70)
     
-    # Set API key
+    # Set API key nếu có
+    if not GEMINI_API_KEY:
+        print("❌ Thiếu GOOGLE_API_KEY. Đặt biến môi trường GOOGLE_API_KEY hoặc truyền qua tham số.")
+        print("   PowerShell: $env:GOOGLE_API_KEY='YOUR_KEY'")
+        print("   CMD: set GOOGLE_API_KEY=YOUR_KEY")
+        return
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
     
     print("\n🔄 Initializing K-pop Chatbot...")
