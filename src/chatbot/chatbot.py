@@ -781,6 +781,10 @@ class KpopChatbot:
         Extract entities from query for membership questions.
         Tries to find artist and group names even if GraphRAG didn't find them.
         """
+        # Đảm bảo có sẵn map biến thể từ graph
+        self._ensure_entity_variant_map()
+        variant_map = self._entity_variant_map
+        
         entities = []
         query_lower = query.lower()
         
@@ -815,30 +819,21 @@ class KpopChatbot:
                 ngrams.append(ngram.replace(" ", "-"))
 
         matched_from_graph = []
-        def add_match(name: str, score: float):
-            lname = name.lower()
-            if not any(m['name'].lower() == lname for m in matched_from_graph):
-                matched_from_graph.append({"name": name, "score": score})
+        candidate_scores = []  # list of (name, score)
 
-        # Quét artists/groups so khớp chặt hơn theo n-gram
-        for artist in all_artists:
-            variants = _variants(artist)
-            for ng in ngrams:
-                if ng in variants:
-                    add_match(artist, 2.0)  # điểm cao cho exact n-gram
-                    break
+        # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
+        for ng in ngrams:
+            if ng in variant_map:
+                for ent in variant_map[ng]:
+                    if ent["label"] in ['Artist', 'Group']:
+                        candidate_scores.append((ent["name"], ent.get("score", 1.5)))
+                        matched_from_graph.append({"name": ent["name"], "score": ent.get("score", 1.5)})
 
-        for group in all_groups:
-            variants = _variants(group)
-            for ng in ngrams:
-                if ng in variants:
-                    add_match(group, 2.0)
-                    break
-        
         # Search for group name in query (case-insensitive) - ưu tiên match exact/variant
         for group in all_groups:
             group_variants = _variants(group)
             if any(variant in query_lower for variant in group_variants if len(variant) >= 3):
+                candidate_scores.append((group, 1.5))
                 entities.append(group)
                 break
         
@@ -898,12 +893,16 @@ class KpopChatbot:
         
         # Thêm tất cả artists tìm được (không chỉ 1)
         entities.extend(found_artists)
+        candidate_scores.extend([(a, 1.4) for a in found_artists])
         # Thêm các match từ bước graph->query n-gram (ưu tiên score cao trước)
         if matched_from_graph:
             matched_from_graph_sorted = sorted(matched_from_graph, key=lambda x: x['score'], reverse=True)
             for m in matched_from_graph_sorted:
                 if m['name'] not in entities:
                     entities.append(m['name'])
+            # Nếu đã có đủ 2 thực thể từ n-gram, ưu tiên trả về sớm (tránh nhiễu)
+            if len(entities) >= 2:
+                return entities[:10]
         
         # Nếu chưa tìm đủ, try fuzzy matching với từng word (nhưng đã có match n-gram ưu tiên)
         # QUAN TRỌNG: Chỉ match với artists/groups, không match với albums/songs (tránh sai)
@@ -928,6 +927,7 @@ class KpopChatbot:
                     if word in base_name_variants or base_name_lower == word:
                         if artist not in entities:
                             entities.append(artist)
+                            candidate_scores.append((artist, 1.0))
                             break
                     # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
                     if '-' in base_name_lower:
@@ -938,6 +938,7 @@ class KpopChatbot:
                             if any(p in query_lower for p in other_parts):
                                 if artist not in entities:
                                     entities.append(artist)
+                                    candidate_scores.append((artist, 1.0))
                                     break
                 
                 # Try exact match với groups (cũng xử lý variants)
@@ -952,10 +953,21 @@ class KpopChatbot:
                     if word in group_variants or group_lower == word:
                         if group not in entities:
                             entities.append(group)
+                            candidate_scores.append((group, 1.0))
                             break
                         break
         
-        # Return tất cả entities tìm được (không giới hạn 2)
+        # Ưu tiên các entity có điểm cao nhất (từ n-gram/alias/exact)
+        if candidate_scores:
+            ordered = []
+            seen = set()
+            for name, score in sorted(candidate_scores, key=lambda x: x[1], reverse=True):
+                if name not in seen:
+                    ordered.append(name)
+                    seen.add(name)
+            return ordered[:10]
+        
+        # Return fallback
         return entities[:10]  # Return max 10 entities để đảm bảo tìm đủ
     
     def _normalize_entity_name(self, entity_name: str) -> str:
@@ -977,6 +989,70 @@ class KpopChatbot:
         # Remove suffixes trong parentheses: (ca sĩ), (nhóm nhạc), (rapper), etc.
         normalized = re.sub(r'\s*\([^)]+\)\s*$', '', entity_name)
         return normalized.strip()
+    
+    def _generate_variants(self, name: str) -> List[str]:
+        """Sinh các biến thể đơn giản của một tên entity."""
+        base = self._normalize_entity_name(name).lower()
+        variants = {
+            base,
+            base.replace('-', ' '),
+            base.replace('-', ''),
+            base.replace(' ', ''),
+        }
+        # Nếu có gạch, thêm bản tách gạch với nhiều space
+        if '-' in base:
+            parts = base.split('-')
+            variants.add(" ".join(parts))
+            variants.add("".join(parts))
+        return list(variants)
+    
+    def _ensure_entity_variant_map(self):
+        """
+        Build một map variant -> [entity] để tra cứu nhanh (graph -> query).
+        Chỉ giữ label Artist/Group; thêm alias thủ công cho một số case dễ nhầm.
+        """
+        if hasattr(self, "_entity_variant_map") and self._entity_variant_map is not None:
+            return
+        
+        alias_map = {
+            # LOONA / LOOΠΔ
+            "loona": ["loona", "looπδ", "loonα", "loona-loona"],
+            "vi vi": ["vivi", "vi-vi", "vi vi"],
+            "vivi": ["vivi", "vi-vi", "vi vi"],
+            "go won": ["go won", "gowon", "go-won"],
+            "gowon": ["go won", "gowon", "go-won"],
+        }
+        
+        variant_map: Dict[str, List[Dict[str, Any]]] = {}
+        for node, data in self.kg.graph.nodes(data=True):
+            label = data.get('label')
+            if label not in ['Artist', 'Group']:
+                continue
+            
+            base_name = self._normalize_entity_name(node)
+            base_variants = self._generate_variants(node)
+            
+            # Thêm alias thủ công nếu khớp base name
+            extra_alias = []
+            base_lower = base_name.lower()
+            if base_lower in alias_map:
+                extra_alias = alias_map[base_lower]
+            
+            all_variants = set(base_variants + extra_alias)
+            for v in all_variants:
+                if len(v) < 2:
+                    continue
+                if v not in variant_map:
+                    variant_map[v] = []
+                # Score: alias cao hơn một chút
+                score = 2.0 if v in extra_alias else 1.5
+                variant_map[v].append({
+                    "name": node,
+                    "label": label,
+                    "score": score
+                })
+        
+        self._entity_variant_map = variant_map
         
     # =========== Specialized Query Methods ===========
     
