@@ -1370,9 +1370,11 @@ class MultiHopReasoner:
                                 break
                     # Substring match (variant trong ngram hoặc ngược lại) - chỉ khi không có dash
                     elif variant in ngram or ngram in variant:
-                        # Verify: nếu cả 2 đều có nhiều từ, phải có ít nhất 2 từ trùng
+                        # QUAN TRỌNG: Chỉ match nếu base_name có nhiều từ VÀ n-gram cũng có nhiều từ
+                        # Tránh match "Yoo" (single word) trong n-gram matching
                         variant_words = variant.split()
                         ngram_words = ngram.split()
+                        # Chỉ match nếu cả 2 đều có ít nhất 2 từ (ưu tiên match đầy đủ tên)
                         if len(variant_words) >= 2 and len(ngram_words) >= 2:
                             # Check xem có ít nhất 2 từ trùng nhau không
                             variant_set = set(variant_words)
@@ -1388,18 +1390,16 @@ class MultiHopReasoner:
                                         words_in_matched_full_names.update(normalized_name.split())
                                     matched_in_ngram = True
                                     break
-                        else:
-                            # Nếu một trong 2 chỉ có 1 từ, chỉ cần exact match hoặc substring match
-                            if base_name_lower not in normalized_seen:
-                                entities.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                # QUAN TRỌNG: Normalize (thay dash bằng space) trước khi split để tách đúng các từ
-                                if base_name_word_count >= 2:
-                                    normalized_name = base_name_lower.replace('-', ' ').replace('  ', ' ').strip()
-                                    words_in_matched_full_names.update(normalized_name.split())
-                                matched_in_ngram = True
-                                break
+                        # Nếu base_name chỉ có 1 từ VÀ n-gram cũng chỉ có 1 từ, có thể match (nhưng ưu tiên thấp)
+                        # Nhưng chỉ match nếu chưa có từ nào trong words_in_matched_full_names
+                        elif len(variant_words) == 1 and len(ngram_words) == 1:
+                            # Chỉ match single word nếu từ đó chưa được match trong tên đầy đủ nào
+                            if base_name_lower not in words_in_matched_full_names:
+                                if base_name_lower not in normalized_seen:
+                                    entities.append(artist)
+                                    normalized_seen.add(base_name_lower)
+                                    matched_in_ngram = True
+                                    break
                 if matched_in_ngram:
                     break
             # QUAN TRỌNG: Nếu đã match trong n-gram, skip tất cả các method khác
