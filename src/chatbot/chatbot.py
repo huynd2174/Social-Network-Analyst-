@@ -1021,7 +1021,21 @@ class KpopChatbot:
                                 matched_from_graph.append({"name": entity_name, "score": ent.get("score", 1.5)})
 
         # Search for group/company/song/album/genre/occupation in query (case-insensitive) - ưu tiên match exact/variant
+        # QUAN TRỌNG: Ưu tiên match đầy đủ tên (n-gram) trước single word
         def _match_list(nodes: List[str], score_val: float, label: str):
+            # Tạo n-grams từ query (2-4 words) để ưu tiên match đầy đủ tên
+            query_ngrams_for_match = []
+            for n in [2, 3, 4]:
+                for i in range(len(query_words_list) - n + 1):
+                    ngram = " ".join(query_words_list[i:i+n])
+                    query_ngrams_for_match.append(ngram)
+                    query_ngrams_for_match.append(ngram.replace(" ", ""))
+                    query_ngrams_for_match.append(ngram.replace(" ", "-"))
+                    if '-' in ngram:
+                        query_ngrams_for_match.append(ngram.replace("-", " "))
+                        query_ngrams_for_match.append(ngram.replace("-", ""))
+            query_ngrams_for_match = list(dict.fromkeys(query_ngrams_for_match))
+            
             for node in nodes:
                 normalized = self._normalize_entity_name(node).lower()
                 # Check duplicate bằng normalized name
@@ -1030,16 +1044,54 @@ class KpopChatbot:
                 
                 variants = _variants(node)
                 hit = False
-                for variant in variants:
-                    if len(variant) < 3:
-                        continue
-                    if variant in query_lower:
-                        base_score = score_val
-                        if variant in token_set:
-                            base_score += 0.4  # ưu tiên match đúng token
-                        candidate_scores.append((node, base_score, label))
-                        hit = True
-                        break
+                base_name_word_count = len(normalized.split())
+                
+                # Method 1: Check n-gram matching (ưu tiên match đầy đủ tên trước)
+                # Chỉ check nếu base_name có nhiều từ (≥2) để ưu tiên match đầy đủ
+                if base_name_word_count >= 2:
+                    for ngram in query_ngrams_for_match:
+                        if len(ngram) < 3:
+                            continue
+                        for variant in variants:
+                            if len(variant) < 3:
+                                continue
+                            # Exact match hoặc substring match
+                            if variant == ngram or variant in ngram or ngram in variant:
+                                base_score = score_val + 0.5  # Bonus cho n-gram match
+                                if variant in token_set:
+                                    base_score += 0.4  # ưu tiên match đúng token
+                                candidate_scores.append((node, base_score, label))
+                                hit = True
+                                break
+                        if hit:
+                            break
+                
+                # Method 2: Check single word matching (chỉ cho single word names hoặc fallback)
+                if not hit:
+                    for variant in variants:
+                        if len(variant) < 3:
+                            continue
+                        # Chỉ match single word nếu base_name chỉ có 1 từ
+                        if base_name_word_count == 1:
+                            if variant in query_lower:
+                                base_score = score_val
+                                if variant in token_set:
+                                    base_score += 0.4  # ưu tiên match đúng token
+                                candidate_scores.append((node, base_score, label))
+                                hit = True
+                                break
+                        # Nếu base_name có nhiều từ, chỉ match nếu tất cả các từ đều có trong query
+                        elif base_name_word_count > 1:
+                            variant_words = set(variant.split())
+                            query_words_set = set(query_words_list)
+                            if variant_words.issubset(query_words_set):
+                                base_score = score_val
+                                if variant in token_set:
+                                    base_score += 0.4
+                                candidate_scores.append((node, base_score, label))
+                                hit = True
+                                break
+                
                 if hit:
                     entities.append(node)
                     normalized_seen.add(normalized)
@@ -1085,14 +1137,10 @@ class KpopChatbot:
             # Loại bỏ trùng lặp
             base_name_variants = list(dict.fromkeys(base_name_variants))
             
-            # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
-            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
-            if any(variant in query_words_list for variant in base_name_variants):
-                found_artists.append(artist)
-                normalized_seen.add(base_name_lower)
-                continue
+            # QUAN TRỌNG: Ưu tiên match đầy đủ tên (n-gram) TRƯỚC khi match single word
+            # Đảo thứ tự: Method 2 (n-gram) trước, Method 1 (single word) sau
             
-            # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp như "Cho Seung-youn"
+            # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp như "Cho Seung-youn", "Yoo Jeong-yeon"
             # Tạo n-grams từ query (2-3 words)
             query_ngrams = []
             for n in [2, 3]:
@@ -1149,7 +1197,20 @@ class KpopChatbot:
                 if base_name_lower in normalized_seen:
                     break
             
-            if artist in found_artists:
+            if base_name_lower in normalized_seen:
+                continue
+            
+            # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
+            # QUAN TRỌNG: Chỉ chạy nếu base_name chỉ có 1 từ (tránh match "Yoo" với "Yoo Jeong-yeon")
+            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
+            base_name_word_count = len(base_name_lower.split())
+            if base_name_word_count == 1:
+                if any(variant in query_words_list for variant in base_name_variants):
+                    found_artists.append(artist)
+                    normalized_seen.add(base_name_lower)
+                    continue
+            
+            if base_name_lower in normalized_seen:
                 continue
             
             # Method 3: Check substring match (cho tên phức tạp như "Cho Seung-youn")

@@ -1308,14 +1308,10 @@ class MultiHopReasoner:
             # Loại bỏ trùng lặp
             base_name_variants = list(dict.fromkeys(base_name_variants))
             
-            # Method 1: Check nếu base name hoặc variants là một từ trong query
-            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
-            if any(variant in query_words_list for variant in base_name_variants):
-                entities.append(artist)
-                normalized_seen.add(base_name_lower)
-                continue
+            # QUAN TRỌNG: Ưu tiên match đầy đủ tên (n-gram) TRƯỚC khi match single word
+            # Đảo thứ tự: Method 2 (n-gram) trước, Method 1 (single word) sau
             
-            # Method 2: Check n-gram matching (2-4 words) để bắt tên phức tạp như "Cho Seung-youn"
+            # Method 2: Check n-gram matching (2-4 words) để bắt tên phức tạp như "Cho Seung-youn", "Yoo Jeong-yeon"
             for ngram in query_ngrams:
                 if len(ngram) < 3:
                     continue
@@ -1344,7 +1340,20 @@ class MultiHopReasoner:
                 if base_name_lower in normalized_seen:
                     break
             
-            if artist in entities:
+            if base_name_lower in normalized_seen:
+                continue
+            
+            # Method 1: Check nếu base name hoặc variants là một từ trong query
+            # QUAN TRỌNG: Chỉ chạy nếu base_name chỉ có 1 từ (tránh match "Yoo" với "Yoo Jeong-yeon")
+            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
+            base_name_word_count = len(base_name_lower.split())
+            if base_name_word_count == 1:
+                if any(variant in query_words_list for variant in base_name_variants):
+                    entities.append(artist)
+                    normalized_seen.add(base_name_lower)
+                    continue
+            
+            if base_name_lower in normalized_seen:
                 continue
             
             # Method 3: Check substring match (cho tên phức tạp)
