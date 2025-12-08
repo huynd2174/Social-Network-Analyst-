@@ -82,7 +82,7 @@ def main():
     print("="*70)
     
     print(f"\n✅ Chatbot: {result.chatbot_name}")
-    print(f"   📈 Accuracy: {result.accuracy:.2%} ({result.correct}/{result.total})")
+    print(f"   📈 Accuracy: {result.accuracy:.2%} ({result.correct_answers}/{result.total_questions})")
     print(f"   ⏱️  Thời gian trung bình: {result.avg_response_time:.2f}s/câu")
     print(f"   ⏱️  Tổng thời gian: {duration/60:.1f} phút ({duration:.0f} giây)")
     
@@ -104,18 +104,31 @@ def main():
     
     # Save results
     output_path = "data/evaluation_results.json"
+    errors = [
+        {
+            "id": r.question_id,
+            "question": r.question,
+            "expected": r.correct_answer,
+            "predicted": r.predicted_answer,
+            "confidence": r.confidence,
+            "hops": r.hops,
+            "category": r.category,
+        }
+        for r in result.results
+        if not r.is_correct
+    ]
     results_data = {
         "timestamp": datetime.now().isoformat(),
         "chatbot_name": result.chatbot_name,
-        "total_questions": result.total,
-        "correct": result.correct,
+        "total_questions": result.total_questions,
+        "correct": result.correct_answers,
         "accuracy": result.accuracy,
         "avg_response_time": result.avg_response_time,
         "total_time_seconds": duration,
         "accuracy_by_hops": result.accuracy_by_hops,
         "accuracy_by_type": result.accuracy_by_type,
         "accuracy_by_category": result.accuracy_by_category,
-        "errors": result.errors[:20] if result.errors else []  # Save first 20 errors
+        "errors": errors[:20]  # Save first 20 errors
     }
     
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -124,12 +137,12 @@ def main():
     print(f"\n💾 Kết quả đã được lưu vào: {output_path}")
     
     # Show some errors if any
-    if result.errors:
+    if errors:
         print(f"\n⚠️  Một số lỗi (hiển thị 5 lỗi đầu):")
-        for i, error in enumerate(result.errors[:5], 1):
-            print(f"   {i}. {error}")
-        if len(result.errors) > 5:
-            print(f"   ... và {len(result.errors) - 5} lỗi khác (xem trong {output_path})")
+        for i, error in enumerate(errors[:5], 1):
+            print(f"   {i}. Q{error['id']} → predicted='{error['predicted']}' | expected='{error['expected']}'")
+        if len(errors) > 5:
+            print(f"   ... và {len(errors) - 5} lỗi khác (xem trong {output_path})")
     
     print("\n" + "="*70)
     print("  ✅ ĐÁNH GIÁ HOÀN TẤT!")
