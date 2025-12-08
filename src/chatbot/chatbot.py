@@ -993,6 +993,9 @@ class KpopChatbot:
 
         # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
         normalized_seen = set()
+        
+        # QUAN TRỌNG: Định nghĩa query_words_list TRƯỚC function _match_list để có thể sử dụng
+        query_words_list = query_lower.split()  # List để giữ thứ tự
 
         # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
         # QUAN TRỌNG: Normalize và lookup với nhiều variants để cover mọi trường hợp
@@ -1106,7 +1109,7 @@ class KpopChatbot:
         
         # Search for artist names trong câu hỏi (query -> graph) - bắt exact/variant, tránh substring lỏng
         found_artists = []
-        query_words_list = query_lower.split()  # List để giữ thứ tự
+        # query_words_list đã được định nghĩa ở trên (trước function _match_list)
         query_text = query_lower  # Full query text để check substring
         
         # Helper: normalize unicode để match tốt hơn (Rosé vs rosé)
