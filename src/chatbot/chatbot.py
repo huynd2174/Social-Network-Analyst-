@@ -222,6 +222,42 @@ class KpopChatbot:
             'có cùng công ty', 'có cùng hãng', 'có cùng label'
         ])
         
+        # Bổ sung nhận dạng cho các câu hỏi đa dạng trong dataset đánh giá
+        is_genre_question = 'thể loại' in query_lower or 'genre' in query_lower
+        is_song_in_album_question = (
+            ('bài hát' in query_lower and 'album' in query_lower)
+            or ('contains' in query_lower and 'released' in query_lower)
+        )
+        is_company_via_group_question = (
+            'công ty nào quản lý' in query_lower
+            or ('được quản lý bởi' in query_lower and 'nhóm' in query_lower)
+            or ('quản lý' in query_lower and 'nhóm' in query_lower)
+        )
+        is_occupation_question = 'nghề nghiệp' in query_lower or 'occupation' in query_lower
+        is_artist_song_question = ('bài hát' in query_lower and ('trình bày' in query_lower or 'hát' in query_lower))
+        is_artist_album_question = ('album' in query_lower and ('phát hành' in query_lower or 'ra mắt' in query_lower))
+        is_artist_genre_question = is_genre_question and ('nghệ sĩ' in query_lower or 'artist' in query_lower or 'ca sĩ' in query_lower)
+        is_same_occupation_question = is_occupation_question and any(kw in query_lower for kw in ['ai', 'nghệ sĩ', 'artist'])
+        is_album_song_group_question = ('album' in query_lower and 'bài hát' in query_lower and 'nhóm' in query_lower)
+        is_three_hop_hint = ('qua' in query_lower and 'rồi' in query_lower) or ('thông qua' in query_lower and 'sau đó' in query_lower)
+        
+        # Xác định label kỳ vọng từ câu hỏi để lọc thực thể đúng loại
+        expected_labels = set()
+        if is_same_group_question or is_list_members_question or 'nhóm' in query_lower or 'ban nhạc' in query_lower:
+            expected_labels.add('Group')
+        if is_membership_question or 'nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower:
+            expected_labels.add('Artist')
+        if is_same_company_question or is_company_via_group_question or 'công ty' in query_lower or 'label' in query_lower or 'hãng' in query_lower:
+            expected_labels.add('Company')
+        if 'bài hát' in query_lower or 'song' in query_lower:
+            expected_labels.add('Song')
+        if 'album' in query_lower:
+            expected_labels.add('Album')
+        if is_genre_question or 'thể loại' in query_lower or 'genre' in query_lower:
+            expected_labels.add('Genre')
+        if is_occupation_question or 'nghề' in query_lower:
+            expected_labels.add('Occupation')
+        
         # Check if this is a "list members" question: "Ai là thành viên", "Who are members"
         is_list_members_question = any(kw in query_lower for kw in [
             'ai là thành viên', 'who are', 'thành viên của', 'members of',
@@ -244,10 +280,26 @@ class KpopChatbot:
             # 
             # Ưu tiên extract entities cho same_group/same_company/list_members questions bằng rule-based
             # Vì đây là câu hỏi factual, cần entities chính xác để reasoning đúng
+            eval_pattern_question = (
+                is_same_group_question or
+                is_same_company_question or
+                is_list_members_question or
+                is_genre_question or
+                is_song_in_album_question or
+                is_company_via_group_question or
+                is_occupation_question or
+                is_artist_song_question or
+                is_artist_album_question or
+                is_artist_genre_question or
+                is_same_occupation_question or
+                is_album_song_group_question or
+                is_three_hop_hint
+            )
+            
             if is_same_group_question or is_same_company_question or is_list_members_question:
                 # LUÔN force extract entities bằng rule-based (nhanh, chính xác)
                 # Bỏ qua GraphRAG nếu không tìm đủ (GraphRAG có thể extract sai)
-                extracted = self._extract_entities_for_membership(query)
+                extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
                 
                 # Với list_members_question, chỉ cần 1 entity (group)
                 min_entities = 1 if is_list_members_question else 2
@@ -293,9 +345,9 @@ class KpopChatbot:
                         start_entities=[],
                         max_hops=max_hops
                     )
-            elif is_membership_question and len(context['entities']) < 2:
+            elif eval_pattern_question and len(context['entities']) < 2:
                 # Membership question: try to extract entities nếu GraphRAG không tìm đủ
-                extracted = self._extract_entities_for_membership(query)
+                extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
                 if extracted:
                     # Add to context for consistency
                     for e in extracted:
@@ -776,25 +828,40 @@ class KpopChatbot:
             
         return result
     
-    def _extract_entities_for_membership(self, query: str) -> List[str]:
+    def _extract_entities_for_membership(self, query: str, expected_labels: Optional[set] = None) -> List[str]:
         """
         Extract entities from query for membership questions.
         Tries to find artist and group names even if GraphRAG didn't find them.
+        
+        expected_labels: tập label ưu tiên (Artist, Group, Company, Song, Album, Genre, Occupation)
+        Nếu provided, chỉ giữ thực thể có label trong tập này (để giảm nhiễu).
         """
         # Đảm bảo có sẵn map biến thể từ graph
         self._ensure_entity_variant_map()
         variant_map = self._entity_variant_map
+        expected_labels = expected_labels or set()
         
         entities = []
         query_lower = query.lower()
         
-        # Try to find group names (case-insensitive)
+        # Try to find group/artist/others (case-insensitive, filtered by expected_labels nếu có)
         all_groups = [node for node, data in self.kg.graph.nodes(data=True) 
-                     if data.get('label') == 'Group']
+                     if data.get('label') == 'Group' and (not expected_labels or 'Group' in expected_labels)]
         
-        # Try to find artist names (case-insensitive)
         all_artists = [node for node, data in self.kg.graph.nodes(data=True) 
-                      if data.get('label') == 'Artist']
+                      if data.get('label') == 'Artist' and (not expected_labels or 'Artist' in expected_labels)]
+        
+        # Thêm các loại khác nếu cần cho intent (song/album/company/genre/occupation)
+        all_companies = [node for node, data in self.kg.graph.nodes(data=True)
+                        if data.get('label') == 'Company' and (not expected_labels or 'Company' in expected_labels)]
+        all_songs = [node for node, data in self.kg.graph.nodes(data=True)
+                    if data.get('label') == 'Song' and (not expected_labels or 'Song' in expected_labels)]
+        all_albums = [node for node, data in self.kg.graph.nodes(data=True)
+                     if data.get('label') == 'Album' and (not expected_labels or 'Album' in expected_labels)]
+        all_genres = [node for node, data in self.kg.graph.nodes(data=True)
+                     if data.get('label') == 'Genre' and (not expected_labels or 'Genre' in expected_labels)]
+        all_occupations = [node for node, data in self.kg.graph.nodes(data=True)
+                          if data.get('label') == 'Occupation' and (not expected_labels or 'Occupation' in expected_labels)]
 
         # Helper: normalize và sinh variants cho một tên node
         def _variants(name: str) -> List[str]:
@@ -829,13 +896,21 @@ class KpopChatbot:
                         candidate_scores.append((ent["name"], ent.get("score", 1.5)))
                         matched_from_graph.append({"name": ent["name"], "score": ent.get("score", 1.5)})
 
-        # Search for group name in query (case-insensitive) - ưu tiên match exact/variant
-        for group in all_groups:
-            group_variants = _variants(group)
-            if any(variant in query_lower for variant in group_variants if len(variant) >= 3):
-                candidate_scores.append((group, 1.5))
-                entities.append(group)
-                break
+        # Search for group/company/song/album/genre/occupation in query (case-insensitive) - ưu tiên match exact/variant
+        def _match_list(nodes: List[str], score_val: float):
+            for node in nodes:
+                variants = _variants(node)
+                if any(variant in query_lower for variant in variants if len(variant) >= 3):
+                    candidate_scores.append((node, score_val))
+                    entities.append(node)
+                    # không break để có thể thêm nhiều thực thể, nhưng tránh trùng lặp
+        
+        _match_list(all_groups, 1.5)
+        _match_list(all_companies, 1.3)
+        _match_list(all_songs, 1.2)
+        _match_list(all_albums, 1.2)
+        _match_list(all_genres, 1.1)
+        _match_list(all_occupations, 1.0)
         
         # Search for artist names trong câu hỏi (query -> graph) - bắt exact/variant, tránh substring lỏng
         found_artists = []
