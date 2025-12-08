@@ -199,7 +199,10 @@ class KpopChatbot:
         )
         
         # 2.5. Check if this is a membership Yes/No question - use reasoning directly
-        query_lower = query.lower()
+        import re
+        # Làm sạch dấu câu để match tốt hơn (ví dụ "1the9," -> "1the9")
+        query_clean = re.sub(r"[^\w\s\-]", " ", query.lower())
+        query_lower = " ".join(query_clean.split())  # normalize spaces
         is_membership_question = (
             any(kw in query_lower for kw in ['có phải', 'phải', 'là thành viên', 'is a member', 'belongs to', 'có thành viên']) and
             any(kw in query_lower for kw in ['thành viên', 'member'])
@@ -887,6 +890,7 @@ class KpopChatbot:
 
         matched_from_graph = []
         candidate_scores = []  # list of (name, score)
+        token_set = set(tokens)
 
         # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
         for ng in ngrams:
@@ -900,8 +904,18 @@ class KpopChatbot:
         def _match_list(nodes: List[str], score_val: float):
             for node in nodes:
                 variants = _variants(node)
-                if any(variant in query_lower for variant in variants if len(variant) >= 3):
-                    candidate_scores.append((node, score_val))
+                hit = False
+                for variant in variants:
+                    if len(variant) < 3:
+                        continue
+                    if variant in query_lower:
+                        base_score = score_val
+                        if variant in token_set:
+                            base_score += 0.4  # ưu tiên match đúng token
+                        candidate_scores.append((node, base_score))
+                        hit = True
+                        break
+                if hit:
                     entities.append(node)
                     # không break để có thể thêm nhiều thực thể, nhưng tránh trùng lặp
         
@@ -1036,7 +1050,7 @@ class KpopChatbot:
         if candidate_scores:
             ordered = []
             seen = set()
-            for name, score in sorted(candidate_scores, key=lambda x: x[1], reverse=True):
+            for name, score in sorted(candidate_scores, key=lambda x: (x[1], len(x[0])), reverse=True):
                 if name not in seen:
                     ordered.append(name)
                     seen.add(name)
