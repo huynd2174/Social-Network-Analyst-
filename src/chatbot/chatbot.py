@@ -1154,22 +1154,38 @@ class KpopChatbot:
             # Đảo thứ tự: Method 2 (n-gram) trước, Method 1 (single word) sau
             
             # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp như "Cho Seung-youn", "Yoo Jeong-yeon"
-            # Tạo n-grams từ query (2-3 words)
-            query_ngrams = []
-            for n in [2, 3]:
-                for i in range(len(query_words_list) - n + 1):
-                    ngram = " ".join(query_words_list[i:i+n])
-                    query_ngrams.append(ngram)
-                    # Thêm variant không có space
-                    query_ngrams.append(ngram.replace(" ", ""))
-                    # Thêm variant với dash
-                    query_ngrams.append(ngram.replace(" ", "-"))
-                    # QUAN TRỌNG: Nếu ngram có dấu gạch ngang, tạo thêm variants
-                    if '-' in ngram:
-                        query_ngrams.append(ngram.replace("-", " "))  # "jeong-yeon" → "jeong yeon"
-                        query_ngrams.append(ngram.replace("-", ""))     # "jeong-yeon" → "jeongyeon"
+            # Tạo n-grams từ query (2-3 words) - tương tự như multi_hop_reasoning.py
+            expanded_words = []
+            for word in query_words_list:
+                expanded_words.append(word)  # Giữ nguyên: "jeong-yeon"
+                if '-' in word:
+                    # Tách token có dash thành parts
+                    parts = word.split('-')
+                    expanded_words.extend(parts)  # "jeong-yeon" → ["jeong-yeon", "jeong", "yeon"]
+                    # Thêm variant với space: "jeong yeon"
+                    expanded_words.append(" ".join(parts))
             
-            # Check nếu base name hoặc variants match với n-gram
+            query_ngrams = []
+            for n in [2, 3, 4]:  # Tăng lên 4 để bắt tên dài
+                # Tạo n-grams từ cả query_words_list và expanded_words
+                for word_list in [query_words_list, expanded_words]:
+                    for i in range(len(word_list) - n + 1):
+                        ngram = " ".join(word_list[i:i+n])
+                        query_ngrams.append(ngram)  # Original: "yoo jeong-yeon", "yoo jeong yeon"
+                        # Thêm variant không có space: "yoojeong-yeon"
+                        query_ngrams.append(ngram.replace(" ", ""))
+                        # Thêm variant với dash: "yoo-jeong-yeon"
+                        query_ngrams.append(ngram.replace(" ", "-"))
+                        # QUAN TRỌNG: Nếu ngram có dấu gạch ngang, tạo thêm variant với space
+                        if '-' in ngram:
+                            query_ngrams.append(ngram.replace("-", " "))  # "yoo jeong-yeon" → "yoo jeong yeon"
+                            query_ngrams.append(ngram.replace("-", ""))   # "jeong-yeon" → "jeongyeon"
+            
+            # Loại bỏ trùng lặp
+            query_ngrams = list(dict.fromkeys(query_ngrams))
+            
+            # QUAN TRỌNG: Duyệt tất cả n-grams trước để match tên đầy đủ, sau đó mới check single word
+            matched_in_ngram = False
             for ngram in query_ngrams:
                 if len(ngram) < 3:
                     continue
@@ -1180,9 +1196,40 @@ class KpopChatbot:
                             found_artists.append(artist)
                             normalized_seen.add(base_name_lower)
                             # Track các từ trong tên đầy đủ đã match để tránh match single word sau
+                            # QUAN TRỌNG: Normalize (thay dash bằng space) trước khi split để tách đúng các từ
                             if base_name_word_count >= 2:
-                                words_in_matched_full_names.update(base_name_lower.split())
+                                normalized_name = base_name_lower.replace('-', ' ').replace('  ', ' ').strip()
+                                words_in_matched_full_names.update(normalized_name.split())
+                            matched_in_ngram = True
                             break
+                    # QUAN TRỌNG: Xử lý tên có dash trước khi check substring
+                    # Normalize cả 2 về cùng format để so sánh chính xác hơn
+                    elif '-' in variant or '-' in ngram:
+                        # Normalize cả 2 về cùng format (space) để so sánh
+                        variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
+                        ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
+                        # Exact match sau khi normalize
+                        if variant_normalized == ngram_normalized:
+                            if base_name_lower not in normalized_seen:
+                                found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
+                                matched_in_ngram = True
+                                break
+                        # So sánh parts: nếu có ít nhất 2 parts giống nhau → match
+                        variant_parts = set(variant_normalized.split())
+                        ngram_parts = set(ngram_normalized.split())
+                        if len(variant_parts.intersection(ngram_parts)) >= 2:
+                            if base_name_lower not in normalized_seen:
+                                found_artists.append(artist)
+                                normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
+                                matched_in_ngram = True
+                                break
                     # Substring match (variant trong ngram hoặc ngược lại)
                     elif variant in ngram or ngram in variant:
                         # Verify: nếu cả 2 đều có nhiều từ, phải có ít nhất 2 từ trùng
@@ -1197,8 +1244,11 @@ class KpopChatbot:
                                     found_artists.append(artist)
                                     normalized_seen.add(base_name_lower)
                                     # Track các từ trong tên đầy đủ đã match
+                                    # QUAN TRỌNG: Normalize (thay dash bằng space) trước khi split để tách đúng các từ
                                     if base_name_word_count >= 2:
-                                        words_in_matched_full_names.update(base_name_lower.split())
+                                        normalized_name = base_name_lower.replace('-', ' ').replace('  ', ' ').strip()
+                                        words_in_matched_full_names.update(normalized_name.split())
+                                    matched_in_ngram = True
                                     break
                         else:
                             # Nếu một trong 2 chỉ có 1 từ, chỉ cần exact match hoặc substring match
@@ -1206,36 +1256,87 @@ class KpopChatbot:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
                                 # Track các từ trong tên đầy đủ đã match
+                                # QUAN TRỌNG: Normalize (thay dash bằng space) trước khi split để tách đúng các từ
                                 if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(base_name_lower.split())
+                                    normalized_name = base_name_lower.replace('-', ' ').replace('  ', ' ').strip()
+                                    words_in_matched_full_names.update(normalized_name.split())
+                                matched_in_ngram = True
                                 break
-                    # QUAN TRỌNG: Nếu cả 2 đều có dấu gạch ngang, so sánh parts
-                    elif '-' in variant and '-' in ngram:
-                        # Normalize cả 2 về cùng format (space) để so sánh exact match
-                        variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
-                        ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
-                        if variant_normalized == ngram_normalized:
+                if matched_in_ngram:
+                    break
+            # QUAN TRỌNG: Nếu đã match trong n-gram, skip tất cả các method khác
+            if matched_in_ngram:
+                continue
+            
+            if base_name_lower in normalized_seen:
+                continue
+            
+            # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
+            # QUAN TRỌNG: Chỉ chạy nếu base_name chỉ có 1 từ (tránh match "Yoo" với "Yoo Jeong-yeon")
+            # VÀ từ đó chưa được match trong tên đầy đủ nào (tránh match "Yoo" khi đã match "Yoo Jeong-yeon")
+            # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
+            base_name_word_count = len(base_name_lower.split())
+            if base_name_word_count == 1:
+                # Check xem từ này đã được match trong tên đầy đủ nào chưa
+                if base_name_lower in words_in_matched_full_names:
+                    continue  # Đã được match trong tên đầy đủ, không match single word nữa
+                
+                if any(variant in query_words_list for variant in base_name_variants):
+                    found_artists.append(artist)
+                    normalized_seen.add(base_name_lower)
+                    continue
+            
+            if base_name_lower in normalized_seen:
+                continue
+            
+            # Method 3: Check substring match (cho tên phức tạp như "Cho Seung-youn")
+            # Chỉ check nếu base name có độ dài hợp lý (≥4 chars) để tránh match sai
+            if len(base_name_lower) >= 4:
+                for variant in base_name_variants:
+                    if len(variant) >= 4 and variant in query_lower:
+                        # Verify: phải có ít nhất 2 từ trong variant xuất hiện trong query
+                        variant_words = variant.split()
+                        if len(variant_words) >= 2:
+                            matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
+                            if matched_words >= 2:
+                                if base_name_lower not in normalized_seen:
+                                    found_artists.append(artist)
+                                    normalized_seen.add(base_name_lower)
+                                    break
+                        elif len(variant_words) == 1 and variant in query_lower:
+                            if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
+                                if base_name_lower not in normalized_seen:
+                                    found_artists.append(artist)
+                                    normalized_seen.add(base_name_lower)
+                                    break
+                if base_name_lower in normalized_seen:
+                    continue
+            
+            # Method 4: Check từng word trong query với base name và variants (strict, tránh match nhầm)
+            for word in query_words_list:
+                if len(word) < 3:  # Skip short words
+                    continue
+                
+                # QUAN TRỌNG: Check xem từ này đã được match trong tên đầy đủ nào chưa
+                if word in words_in_matched_full_names:
+                    continue  # Đã được match trong tên đầy đủ, không match single word nữa
+                
+                # Exact match với base name hoặc variants
+                if word in base_name_variants or word == base_name_lower:
+                    if base_name_lower not in normalized_seen:
+                        found_artists.append(artist)
+                        normalized_seen.add(base_name_lower)
+                        break
+                # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
+                elif '-' in base_name_lower:
+                    base_parts = base_name_lower.split('-')
+                    if word in base_parts and len(word) >= 3:
+                        other_parts = [p for p in base_parts if p != word and len(p) >= 2]
+                        if any(p in query_words_list for p in other_parts) or any(p in query_lower for p in other_parts):
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
-                        # So sánh parts
-                        variant_parts = set(variant.split('-'))
-                        ngram_parts = set(ngram.split('-'))
-                        # Nếu có ít nhất 2 parts giống nhau → match (cho tên như "yoo-jeong-yeon")
-                        if len(variant_parts.intersection(ngram_parts)) >= 2:
-                            if base_name_lower not in normalized_seen:
-                                found_artists.append(artist)
-                                normalized_seen.add(base_name_lower)
-                                # Track các từ trong tên đầy đủ đã match
-                                if base_name_word_count >= 2:
-                                    words_in_matched_full_names.update(variant_normalized.split())
-                                break
-                    # Tương tự với space: "yoo jeong yeon" vs "yoo jeong-yeon"
-                    elif ' ' in variant and '-' in ngram:
                         # Normalize cả 2 về cùng format (space) để so sánh exact match
                         variant_normalized = variant.replace(' ', ' ').strip()
                         ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
@@ -1289,9 +1390,14 @@ class KpopChatbot:
             
             # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
             # QUAN TRỌNG: Chỉ chạy nếu base_name chỉ có 1 từ (tránh match "Yoo" với "Yoo Jeong-yeon")
+            # VÀ từ đó chưa được match trong tên đầy đủ nào (tránh match "Yoo" khi đã match "Yoo Jeong-yeon")
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
             base_name_word_count = len(base_name_lower.split())
             if base_name_word_count == 1:
+                # Check xem từ này đã được match trong tên đầy đủ nào chưa
+                if base_name_lower in words_in_matched_full_names:
+                    continue  # Đã được match trong tên đầy đủ, không match single word nữa
+                
                 if any(variant in query_words_list for variant in base_name_variants):
                     found_artists.append(artist)
                     normalized_seen.add(base_name_lower)
