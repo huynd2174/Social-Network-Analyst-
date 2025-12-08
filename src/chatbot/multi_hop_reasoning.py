@@ -1327,6 +1327,12 @@ class MultiHopReasoner:
             for ngram in query_ngrams:
                 if len(ngram) < 3:
                     continue
+                # QUAN TRỌNG: Nếu base_name có nhiều từ, chỉ match với n-gram có ít nhất 2 từ
+                # Tránh match "Yoo Jeong-yeon" với n-gram "yoo" (single word)
+                if base_name_word_count >= 2:
+                    ngram_word_count = len(ngram.split())
+                    if ngram_word_count < 2:
+                        continue  # Skip single word n-grams cho multi-word names
                 for variant in base_name_variants:
                     # Exact match (ưu tiên cao nhất)
                     if variant == ngram:
