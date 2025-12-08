@@ -15,11 +15,19 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from .knowledge_graph import KpopKnowledgeGraph
-from .knowledge_graph_neo4j import KpopKnowledgeGraphNeo4j
-from .graph_rag import GraphRAG
-from .multi_hop_reasoning import MultiHopReasoner, ReasoningResult
-from .small_llm import SmallLLM, get_llm, TRANSFORMERS_AVAILABLE
+# Support running both as a package (streamlit) and as a script (python .../run_chatbot.py)
+try:
+    from .knowledge_graph import KpopKnowledgeGraph
+    from .knowledge_graph_neo4j import KpopKnowledgeGraphNeo4j
+    from .graph_rag import GraphRAG
+    from .multi_hop_reasoning import MultiHopReasoner, ReasoningResult
+    from .small_llm import SmallLLM, get_llm, TRANSFORMERS_AVAILABLE
+except ImportError:  # Fallback for no-package context
+    from knowledge_graph import KpopKnowledgeGraph
+    from knowledge_graph_neo4j import KpopKnowledgeGraphNeo4j
+    from graph_rag import GraphRAG
+    from multi_hop_reasoning import MultiHopReasoner, ReasoningResult
+    from small_llm import SmallLLM, get_llm, TRANSFORMERS_AVAILABLE
 
 
 @dataclass
@@ -783,17 +791,53 @@ class KpopChatbot:
         # Try to find artist names (case-insensitive)
         all_artists = [node for node, data in self.kg.graph.nodes(data=True) 
                       if data.get('label') == 'Artist']
-        
-        # Search for group name in query (case-insensitive)
-        # Xử lý variants: "blackpink", "black pink", "BLACKPINK"
+
+        # Helper: normalize và sinh variants cho một tên node
+        def _variants(name: str) -> List[str]:
+            base = self._normalize_entity_name(name).lower()
+            return list({  # dùng set để loại trùng
+                base,
+                base.replace('-', ' '),
+                base.replace('-', ''),
+                base.replace(' ', ''),
+            })
+
+        # ===== Graph -> Query: quét n-gram (2-4 words) để bắt cặp tên liền nhau =====
+        tokens = query_lower.split()
+        ngrams = []
+        for n in [2, 3, 4]:
+            for i in range(len(tokens) - n + 1):
+                ngram = " ".join(tokens[i:i+n])
+                ngrams.append(ngram)
+                # thêm phiên bản không dấu cách để bắt "go won" vs "gowon"
+                ngrams.append(ngram.replace(" ", ""))
+                # thêm phiên bản thay space bằng gạch để bắt "jang won young" vs "jang-won-young"
+                ngrams.append(ngram.replace(" ", "-"))
+
+        matched_from_graph = []
+        def add_match(name: str, score: float):
+            lname = name.lower()
+            if not any(m['name'].lower() == lname for m in matched_from_graph):
+                matched_from_graph.append({"name": name, "score": score})
+
+        # Quét artists/groups so khớp chặt hơn theo n-gram
+        for artist in all_artists:
+            variants = _variants(artist)
+            for ng in ngrams:
+                if ng in variants:
+                    add_match(artist, 2.0)  # điểm cao cho exact n-gram
+                    break
+
         for group in all_groups:
-            group_lower = group.lower()
-            group_variants = [
-                group_lower,
-                group_lower.replace('-', ' '),
-                group_lower.replace('-', ''),
-                group_lower.replace(' ', ''),  # "black pink" → "blackpink"
-            ]
+            variants = _variants(group)
+            for ng in ngrams:
+                if ng in variants:
+                    add_match(group, 2.0)
+                    break
+        
+        # Search for group name in query (case-insensitive) - ưu tiên match exact/variant
+        for group in all_groups:
+            group_variants = _variants(group)
             if any(variant in query_lower for variant in group_variants if len(variant) >= 3):
                 entities.append(group)
                 break
@@ -833,7 +877,7 @@ class KpopChatbot:
                     found_artists.append(artist)
                     continue
             
-            # Method 3: Check từng word trong query với base name và variants
+            # Method 3: Check từng word trong query với base name và variants (strict, tránh match nhầm)
             for word in query_words_list:
                 if len(word) < 3:  # Skip short words
                     continue
@@ -842,26 +886,26 @@ class KpopChatbot:
                     if artist not in found_artists:
                         found_artists.append(artist)
                         break
-                # Partial match: word là một phần của base name hoặc ngược lại
-                elif (word in base_name_lower and len(word) >= 3) or (base_name_lower in word and len(base_name_lower) >= 3):
-                    if artist not in found_artists:
-                        found_artists.append(artist)
-                        break
-                # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
+                # Xử lý tên có dấu gạch ngang: yêu cầu có đủ ≥2 phần trong query
                 elif '-' in base_name_lower:
                     base_parts = base_name_lower.split('-')
                     if word in base_parts and len(word) >= 3:
-                        # Check xem có part khác cũng trong query không
-                        other_parts = [p for p in base_parts if p != word]
-                        if any(p in query_lower for p in other_parts):
+                        other_parts = [p for p in base_parts if p != word and len(p) >= 2]
+                        if any(p in query_lower.split() for p in other_parts) or any(p in query_lower for p in other_parts):
                             if artist not in found_artists:
                                 found_artists.append(artist)
                                 break
         
         # Thêm tất cả artists tìm được (không chỉ 1)
         entities.extend(found_artists)
+        # Thêm các match từ bước graph->query n-gram (ưu tiên score cao trước)
+        if matched_from_graph:
+            matched_from_graph_sorted = sorted(matched_from_graph, key=lambda x: x['score'], reverse=True)
+            for m in matched_from_graph_sorted:
+                if m['name'] not in entities:
+                    entities.append(m['name'])
         
-        # Nếu chưa tìm đủ, try fuzzy matching với từng word
+        # Nếu chưa tìm đủ, try fuzzy matching với từng word (nhưng đã có match n-gram ưu tiên)
         # QUAN TRỌNG: Chỉ match với artists/groups, không match với albums/songs (tránh sai)
         if len(entities) < 2:
             words = query_lower.split()
@@ -910,13 +954,6 @@ class KpopChatbot:
                             entities.append(group)
                             break
                         break
-                    # Partial match - word là một phần của node name
-                    elif word in node_lower and len(word) >= 3:
-                        node_data = self.kg.get_entity(node)
-                        if node_data and node_data.get('label') in ['Artist', 'Group']:
-                            if node not in entities:
-                                entities.append(node)
-                            break
         
         # Return tất cả entities tìm được (không giới hạn 2)
         return entities[:10]  # Return max 10 entities để đảm bảo tìm đủ
