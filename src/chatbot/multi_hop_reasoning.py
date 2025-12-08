@@ -1205,11 +1205,33 @@ class MultiHopReasoner:
         
         # 2. Rule-based extraction từ query
         extracted = self._extract_entities_from_query(query)
+        # QUAN TRỌNG: Sắp xếp extracted entities theo độ dài tên (dài trước) để ưu tiên full names
+        # Ví dụ: "Yoo Jeong-yeon" sẽ được thêm trước "Yoo"
+        extracted_sorted = sorted(extracted, key=lambda x: len(self._normalize_entity_name(x)), reverse=True)
         # Combine với start_entities (không trùng, normalize để tránh "Rosé" và "Rosé (ca sĩ)")
-        for e in extracted:
+        for e in extracted_sorted:
             normalized = self._normalize_entity_name(e).lower()
             # Check duplicate bằng normalized name
             if normalized not in normalized_seen:
+                # QUAN TRỌNG: Nếu đã có entity với tên ngắn hơn (single word) và entity mới là full name (multi-word),
+                # thì loại bỏ entity ngắn hơn và thêm entity dài hơn
+                # Ví dụ: nếu đã có "Yoo" và bây giờ có "Yoo Jeong-yeon", loại bỏ "Yoo" và thêm "Yoo Jeong-yeon"
+                normalized_words = normalized.split()
+                if len(normalized_words) >= 2:  # Entity mới là multi-word
+                    # Tìm và loại bỏ các entity ngắn hơn có cùng từ đầu
+                    to_remove = []
+                    for existing_e in all_entities:
+                        existing_normalized = self._normalize_entity_name(existing_e).lower()
+                        existing_words = existing_normalized.split()
+                        # Nếu existing entity là single word và là một phần của entity mới
+                        if len(existing_words) == 1 and existing_words[0] in normalized_words:
+                            to_remove.append(existing_e)
+                    # Loại bỏ các entity ngắn hơn
+                    for e_to_remove in to_remove:
+                        all_entities.remove(e_to_remove)
+                        removed_normalized = self._normalize_entity_name(e_to_remove).lower()
+                        normalized_seen.discard(removed_normalized)
+                
                 # Filter theo expected_types nếu có
                 if expected_types:
                     entity_type = self.kg.get_entity_type(e)
