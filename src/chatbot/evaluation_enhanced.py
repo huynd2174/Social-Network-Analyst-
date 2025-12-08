@@ -249,59 +249,59 @@ class EnhancedEvaluationGenerator:
             # Nghệ sĩ cùng nhóm
             ('MEMBER_OF', 'MEMBER_OF'): {
                 'yes_no': [
-                    f"{start} và {end} có cùng nhóm nhạc không?",
-                    f"{start} và {end} có phải thành viên của cùng một nhóm nhạc không?",
-                    f"{start} và {end} có thuộc cùng nhóm nhạc {clean_middle} không?",
+                    f"(2-hop) {start} và {end} có cùng nhóm nhạc thông qua {clean_middle} không?",
+                    f"(2-hop) {start} và {end} đều MEMBER_OF nhóm {clean_middle}, đúng không?",
+                    f"(2-hop) {start} và {end} có thuộc cùng nhóm nhạc {clean_middle} qua quan hệ thành viên không?",
                 ],
                 'true_false': [
-                    f"{start} và {end} đều là thành viên của nhóm nhạc {clean_middle}.",
-                    f"{start} và {end} thuộc cùng một nhóm nhạc.",
+                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} và {end} → MEMBER_OF → {clean_middle}.",
+                    f"(2-hop) {start} và {end} thuộc cùng một nhóm nhạc {clean_middle}.",
                 ],
                 'multiple_choice': [
-                    f"Ai là thành viên khác của nhóm nhạc {clean_middle} cùng với {start}?",
-                    f"Nghệ sĩ nào khác cũng là thành viên của nhóm nhạc {clean_middle} giống như {start}?",
+                    f"(2-hop) Nghệ sĩ nào cũng MEMBER_OF nhóm {clean_middle} giống như {start}?",
+                    f"(2-hop) Ai là thành viên khác của {clean_middle} cùng với {start}?",
                 ]
             },
             
             # Nhóm cùng công ty
             ('MANAGED_BY', 'MANAGED_BY'): {
                 'yes_no': [
-                    f"{start} và {end} có cùng công ty quản lý không?",
-                    f"{start} và {end} có thuộc cùng công ty {clean_middle} không?",
+                    f"(2-hop) {start} và {end} có cùng công ty quản lý {clean_middle} không?",
+                    f"(2-hop) {start} và {end} đều MANAGED_BY {clean_middle}, đúng không?",
                 ],
                 'true_false': [
-                    f"{start} và {end} đều được quản lý bởi công ty {clean_middle}.",
-                    f"{start} và {end} thuộc cùng một công ty quản lý.",
+                    f"(2-hop) {start} → MANAGED_BY → {clean_middle} và {end} → MANAGED_BY → {clean_middle}.",
+                    f"(2-hop) {start} và {end} thuộc cùng công ty quản lý {clean_middle}.",
                 ],
                 'multiple_choice': [
-                    f"Nhóm nhạc nào khác cũng được quản lý bởi công ty {clean_middle} giống như {start}?",
-                    f"Cùng được quản lý bởi {clean_middle}, nhóm nhạc nào khác ngoài {start}?",
+                    f"(2-hop) Nhóm nào cũng MANAGED_BY {clean_middle} giống như {start}?",
+                    f"(2-hop) Ngoài {start}, nhóm nào khác được quản lý bởi {clean_middle}?",
                 ]
             },
             
             # Nghệ sĩ trình bày bài hát qua nhóm
             ('MEMBER_OF', 'SINGS'): {
                 'yes_no': [
-                    f"Nghệ sĩ {start} có trình bày bài hát {clean_end} thông qua nhóm nhạc {clean_middle} không?",
+                    f"(2-hop) {start} (MEMBER_OF {clean_middle}) có trình bày bài hát {clean_end} không?",
                 ],
                 'true_false': [
-                    f"Nghệ sĩ {start} trình bày bài hát {clean_end} thông qua nhóm nhạc {clean_middle}.",
+                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} → SINGS → {clean_end}.",
                 ],
                 'multiple_choice': [
-                    f"Bài hát nào mà nghệ sĩ {start} trình bày thông qua nhóm nhạc {clean_middle}?",
+                    f"(2-hop) Bài hát nào {start} trình bày qua nhóm {clean_middle}?",
                 ]
             },
             
             # Nghệ sĩ liên quan đến công ty qua nhóm
             ('MEMBER_OF', 'MANAGED_BY'): {
                 'yes_no': [
-                    f"Nghệ sĩ {start} có được quản lý bởi công ty {clean_end} thông qua nhóm nhạc {clean_middle} không?",
+                    f"(2-hop) {start} (MEMBER_OF {clean_middle}) có được {clean_end} quản lý không?",
                 ],
                 'true_false': [
-                    f"Nghệ sĩ {start} được quản lý bởi công ty {clean_end} thông qua nhóm nhạc {clean_middle}.",
+                    f"(2-hop) {start} → MEMBER_OF → {clean_middle} → MANAGED_BY → {clean_end}.",
                 ],
                 'multiple_choice': [
-                    f"Công ty nào quản lý nghệ sĩ {start} thông qua nhóm nhạc {clean_middle}?",
+                    f"(2-hop) Công ty nào quản lý {start} thông qua nhóm {clean_middle}?",
                 ]
             },
         }
@@ -316,22 +316,22 @@ class EnhancedEvaluationGenerator:
         else:
             # Fallback: tạo câu hỏi tổng quát
             if question_type == 'yes_no':
-                question_text = f"{start} và {clean_end} có liên quan thông qua {clean_middle} không?"
+                question_text = f"(2-hop) {start} và {clean_end} có liên quan thông qua {clean_middle} không?"
             elif question_type == 'true_false':
-                question_text = f"{start} liên quan đến {clean_end} thông qua {clean_middle}."
+                question_text = f"(2-hop) {start} liên quan đến {clean_end} thông qua {clean_middle}."
             else:
-                question_text = f"Ai/cái gì liên quan đến {start} thông qua {clean_middle}?"
+                question_text = f"(2-hop) Ai/cái gì liên quan đến {start} thông qua {clean_middle}?"
         
         # Tạo answer và explanation
         if question_type == 'yes_no':
             answer = "Có"
-            explanation = f"Có, {start} → [{edge1_type}] → {clean_middle} → [{edge2_type}] → {clean_end}."
+            explanation = f"Có, đây là chuỗi 2-hop: {start} → [{edge1_type}] → {clean_middle} → [{edge2_type}] → {clean_end}."
         elif question_type == 'true_false':
             answer = "Đúng"
-            explanation = f"Đúng, {start} → [{edge1_type}] → {clean_middle} → [{edge2_type}] → {clean_end}."
+            explanation = f"Đúng, chuỗi 2-hop: {start} → [{edge1_type}] → {clean_middle} → [{edge2_type}] → {clean_end}."
         else:  # multiple_choice
             answer = "A"  # Sẽ được set sau
-            explanation = f"{clean_end} liên quan đến {start} thông qua {clean_middle}."
+            explanation = f"Chuỗi 2-hop: {start} → [{edge1_type}] → {clean_middle} → [{edge2_type}] → {clean_end}."
         
         # Tạo choices cho multiple choice
         choices = []
