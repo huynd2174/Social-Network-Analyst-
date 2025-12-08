@@ -115,7 +115,8 @@ class KpopChatbot:
         # 3. Multi-hop Reasoner
         if verbose:
             print("  🧠 Initializing Multi-hop Reasoner...")
-        self.reasoner = MultiHopReasoner(self.kg)
+        # Pass GraphRAG để reasoner có thể dùng LLM extract entities khi thiếu
+        self.reasoner = MultiHopReasoner(self.kg, graph_rag=self.rag)
         
         # 4. Small LLM (optional)
         self.llm = None
@@ -412,12 +413,23 @@ class KpopChatbot:
                         max_hops=max_hops
                     )
                 elif len(extracted) == 1:
-                    # Chỉ có 1 entity → vẫn thử reasoning (có thể tìm thêm từ graph)
-                    reasoning_result = self.reasoner.reason(
-                        query,
-                        start_entities=extracted,
-                        max_hops=max_hops
-                    )
+                    # Chỉ có 1 entity → với same_company/same_group questions, cần đủ 2
+                    if is_same_company_question or is_same_group_question:
+                        # Thử extract lại với logic mạnh hơn
+                        # Hoặc để reasoner tự extract từ query
+                        reasoning_result = self.reasoner.reason(
+                            query,
+                            start_entities=extracted,  # Có 1 entity, reasoner sẽ extract thêm
+                            max_hops=max_hops
+                        )
+                        # Nếu reasoner vẫn không extract được đủ 2, sẽ trả về lỗi rõ ràng
+                    else:
+                        # Với các câu hỏi khác, 1 entity có thể đủ
+                        reasoning_result = self.reasoner.reason(
+                            query,
+                            start_entities=extracted,
+                            max_hops=max_hops
+                        )
                 else:
                     # Không tìm được entities → reasoner sẽ tự extract
                     reasoning_result = self.reasoner.reason(
@@ -934,36 +946,74 @@ class KpopChatbot:
         # Helper: normalize và sinh variants cho một tên node
         def _variants(name: str) -> List[str]:
             base = self._normalize_entity_name(name).lower()
-            return list({  # dùng set để loại trùng
-                base,
-                base.replace('-', ' '),
-                base.replace('-', ''),
-                base.replace(' ', ''),
-            })
+            variants = {
+                base,  # Original
+                base.replace('-', ' '),  # "go-won" → "go won"
+                base.replace('-', ''),   # "go-won" → "gowon"
+                base.replace(' ', ''),   # "go won" → "gowon"
+                base.replace(' ', '-'),  # "go won" → "go-won"
+            }
+            return list(variants)  # Loại bỏ trùng lặp
 
         # ===== Graph -> Query: quét n-gram (1-4 words) để bắt cặp tên liền nhau =====
+        # QUAN TRỌNG: Xử lý tokens có dash trong đó (như "won-young")
+        # Tách tokens, nhưng cũng tách các token có dash thành nhiều parts
         tokens = query_lower.split()
+        expanded_tokens = []
+        for token in tokens:
+            expanded_tokens.append(token)  # Giữ nguyên token gốc
+            # Nếu token có dash, thêm các parts
+            if '-' in token:
+                parts = token.split('-')
+                expanded_tokens.extend(parts)  # "won-young" → ["won-young", "won", "young"]
+        
         ngrams = []
         for n in [1, 2, 3, 4]:
-            for i in range(len(tokens) - n + 1):
-                ngram = " ".join(tokens[i:i+n])
-                ngrams.append(ngram)
-                # thêm phiên bản không dấu cách để bắt "go won" vs "gowon"
-                ngrams.append(ngram.replace(" ", ""))
-                # thêm phiên bản thay space bằng gạch để bắt "jang won young" vs "jang-won-young"
-                ngrams.append(ngram.replace(" ", "-"))
+            # Tạo n-grams từ cả tokens gốc và expanded_tokens
+            for token_list in [tokens, expanded_tokens]:
+                for i in range(len(token_list) - n + 1):
+                    ngram = " ".join(token_list[i:i+n])
+                    ngrams.append(ngram)  # Original: "go won", "jang won-young", "jang won young"
+                    # thêm phiên bản không dấu cách để bắt "go won" vs "gowon"
+                    ngrams.append(ngram.replace(" ", ""))
+                    # thêm phiên bản thay space bằng gạch để bắt "jang won young" vs "jang-won-young"
+                    ngrams.append(ngram.replace(" ", "-"))
+                    # QUAN TRỌNG: Xử lý tên có dấu gạch ngang trong query
+                    # Nếu ngram có dấu gạch ngang, tạo thêm variant với space
+                    if '-' in ngram:
+                        ngrams.append(ngram.replace("-", " "))  # "won-young" → "won young", "jang won-young" → "jang won young"
+                        ngrams.append(ngram.replace("-", ""))   # "won-young" → "wonyoung"
+        
+        # Loại bỏ trùng lặp
+        ngrams = list(dict.fromkeys(ngrams))
 
         matched_from_graph = []
         candidate_scores = []  # list of (name, score, label)
         token_set = set(tokens)
 
         # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
+        # QUAN TRỌNG: Normalize và lookup với nhiều variants để cover mọi trường hợp
+        seen_entities = set()  # Tránh trùng lặp
         for ng in ngrams:
-            if ng in variant_map:
-                for ent in variant_map[ng]:
-                    if ent["label"] in ['Artist', 'Group']:
-                        candidate_scores.append((ent["name"], ent.get("score", 1.5)))
-                        matched_from_graph.append({"name": ent["name"], "score": ent.get("score", 1.5)})
+            if len(ng) < 2:
+                continue
+            # Normalize n-gram (loại bỏ spaces thừa)
+            ng_normalized = " ".join(ng.split())
+            # Tạo các lookup keys: original, normalized, lowercase
+            lookup_keys = [ng, ng_normalized, ng.lower(), ng_normalized.lower()]
+            # Loại bỏ trùng lặp
+            lookup_keys = list(dict.fromkeys(lookup_keys))
+            
+            for lookup_key in lookup_keys:
+                if lookup_key in variant_map:
+                    for ent in variant_map[lookup_key]:
+                        if ent["label"] in ['Artist', 'Group']:
+                            entity_name = ent["name"]
+                            # Tránh trùng lặp
+                            if entity_name not in seen_entities:
+                                seen_entities.add(entity_name)
+                                candidate_scores.append((entity_name, ent.get("score", 1.5)))
+                                matched_from_graph.append({"name": entity_name, "score": ent.get("score", 1.5)})
 
         # Search for group/company/song/album/genre/occupation in query (case-insensitive) - ưu tiên match exact/variant
         def _match_list(nodes: List[str], score_val: float, label: str):
@@ -996,19 +1046,29 @@ class KpopChatbot:
         query_words_list = query_lower.split()  # List để giữ thứ tự
         query_text = query_lower  # Full query text để check substring
         
+        # Helper: normalize unicode để match tốt hơn (Rosé vs rosé)
+        import unicodedata
+        def normalize_unicode(text: str) -> str:
+            """Normalize unicode để match tốt hơn (é → e, nhưng giữ nguyên nếu cần)"""
+            # Giữ nguyên để match chính xác hơn với tên có dấu
+            return text.lower()
+        
         for artist in all_artists:
             artist_lower = artist.lower()
             # Extract base name (không có đuôi)
             base_name = self._normalize_entity_name(artist)
             base_name_lower = base_name.lower()
             
-            # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "blackpink"
+            # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
-                base_name_lower,
-                base_name_lower.replace('-', ' '),  # "g-dragon" → "g dragon"
-                base_name_lower.replace('-', ''),    # "g-dragon" → "gdragon"
-                base_name_lower.replace(' ', ''),    # "black pink" → "blackpink"
+                base_name_lower,  # Original
+                base_name_lower.replace('-', ' '),  # "g-dragon" → "g dragon", "go-won" → "go won"
+                base_name_lower.replace('-', ''),    # "g-dragon" → "gdragon", "go-won" → "gowon"
+                base_name_lower.replace(' ', ''),    # "black pink" → "blackpink", "go won" → "gowon"
+                base_name_lower.replace(' ', '-'),   # "go won" → "go-won", "jang won young" → "jang-won-young"
             ]
+            # Loại bỏ trùng lặp
+            base_name_variants = list(dict.fromkeys(base_name_variants))
             
             # Method 1: Check nếu base name hoặc variants là một từ trong query (exact match)
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
@@ -1017,9 +1077,86 @@ class KpopChatbot:
                     found_artists.append(artist)
                     continue
             
-            # (Bỏ method substring lỏng để tránh match sai; chỉ dùng exact/variant và dash check)
+            # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp như "Cho Seung-youn"
+            # Tạo n-grams từ query (2-3 words)
+            query_ngrams = []
+            for n in [2, 3]:
+                for i in range(len(query_words_list) - n + 1):
+                    ngram = " ".join(query_words_list[i:i+n])
+                    query_ngrams.append(ngram)
+                    # Thêm variant không có space
+                    query_ngrams.append(ngram.replace(" ", ""))
+                    # Thêm variant với dash
+                    query_ngrams.append(ngram.replace(" ", "-"))
+                    # QUAN TRỌNG: Nếu ngram có dấu gạch ngang, tạo thêm variants
+                    if '-' in ngram:
+                        query_ngrams.append(ngram.replace("-", " "))  # "jeong-yeon" → "jeong yeon"
+                        query_ngrams.append(ngram.replace("-", ""))     # "jeong-yeon" → "jeongyeon"
             
-            # Method 3: Check từng word trong query với base name và variants (strict, tránh match nhầm)
+            # Check nếu base name hoặc variants match với n-gram
+            for ngram in query_ngrams:
+                if len(ngram) < 3:
+                    continue
+                for variant in base_name_variants:
+                    # Exact match hoặc substring match
+                    if variant == ngram or variant in ngram or ngram in variant:
+                        if artist not in found_artists:
+                            found_artists.append(artist)
+                            break
+                    # QUAN TRỌNG: Nếu cả 2 đều có dấu gạch ngang, so sánh parts
+                    elif '-' in variant and '-' in ngram:
+                        variant_parts = set(variant.split('-'))
+                        ngram_parts = set(ngram.split('-'))
+                        # Nếu có ít nhất 2 parts giống nhau → match (cho tên như "yoo-jeong-yeon")
+                        if len(variant_parts.intersection(ngram_parts)) >= 2:
+                            if artist not in found_artists:
+                                found_artists.append(artist)
+                                break
+                    # Tương tự với space: "yoo jeong yeon" vs "yoo jeong-yeon"
+                    elif ' ' in variant and '-' in ngram:
+                        variant_parts = set(variant.split(' '))
+                        ngram_parts = set(ngram.split('-'))
+                        if len(variant_parts.intersection(ngram_parts)) >= 2:
+                            if artist not in found_artists:
+                                found_artists.append(artist)
+                                break
+                    elif '-' in variant and ' ' in ngram:
+                        variant_parts = set(variant.split('-'))
+                        ngram_parts = set(ngram.split(' '))
+                        if len(variant_parts.intersection(ngram_parts)) >= 2:
+                            if artist not in found_artists:
+                                found_artists.append(artist)
+                                break
+                if artist in found_artists:
+                    break
+            
+            if artist in found_artists:
+                continue
+            
+            # Method 3: Check substring match (cho tên phức tạp như "Cho Seung-youn")
+            # Chỉ check nếu base name có độ dài hợp lý (≥4 chars) để tránh match sai
+            if len(base_name_lower) >= 4:
+                for variant in base_name_variants:
+                    if len(variant) >= 4 and variant in query_lower:
+                        # Verify: phải có ít nhất 2 từ trong variant xuất hiện trong query
+                        variant_words = variant.split()
+                        if len(variant_words) >= 2:
+                            # Check xem có ít nhất 2 từ trong variant xuất hiện trong query không
+                            matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
+                            if matched_words >= 2:
+                                if artist not in found_artists:
+                                    found_artists.append(artist)
+                                    break
+                        elif len(variant_words) == 1 and variant in query_lower:
+                            # Single word variant: check exact match hoặc trong từ đầy đủ
+                            if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
+                                if artist not in found_artists:
+                                    found_artists.append(artist)
+                                    break
+                if artist in found_artists:
+                    continue
+            
+            # Method 4: Check từng word trong query với base name và variants (strict, tránh match nhầm)
             for word in query_words_list:
                 if len(word) < 3:  # Skip short words
                     continue
@@ -1154,16 +1291,64 @@ class KpopChatbot:
         """Sinh các biến thể đơn giản của một tên entity."""
         base = self._normalize_entity_name(name).lower()
         variants = {
-            base,
-            base.replace('-', ' '),
-            base.replace('-', ''),
-            base.replace(' ', ''),
+            base,  # Original: "jang won-young"
+            base.replace('-', ' '),  # "jang won-young" → "jang won young", "go-won" → "go won"
+            base.replace('-', ''),   # "jang won-young" → "jangwonyoung", "go-won" → "gowon"
+            base.replace(' ', ''),   # "jang won-young" → "jangwon-young", "go won" → "gowon"
+            base.replace(' ', '-'),  # "jang won-young" → "jang-won-young", "go won" → "go-won"
         }
-        # Nếu có gạch, thêm bản tách gạch với nhiều space
+        
+        # QUAN TRỌNG: Xử lý tên có CẢ dash VÀ space như "jang won-young"
+        # Tách thành các parts (cả dash và space đều là separator)
+        # "jang won-young" → ["jang", "won", "young"]
+        all_parts = []
+        # Tách theo dash trước
+        for part in base.split('-'):
+            # Mỗi part có thể có space, tách tiếp
+            all_parts.extend(part.split())
+        # Loại bỏ empty parts
+        all_parts = [p for p in all_parts if p]
+        
+        if len(all_parts) >= 2:
+            # Tạo variants với tất cả các combinations
+            # "jang won-young" → ["jang", "won", "young"]
+            variants.add(" ".join(all_parts))  # "jang won young"
+            variants.add("-".join(all_parts))  # "jang-won-young"
+            variants.add("".join(all_parts))   # "jangwonyoung"
+            
+            # Tạo các combinations: một số parts có dash, một số có space
+            # "jang won-young" → "jang won-young", "jang-won young", etc.
+            if len(all_parts) == 3:
+                # 3 parts: có thể có 2 dash positions
+                variants.add(f"{all_parts[0]} {all_parts[1]}-{all_parts[2]}")  # "jang won-young"
+                variants.add(f"{all_parts[0]}-{all_parts[1]} {all_parts[2]}")  # "jang-won young"
+                variants.add(f"{all_parts[0]}-{all_parts[1]}-{all_parts[2]}")  # "jang-won-young"
+                variants.add(f"{all_parts[0]} {all_parts[1]} {all_parts[2]}")  # "jang won young"
+        
+        # Nếu có gạch, thêm bản tách gạch với nhiều space và combinations
         if '-' in base:
             parts = base.split('-')
-            variants.add(" ".join(parts))
-            variants.add("".join(parts))
+            # "yoo-jeong-yeon" → ["yoo", "jeong", "yeon"]
+            variants.add(" ".join(parts))  # "yoo jeong yeon"
+            variants.add("".join(parts))   # "yoojeongyeon"
+            # Thêm các combinations: "yoo jeong-yeon", "yoo-jeong yeon", etc.
+            for i in range(len(parts)):
+                # Tạo variant với một số phần có gạch, một số có space
+                if i < len(parts) - 1:
+                    variant_parts = parts.copy()
+                    variant_parts[i] = variant_parts[i] + "-" + variant_parts[i+1]
+                    variant_parts.pop(i+1)
+                    variants.add(" ".join(variant_parts))
+        # Nếu có space, thêm variant với gạch và các combinations
+        if ' ' in base:
+            parts = base.split(' ')
+            # "go won" → ["go", "won"]
+            variants.add("-".join(parts))  # "go-won"
+            variants.add("".join(parts))   # "gowon"
+            # Với tên dài hơn: "jang won young" → "jang-won-young", "jangwonyoung"
+            if len(parts) > 2:
+                variants.add("-".join(parts))  # "jang-won-young"
+                variants.add("".join(parts))   # "jangwonyoung"
         return list(variants)
     
     def _ensure_entity_variant_map(self):
@@ -1200,14 +1385,33 @@ class KpopChatbot:
             if base_lower in alias_map:
                 extra_alias = alias_map[base_lower]
             
-            all_variants = set(base_variants + extra_alias)
+            # QUAN TRỌNG: Tạo thêm variants từ base_name (không chỉ từ node)
+            # Đảm bảo cover được cả base_name variants
+            base_name_variants = self._generate_variants(base_name)
+            
+            all_variants = set(base_variants + base_name_variants + extra_alias)
+            
+            # Thêm cả full node name (có thể có đuôi) và base name
+            all_variants.add(node.lower())
+            all_variants.add(base_name.lower())
+            
             for v in all_variants:
                 if len(v) < 2:
                     continue
+                # Normalize: loại bỏ spaces thừa
+                v = " ".join(v.split())
+                if len(v) < 2:
+                    continue
+                    
                 if v not in variant_map:
                     variant_map[v] = []
-                # Score: alias cao hơn một chút
-                score = 2.0 if v in extra_alias else 1.5
+                # Score: alias cao hơn một chút, base name variants cao hơn node variants
+                if v in extra_alias:
+                    score = 2.0
+                elif v in base_name_variants:
+                    score = 1.6
+                else:
+                    score = 1.5
                 variant_map[v].append({
                     "name": node,
                     "label": label,

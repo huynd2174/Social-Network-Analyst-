@@ -67,9 +67,10 @@ class MultiHopReasoner:
     multiple relationships and entity types.
     """
     
-    def __init__(self, knowledge_graph: Optional[KpopKnowledgeGraph] = None):
-        """Initialize with knowledge graph."""
+    def __init__(self, knowledge_graph: Optional[KpopKnowledgeGraph] = None, graph_rag: Optional['GraphRAG'] = None):
+        """Initialize with knowledge graph and optional GraphRAG for LLM entity extraction."""
         self.kg = knowledge_graph or KpopKnowledgeGraph()
+        self.graph_rag = graph_rag  # GraphRAG instance để dùng LLM extract entities khi thiếu
         
         # Query templates for different reasoning patterns
         self._init_query_templates()
@@ -236,15 +237,17 @@ class MultiHopReasoner:
                                 )
             
             # Pattern 2: "X có phải thành viên của Y không?" (artist is member of group)
-            # Extract artist and group names from query
+            # Extract artist and group names từ query với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
             artist_entity = None
             group_entity = None
             
-            for entity in start_entities:
+            for entity in all_entities:
                 entity_type = self.kg.get_entity_type(entity)
-                if entity_type == 'Artist':
+                if entity_type == 'Artist' and not artist_entity:
                     artist_entity = entity
-                elif entity_type == 'Group':
+                elif entity_type == 'Group' and not group_entity:
                     group_entity = entity
             
             if artist_entity and group_entity:
@@ -313,35 +316,34 @@ class MultiHopReasoner:
         
         # Fallback: Câu hỏi về thành viên (không phải Yes/No)
         if any(kw in query_lower for kw in ['thành viên', 'members', 'member']) and 'có phải' not in query_lower and 'không' not in query_lower:
-            for entity in start_entities:
+            # Extract group entity với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Group'])
+            
+            for entity in all_entities:
                 entity_type = self.kg.get_entity_type(entity)
                 if entity_type == 'Group':
                     return self.get_group_members(entity)
         
         # 1c. Câu hỏi về nhóm nhạc của artist: "Lisa thuộc nhóm nhạc nào", "Nhóm nào có Lisa"
         if any(kw in query_lower for kw in ['thuộc nhóm', 'thuộc nhóm nhạc', 'nhóm nào', 'nhóm nhạc nào', 'belongs to group', 'group of']):
-            # Tìm artist entity từ start_entities
+            # Extract artist entity với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Artist'])
+            
             artist_entity = None
-            for entity in start_entities:
-                entity_type = self.kg.get_entity_type(entity)
-                if entity_type == 'Artist':
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Artist':
                     artist_entity = entity
                     break
-            
-            # Nếu không tìm được từ start_entities, extract từ query
-            if not artist_entity:
-                extracted = self._extract_entities_from_query(query)
-                for e in extracted:
-                    if self.kg.get_entity_type(e) == 'Artist':
-                        artist_entity = e
-                        break
             
             if artist_entity:
                 return self.get_artist_groups(artist_entity)
                     
         # 2. Câu hỏi về công ty: "Công ty nào quản lý BTS", "BLACKPINK thuộc công ty nào"
         if any(kw in query_lower for kw in ['công ty', 'company', 'label', 'hãng', 'quản lý']):
-            for entity in start_entities:
+            # Extract entities với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Group', 'Artist'])
+            
+            for entity in all_entities:
                 entity_type = self.kg.get_entity_type(entity)
                 if entity_type == 'Group':
                     return self.get_company_of_group(entity)
@@ -349,17 +351,47 @@ class MultiHopReasoner:
                     return self.get_artist_company(entity)
                     
         # 3. Câu hỏi so sánh công ty: "BTS và SEVENTEEN có cùng công ty không"
-        if any(kw in query_lower for kw in ['cùng công ty', 'same company', 'cùng hãng', 'cùng label', 'cùng hãng đĩa']):
+        if any(kw in query_lower for kw in ['cùng công ty', 'same company', 'cùng hãng', 'cùng label', 'cùng hãng đĩa', 'cùng công ty quản lý']):
+            # QUAN TRỌNG: Phải có đủ 2 entities để so sánh
             # Nếu không có đủ 2 entities, tự extract từ query (case-insensitive)
             if len(start_entities) < 2:
                 # Tự extract entities từ query
                 extracted = self._extract_entities_from_query(query)
-                if len(extracted) >= 2:
-                    return self.check_same_company(extracted[0], extracted[1])
-                elif len(extracted) == 1 and len(start_entities) == 1:
-                    # Có 1 từ query, 1 từ start_entities
-                    return self.check_same_company(start_entities[0], extracted[0])
+                # Combine với start_entities nếu có
+                all_entities = list(start_entities) + [e for e in extracted if e not in start_entities]
+                
+                # Nếu vẫn thiếu, dùng LLM để vá
+                if len(all_entities) < 2:
+                    llm_entities = self._extract_entities_with_llm_fallback(query, all_entities)
+                    all_entities.extend(llm_entities)
+                
+                if len(all_entities) >= 2:
+                    # Có đủ 2 entities → so sánh
+                    return self.check_same_company(all_entities[0], all_entities[1])
+                elif len(all_entities) == 1:
+                    # Chỉ có 1 entity → không đủ để so sánh, trả về lỗi rõ ràng
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ/nhóm nhạc.",
+                        confidence=0.0,
+                        explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh công ty"
+                    )
+                else:
+                    # Không tìm được entity nào
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text="Không tìm thấy thông tin về các nghệ sĩ/nhóm nhạc trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                        confidence=0.0,
+                        explanation="Không extract được entities từ query"
+                    )
             elif len(start_entities) >= 2:
+                # Có đủ 2 entities từ start_entities → so sánh ngay
                 return self.check_same_company(start_entities[0], start_entities[1])
         
         # 3.5. Câu hỏi so sánh nhóm nhạc: "Lisa và Jennie có cùng nhóm nhạc không"
@@ -374,21 +406,37 @@ class MultiHopReasoner:
             elif len(start_entities) < 2:
                 # Tự extract entities từ query (case-insensitive)
                 extracted = self._extract_entities_from_query(query)
-                if len(extracted) >= 2:
-                    return self.check_same_group(extracted[0], extracted[1])
-                elif len(extracted) == 1 and len(start_entities) == 1:
-                    # Có 1 từ query, 1 từ start_entities
-                    return self.check_same_group(start_entities[0], extracted[0])
-                elif len(extracted) == 1:
+                # Combine với start_entities nếu có
+                all_entities = list(start_entities) + [e for e in extracted if e not in start_entities]
+                
+                # Nếu vẫn thiếu, dùng LLM để vá
+                if len(all_entities) < 2:
+                    llm_entities = self._extract_entities_with_llm_fallback(query, all_entities)
+                    all_entities.extend(llm_entities)
+                
+                if len(all_entities) >= 2:
+                    return self.check_same_group(all_entities[0], all_entities[1])
+                elif len(all_entities) == 1:
                     # Chỉ có 1 entity → không đủ để so sánh
                     return ReasoningResult(
                         query=query,
                         reasoning_type=ReasoningType.COMPARISON,
                         steps=[],
                         answer_entities=[],
-                        answer_text="Không tìm đủ thông tin để so sánh. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                        answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
                         confidence=0.0,
-                        explanation="Cần ít nhất 2 entities để so sánh cùng nhóm"
+                        explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh cùng nhóm"
+                    )
+                else:
+                    # Không tìm được entity nào
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                        confidence=0.0,
+                        explanation="Không extract được entities từ query"
                     )
                 
         # 4. Câu hỏi về nhóm cùng công ty: "Các nhóm cùng công ty với BTS"
@@ -1083,6 +1131,84 @@ class MultiHopReasoner:
             explanation=f"2-hop: {artist_name} → MEMBER_OF → Group → MANAGED_BY → Company"
         )
     
+    def _extract_entities_with_llm_fallback(self, query: str, existing_entities: List[str]) -> List[str]:
+        """
+        Dùng LLM để extract thêm entities khi rule-based không đủ.
+        Đảm bảo không trùng với existing_entities.
+        
+        Args:
+            query: User query
+            existing_entities: List entities đã extract được (không trùng)
+            
+        Returns:
+            List entities mới từ LLM (không trùng với existing_entities)
+        """
+        if not self.graph_rag or not self.graph_rag.llm_for_understanding:
+            return []
+        
+        try:
+            # Gọi LLM để extract entities
+            llm_entities = self.graph_rag._extract_entities_with_llm(query)
+            new_entities = []
+            existing_lower = {e.lower() for e in existing_entities}
+            
+            for llm_e in llm_entities:
+                entity_id = llm_e.get('text', '')
+                if entity_id and entity_id.lower() not in existing_lower:
+                    # Validate với KG
+                    entity_data = self.kg.get_entity(entity_id)
+                    if entity_data:
+                        new_entities.append(entity_id)
+                        existing_lower.add(entity_id.lower())  # Tránh trùng
+            
+            return new_entities
+        except Exception as e:
+            # Nếu LLM fail, return empty list
+            return []
+    
+    def _extract_entities_robust(self, query: str, start_entities: List[str], min_count: int = 1, expected_types: Optional[List[str]] = None) -> List[str]:
+        """
+        Extract entities từ query một cách robust với LLM fallback.
+        Áp dụng cho TẤT CẢ các usecase.
+        
+        Args:
+            query: User query
+            start_entities: Entities đã có sẵn
+            min_count: Số lượng entities tối thiểu cần extract
+            expected_types: Loại entities mong đợi (Artist, Group, Company, etc.) - None = tất cả
+            
+        Returns:
+            List entities đã extract (không trùng, đã validate với KG)
+        """
+        # 1. Bắt đầu với start_entities
+        all_entities = list(start_entities)
+        
+        # 2. Rule-based extraction từ query
+        extracted = self._extract_entities_from_query(query)
+        # Combine với start_entities (không trùng)
+        for e in extracted:
+            if e not in all_entities:
+                # Filter theo expected_types nếu có
+                if expected_types:
+                    entity_type = self.kg.get_entity_type(e)
+                    if entity_type not in expected_types:
+                        continue
+                all_entities.append(e)
+        
+        # 3. Nếu vẫn thiếu, dùng LLM để vá
+        if len(all_entities) < min_count:
+            llm_entities = self._extract_entities_with_llm_fallback(query, all_entities)
+            for e in llm_entities:
+                if e not in all_entities:
+                    # Filter theo expected_types nếu có
+                    if expected_types:
+                        entity_type = self.kg.get_entity_type(e)
+                        if entity_type not in expected_types:
+                            continue
+                    all_entities.append(e)
+        
+        return all_entities
+    
     def _extract_entities_from_query(self, query: str) -> List[str]:
         """
         Extract entity names from query (case-insensitive).
@@ -1101,34 +1227,101 @@ class MultiHopReasoner:
         # QUAN TRỌNG: Xử lý node có đuôi như "Lisa (ca sĩ)"
         query_words_list = query_lower.split()  # List để giữ thứ tự
         
+        # Tạo n-grams từ query (2-4 words) để bắt tên phức tạp như "Cho Seung-youn", "Jang Won Young", "jang won-young"
+        # QUAN TRỌNG: Xử lý tokens có dash trong đó (như "won-young")
+        expanded_words = []
+        for word in query_words_list:
+            expanded_words.append(word)  # Giữ nguyên
+            if '-' in word:
+                # Tách token có dash thành parts
+                parts = word.split('-')
+                expanded_words.extend(parts)  # "won-young" → ["won-young", "won", "young"]
+        
+        query_ngrams = []
+        for n in [2, 3, 4]:  # Tăng lên 4 để bắt tên dài như "Jang Won Young"
+            # Tạo n-grams từ cả query_words_list và expanded_words
+            for word_list in [query_words_list, expanded_words]:
+                for i in range(len(word_list) - n + 1):
+                    ngram = " ".join(word_list[i:i+n])
+                    query_ngrams.append(ngram)  # Original: "jang won-young", "jang won young"
+                    # Thêm variant không có space: "jangwonyoung"
+                    query_ngrams.append(ngram.replace(" ", ""))
+                    # Thêm variant với dash: "jang-won-young"
+                    query_ngrams.append(ngram.replace(" ", "-"))
+                    # QUAN TRỌNG: Nếu ngram có dấu gạch ngang, tạo thêm variant với space
+                    if '-' in ngram:
+                        query_ngrams.append(ngram.replace("-", " "))  # "jang won-young" → "jang won young", "won-young" → "won young"
+                        query_ngrams.append(ngram.replace("-", ""))   # "won-young" → "wonyoung"
+        
+        # Loại bỏ trùng lặp
+        query_ngrams = list(dict.fromkeys(query_ngrams))
+        
         for artist in all_artists:
             artist_lower = artist.lower()
             # Extract base name (không có đuôi)
             base_name = self._normalize_entity_name(artist)
             base_name_lower = base_name.lower()
             
-            # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon"
+            # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
-                base_name_lower,
-                base_name_lower.replace('-', ' '),  # "g-dragon" → "g dragon"
-                base_name_lower.replace('-', ''),    # "g-dragon" → "gdragon"
-                base_name_lower.replace(' ', ''),    # "black pink" → "blackpink"
+                base_name_lower,  # Original
+                base_name_lower.replace('-', ' '),  # "g-dragon" → "g dragon", "go-won" → "go won"
+                base_name_lower.replace('-', ''),    # "g-dragon" → "gdragon", "go-won" → "gowon"
+                base_name_lower.replace(' ', ''),    # "black pink" → "blackpink", "go won" → "gowon"
+                base_name_lower.replace(' ', '-'),   # "go won" → "go-won", "jang won young" → "jang-won-young"
             ]
+            # Loại bỏ trùng lặp
+            base_name_variants = list(dict.fromkeys(base_name_variants))
             
-            # Check nếu base name hoặc variants là một từ trong query
+            # Method 1: Check nếu base name hoặc variants là một từ trong query
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
             if any(variant in query_words_list for variant in base_name_variants):
                 if artist not in entities:
                     entities.append(artist)
                     continue
             
-            # Check nếu base name hoặc variants xuất hiện trong query text
+            # Method 2: Check n-gram matching (2-3 words) để bắt tên phức tạp
+            for ngram in query_ngrams:
+                if len(ngram) < 3:
+                    continue
+                for variant in base_name_variants:
+                    if variant == ngram or variant in ngram or ngram in variant:
+                        if artist not in entities:
+                            entities.append(artist)
+                            break
+                if artist in entities:
+                    break
+            
+            if artist in entities:
+                continue
+            
+            # Method 3: Check substring match (cho tên phức tạp)
+            if len(base_name_lower) >= 4:
+                for variant in base_name_variants:
+                    if len(variant) >= 4 and variant in query_lower:
+                        # Verify: phải có ít nhất 2 từ trong variant xuất hiện trong query
+                        variant_words = variant.split()
+                        if len(variant_words) >= 2:
+                            matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
+                            if matched_words >= 2:
+                                if artist not in entities:
+                                    entities.append(artist)
+                                    break
+                        elif len(variant_words) == 1 and variant in query_lower:
+                            if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
+                                if artist not in entities:
+                                    entities.append(artist)
+                                    break
+                if artist in entities:
+                    continue
+            
+            # Method 4: Check nếu base name hoặc variants xuất hiện trong query text
             if any(variant in query_lower for variant in base_name_variants if len(variant) >= 3):
                 if artist not in entities:
                     entities.append(artist)
                     continue
             
-            # Check từng word trong query với base name và variants
+            # Method 5: Check từng word trong query với base name và variants
             for word in query_words_list:
                 if len(word) < 3:  # Skip short words
                     continue
