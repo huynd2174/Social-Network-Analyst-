@@ -1286,6 +1286,9 @@ class MultiHopReasoner:
         
         # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
         normalized_seen = set()
+        # Track các từ đã được match trong tên đầy đủ để tránh match single word khi đã có match đầy đủ
+        # Ví dụ: nếu đã match "Yoo Jeong-yeon", thì không match "Yoo" nữa
+        words_in_matched_full_names = set()
         
         # QUAN TRỌNG: Sắp xếp artists theo độ dài tên (dài trước) để ưu tiên match tên đầy đủ trước
         # Ví dụ: "Yoo Jeong-yeon" sẽ được duyệt trước "Yoo" để match đúng
@@ -1300,6 +1303,9 @@ class MultiHopReasoner:
             # Check duplicate bằng normalized name TRƯỚC khi match
             if base_name_lower in normalized_seen:
                 continue  # Đã có entity với cùng normalized name
+            
+            # QUAN TRỌNG: Định nghĩa base_name_word_count TRƯỚC khi dùng
+            base_name_word_count = len(base_name_lower.split())
             
             # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
@@ -1325,8 +1331,37 @@ class MultiHopReasoner:
                         if base_name_lower not in normalized_seen:
                             entities.append(artist)
                             normalized_seen.add(base_name_lower)
+                            # Track các từ trong tên đầy đủ đã match để tránh match single word sau
+                            if base_name_word_count >= 2:
+                                words_in_matched_full_names.update(base_name_lower.split())
                             break
-                    # Substring match (variant trong ngram hoặc ngược lại)
+                    # QUAN TRỌNG: Xử lý tên có dash trước khi check substring
+                    # Normalize cả 2 về cùng format để so sánh chính xác hơn
+                    elif '-' in variant or '-' in ngram:
+                        # Normalize cả 2 về cùng format (space) để so sánh
+                        variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
+                        ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
+                        # Exact match sau khi normalize
+                        if variant_normalized == ngram_normalized:
+                            if base_name_lower not in normalized_seen:
+                                entities.append(artist)
+                                normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
+                                break
+                        # So sánh parts: nếu có ít nhất 2 parts giống nhau → match
+                        variant_parts = set(variant_normalized.split())
+                        ngram_parts = set(ngram_normalized.split())
+                        if len(variant_parts.intersection(ngram_parts)) >= 2:
+                            if base_name_lower not in normalized_seen:
+                                entities.append(artist)
+                                normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
+                                break
+                    # Substring match (variant trong ngram hoặc ngược lại) - chỉ khi không có dash
                     elif variant in ngram or ngram in variant:
                         # Verify: nếu cả 2 đều có nhiều từ, phải có ít nhất 2 từ trùng
                         variant_words = variant.split()
@@ -1339,12 +1374,18 @@ class MultiHopReasoner:
                                 if base_name_lower not in normalized_seen:
                                     entities.append(artist)
                                     normalized_seen.add(base_name_lower)
+                                    # Track các từ trong tên đầy đủ đã match
+                                    if base_name_word_count >= 2:
+                                        words_in_matched_full_names.update(base_name_lower.split())
                                     break
                         else:
                             # Nếu một trong 2 chỉ có 1 từ, chỉ cần exact match hoặc substring match
                             if base_name_lower not in normalized_seen:
                                 entities.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(base_name_lower.split())
                                 break
                     # QUAN TRỌNG: Xử lý tên có cả space và dash như "Cho Seung-youn", "Yoo Jeong-yeon"
                     # So sánh parts: "cho seung-youn" vs "cho seung youn" hoặc "cho-seung-youn"
@@ -1357,6 +1398,9 @@ class MultiHopReasoner:
                             if base_name_lower not in normalized_seen:
                                 entities.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                         # So sánh parts
                         variant_parts = set(variant_normalized.split())
@@ -1366,6 +1410,9 @@ class MultiHopReasoner:
                             if base_name_lower not in normalized_seen:
                                 entities.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                 if base_name_lower in normalized_seen:
                     break
@@ -1375,9 +1422,14 @@ class MultiHopReasoner:
             
             # Method 1: Check nếu base name hoặc variants là một từ trong query
             # QUAN TRỌNG: Chỉ chạy nếu base_name chỉ có 1 từ (tránh match "Yoo" với "Yoo Jeong-yeon")
+            # VÀ từ đó chưa được match trong tên đầy đủ nào (tránh match "Yoo" khi đã match "Yoo Jeong-yeon")
             # Ví dụ: query "lisa có cùng nhóm" → word "lisa" match với base_name "lisa"
             base_name_word_count = len(base_name_lower.split())
             if base_name_word_count == 1:
+                # Check xem từ này đã được match trong tên đầy đủ nào chưa
+                if base_name_lower in words_in_matched_full_names:
+                    continue  # Đã được match trong tên đầy đủ, không match single word nữa
+                
                 if any(variant in query_words_list for variant in base_name_variants):
                     entities.append(artist)
                     normalized_seen.add(base_name_lower)
@@ -1423,6 +1475,10 @@ class MultiHopReasoner:
             for word in query_words_list:
                 if len(word) < 3:  # Skip short words
                     continue
+                
+                # QUAN TRỌNG: Check xem từ này đã được match trong tên đầy đủ nào chưa
+                if word in words_in_matched_full_names:
+                    continue  # Đã được match trong tên đầy đủ, không match single word nữa
                 
                 # Chỉ match single word nếu base_name cũng chỉ có 1 từ (tránh match sai)
                 if base_name_word_count == 1:

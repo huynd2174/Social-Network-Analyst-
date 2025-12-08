@@ -993,6 +993,9 @@ class KpopChatbot:
 
         # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
         normalized_seen = set()
+        # Track các từ đã được match trong tên đầy đủ để tránh match single word khi đã có match đầy đủ
+        # Ví dụ: nếu đã match "Yoo Jeong-yeon", thì không match "Yoo" nữa
+        words_in_matched_full_names = set()
         
         # QUAN TRỌNG: Định nghĩa query_words_list TRƯỚC function _match_list để có thể sử dụng
         query_words_list = query_lower.split()  # List để giữ thứ tự
@@ -1133,6 +1136,9 @@ class KpopChatbot:
             if base_name_lower in normalized_seen:
                 continue
             
+            # QUAN TRỌNG: Định nghĩa base_name_word_count TRƯỚC khi dùng
+            base_name_word_count = len(base_name_lower.split())
+            
             # Tạo variants để match với nhiều format: "g-dragon", "g dragon", "gdragon", "go won", "go-won", "gowon"
             base_name_variants = [
                 base_name_lower,  # Original
@@ -1173,6 +1179,9 @@ class KpopChatbot:
                         if base_name_lower not in normalized_seen:
                             found_artists.append(artist)
                             normalized_seen.add(base_name_lower)
+                            # Track các từ trong tên đầy đủ đã match để tránh match single word sau
+                            if base_name_word_count >= 2:
+                                words_in_matched_full_names.update(base_name_lower.split())
                             break
                     # Substring match (variant trong ngram hoặc ngược lại)
                     elif variant in ngram or ngram in variant:
@@ -1187,12 +1196,18 @@ class KpopChatbot:
                                 if base_name_lower not in normalized_seen:
                                     found_artists.append(artist)
                                     normalized_seen.add(base_name_lower)
+                                    # Track các từ trong tên đầy đủ đã match
+                                    if base_name_word_count >= 2:
+                                        words_in_matched_full_names.update(base_name_lower.split())
                                     break
                         else:
                             # Nếu một trong 2 chỉ có 1 từ, chỉ cần exact match hoặc substring match
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(base_name_lower.split())
                                 break
                     # QUAN TRỌNG: Nếu cả 2 đều có dấu gạch ngang, so sánh parts
                     elif '-' in variant and '-' in ngram:
@@ -1203,6 +1218,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                         # So sánh parts
                         variant_parts = set(variant.split('-'))
@@ -1212,6 +1230,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                     # Tương tự với space: "yoo jeong yeon" vs "yoo jeong-yeon"
                     elif ' ' in variant and '-' in ngram:
@@ -1222,6 +1243,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                         # So sánh parts
                         variant_parts = set(variant.split(' '))
@@ -1230,6 +1254,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                     elif '-' in variant and ' ' in ngram:
                         # Normalize cả 2 về cùng format (space) để so sánh exact match
@@ -1239,6 +1266,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                         # So sánh parts
                         variant_parts = set(variant.split('-'))
@@ -1247,6 +1277,9 @@ class KpopChatbot:
                             if base_name_lower not in normalized_seen:
                                 found_artists.append(artist)
                                 normalized_seen.add(base_name_lower)
+                                # Track các từ trong tên đầy đủ đã match
+                                if base_name_word_count >= 2:
+                                    words_in_matched_full_names.update(variant_normalized.split())
                                 break
                 if base_name_lower in normalized_seen:
                     break
