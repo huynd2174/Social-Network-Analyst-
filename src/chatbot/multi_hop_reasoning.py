@@ -1402,8 +1402,9 @@ class MultiHopReasoner:
                                 break
                 if matched_in_ngram:
                     break
-                if base_name_lower in normalized_seen:
-                    break
+            # QUAN TRỌNG: Nếu đã match trong n-gram, skip tất cả các method khác
+            if matched_in_ngram:
+                continue
             
             if base_name_lower in normalized_seen:
                 continue
