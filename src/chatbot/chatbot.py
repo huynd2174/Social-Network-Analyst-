@@ -806,10 +806,10 @@ class KpopChatbot:
                 base.replace(' ', ''),
             })
 
-        # ===== Graph -> Query: quét n-gram (2-4 words) để bắt cặp tên liền nhau =====
+        # ===== Graph -> Query: quét n-gram (1-4 words) để bắt cặp tên liền nhau =====
         tokens = query_lower.split()
         ngrams = []
-        for n in [2, 3, 4]:
+        for n in [1, 2, 3, 4]:
             for i in range(len(tokens) - n + 1):
                 ngram = " ".join(tokens[i:i+n])
                 ngrams.append(ngram)
@@ -837,8 +837,7 @@ class KpopChatbot:
                 entities.append(group)
                 break
         
-        # Search for artist names in query (case-insensitive) - TÌM TẤT CẢ, không chỉ 1
-        # QUAN TRỌNG: Xử lý node có đuôi như "Lisa (ca sĩ)", "Jennie (rapper)"
+        # Search for artist names trong câu hỏi (query -> graph) - bắt exact/variant, tránh substring lỏng
         found_artists = []
         query_words_list = query_lower.split()  # List để giữ thứ tự
         query_text = query_lower  # Full query text để check substring
@@ -864,13 +863,7 @@ class KpopChatbot:
                     found_artists.append(artist)
                     continue
             
-            # Method 2: Check nếu base name hoặc variants xuất hiện trong query (substring match)
-            # Ví dụ: query "jungkook và lisa" → "jungkook" match với "Jungkook"
-            # QUAN TRỌNG: Xử lý "g-dragon" và "blackpink" (lowercase, không space)
-            if any(variant in query_text for variant in base_name_variants if len(variant) >= 3):
-                if artist not in found_artists:
-                    found_artists.append(artist)
-                    continue
+            # (Bỏ method substring lỏng để tránh match sai; chỉ dùng exact/variant và dash check)
             
             # Method 3: Check từng word trong query với base name và variants (strict, tránh match nhầm)
             for word in query_words_list:
@@ -900,9 +893,16 @@ class KpopChatbot:
             for m in matched_from_graph_sorted:
                 if m['name'] not in entities:
                     entities.append(m['name'])
-            # Nếu đã có đủ 2 thực thể từ n-gram, ưu tiên trả về sớm (tránh nhiễu)
-            if len(entities) >= 2:
-                return entities[:10]
+        # Nếu đã có đủ 2 thực thể từ candidate_scores → ưu tiên top 2 để tránh nhiễu
+        if candidate_scores:
+            ordered = []
+            seen = set()
+            for name, score in sorted(candidate_scores, key=lambda x: x[1], reverse=True):
+                if name not in seen:
+                    ordered.append(name)
+                    seen.add(name)
+            if len(ordered) >= 2:
+                return ordered[:10]
         
         # Nếu chưa tìm đủ, try fuzzy matching với từng word (nhưng đã có match n-gram ưu tiên)
         # QUAN TRỌNG: Chỉ match với artists/groups, không match với albums/songs (tránh sai)
