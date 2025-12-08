@@ -1377,34 +1377,56 @@ class MultiHopReasoner:
                     continue
             
             # Method 5: Check từng word trong query với base name và variants
+            # QUAN TRỌNG: Chỉ match single word nếu base_name chỉ có 1 từ (tránh match "Punch" với "Punch (ca sĩ)" khi query có "Rocket Punch")
+            # Nếu base_name có nhiều từ, chỉ match nếu tất cả các từ đều xuất hiện trong query
+            base_name_word_count = len(base_name_lower.split())
+            
             for word in query_words_list:
                 if len(word) < 3:  # Skip short words
                     continue
-                # Exact match với base name hoặc variants
-                if word in base_name_variants or word == base_name_lower:
-                    if base_name_lower not in normalized_seen:
-                        entities.append(artist)
-                        normalized_seen.add(base_name_lower)
-                        break
-                # Partial match: word là một phần của base name hoặc ngược lại
-                elif (word in base_name_lower and len(word) >= 3) or (base_name_lower in word and len(base_name_lower) >= 3):
-                    if base_name_lower not in normalized_seen:
-                        entities.append(artist)
-                        normalized_seen.add(base_name_lower)
-                        break
+                
+                # Chỉ match single word nếu base_name cũng chỉ có 1 từ (tránh match sai)
+                if base_name_word_count == 1:
+                    # Exact match với base name hoặc variants
+                    if word in base_name_variants or word == base_name_lower:
+                        if base_name_lower not in normalized_seen:
+                            entities.append(artist)
+                            normalized_seen.add(base_name_lower)
+                            break
+                    # Partial match: word là một phần của base name hoặc ngược lại (chỉ cho single word names)
+                    elif (word in base_name_lower and len(word) >= 3) or (base_name_lower in word and len(base_name_lower) >= 3):
+                        if base_name_lower not in normalized_seen:
+                            entities.append(artist)
+                            normalized_seen.add(base_name_lower)
+                            break
+                # Nếu base_name có nhiều từ, chỉ match nếu tất cả các từ đều xuất hiện trong query
+                elif base_name_word_count > 1:
+                    base_words = set(base_name_lower.split())
+                    query_words_set = set(query_words_list)
+                    # Nếu tất cả các từ trong base_name đều có trong query → match
+                    if base_words.issubset(query_words_set):
+                        if base_name_lower not in normalized_seen:
+                            entities.append(artist)
+                            normalized_seen.add(base_name_lower)
+                            break
+                
                 # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
-                elif '-' in base_name_lower:
+                # Chỉ match nếu có đủ các parts trong query
+                if '-' in base_name_lower:
                     base_parts = base_name_lower.split('-')
                     if word in base_parts and len(word) >= 3:
-                        # Check xem có part khác cũng trong query không
+                        # Check xem có part khác cũng trong query không (phải có ít nhất 2 parts)
                         other_parts = [p for p in base_parts if p != word]
-                        if any(p in query_lower for p in other_parts):
-                            if base_name_lower not in normalized_seen:
+                        if len(other_parts) > 0 and any(p in query_lower for p in other_parts):
+                            # Verify: phải có ít nhất 2 parts trong query để match
+                            matched_parts = sum(1 for p in base_parts if p in query_lower)
+                            if matched_parts >= 2 and base_name_lower not in normalized_seen:
                                 entities.append(artist)
                                 normalized_seen.add(base_name_lower)
                                 break
         
         # Tìm tất cả groups trong query (case-insensitive)
+        # QUAN TRỌNG: Ưu tiên match groups trước artists để tránh match sai (ví dụ: "Rocket Punch" group vs "Punch" artist)
         for group in all_groups:
             group_lower = group.lower()
             base_name = self._normalize_entity_name(group).lower()
@@ -1413,10 +1435,53 @@ class MultiHopReasoner:
             if base_name in normalized_seen:
                 continue
             
+            # Tạo variants cho group name
+            group_variants = [
+                base_name,
+                base_name.replace('-', ' '),
+                base_name.replace('-', ''),
+                base_name.replace(' ', ''),
+                base_name.replace(' ', '-'),
+            ]
+            group_variants = list(dict.fromkeys(group_variants))
+            
+            # Method 1: Check n-gram matching (ưu tiên match đầy đủ tên trước)
+            for ngram in query_ngrams:
+                if len(ngram) < 3:
+                    continue
+                for variant in group_variants:
+                    # Exact match hoặc substring match
+                    if variant == ngram or variant in ngram or ngram in variant:
+                        entities.append(group)
+                        normalized_seen.add(base_name)
+                        break
+                if base_name in normalized_seen:
+                    break
+            
+            if base_name in normalized_seen:
+                continue
+            
+            # Method 2: Check nếu tất cả các từ trong group name đều có trong query
+            group_words = set(base_name.split())
+            query_words_set = set(query_words_list)
+            if group_words.issubset(query_words_set) and len(group_words) >= 2:
+                entities.append(group)
+                normalized_seen.add(base_name)
+                continue
+            
+            # Method 3: Check substring match (fallback - chỉ cho single word groups)
+            if len(base_name.split()) == 1:
+                if base_name in query_words_list or any(variant in query_words_list for variant in group_variants):
+                    entities.append(group)
+                    normalized_seen.add(base_name)
+                    continue
+            
+            # Method 4: Check substring match (fallback - yêu cầu ít nhất 2 từ trùng)
             if group_lower in query_lower:
                 query_words = set(query_lower.split())
-                group_words = set(group_lower.split())
-                if group_words.intersection(query_words) or group_lower in query_lower:
+                group_words_set = set(group_lower.split())
+                # Chỉ match nếu có ít nhất 2 từ trùng nhau (tránh match "Punch" với "Rocket Punch")
+                if len(group_words_set.intersection(query_words)) >= 2 or (len(group_words_set) == 1 and group_lower in query_lower):
                     entities.append(group)
                     normalized_seen.add(base_name)
         
