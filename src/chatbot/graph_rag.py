@@ -439,28 +439,33 @@ class GraphRAG:
                     })
         
         # ============================================
-        # PHƯƠNG PHÁP 2: LLM Understanding (FALLBACK/AUGMENTATION)
+        # PHƯƠNG PHÁP 2: LLM Understanding (FALLBACK/AUGMENTATION + INTENT DETECTION)
         # ============================================
-        # ✅ CHIẾN LƯỢC: LLM chỉ dùng khi rule không đủ hoặc confidence thấp
-        # 
-        # LLM nhỏ (≤1B params) dùng để:
-        # - FALLBACK: Khi rule/semantic không tìm đủ entities (< 2)
-        # - AUGMENTATION: Khi confidence thấp hoặc cần normalize (lowercase names)
+        # ✅ CHIẾN LƯỢC: LLM dùng để:
+        # 1. FALLBACK: Khi rule/semantic không tìm đủ entities (< 2)
+        # 2. AUGMENTATION: Khi confidence thấp hoặc cần normalize (lowercase names)
+        # 3. INTENT DETECTION: Detect intent chính xác hơn rule-based (xử lý biến thể ngôn ngữ)
+        #    - "cùng một nhóm nhạc" → same_group (rule có thể miss từ "một")
+        #    - "thuộc nhóm nhạc nào" → membership (rule có thể miss biến thể)
         # - Parse: Extract entities, detect intent, detect hop depth
         # 
         # ⚠️ QUAN TRỌNG: 
         # - LLM CHỈ parse câu hỏi → KHÔNG làm reasoning
         # - Tất cả kết quả từ LLM PHẢI được validate với KG + threshold
+        llm_intent = None
+        llm_metadata = {}
         if self.llm_for_understanding:
-            # Gọi LLM trong các trường hợp (FALLBACK):
+            # ✅ LUÔN gọi LLM để detect intent (quan trọng cho biến thể ngôn ngữ)
+            # Gọi LLM trong các trường hợp:
             # 1. Không tìm đủ entities (< 2) - rule/semantic không đủ
             # 2. Query có lowercase names (jungkook, lisa) - pattern matching có thể miss
-            # 3. Query có comparison keywords - cần detect intent
+            # 3. Query có comparison keywords - cần detect intent chính xác
+            # 4. Query có từ "một", "các", "nào" - biến thể ngôn ngữ tự nhiên
             should_use_llm = (
                 not entities or 
                 len(entities) < 2 or
                 any(word.islower() and len(word) >= 4 for word in query_lower.split()) or  # Có lowercase words dài
-                any(kw in query_lower for kw in ['và', 'and', 'cùng', 'same', 'có phải', 'phải'])  # Câu hỏi so sánh
+                any(kw in query_lower for kw in ['và', 'and', 'cùng', 'same', 'có phải', 'phải', 'một', 'các', 'nào'])  # Câu hỏi so sánh hoặc biến thể
             )
             
             if should_use_llm:

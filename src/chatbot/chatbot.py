@@ -192,6 +192,12 @@ class KpopChatbot:
         # 3. Build Context: Chuyển subgraph → text/triples để feed vào LLM
         # 
         # TẤT CẢ thông tin đều lấy từ ĐỒ THỊ TRI THỨC (Knowledge Graph), không phải từ LLM memory
+        
+        # ============================================
+        # BƯỚC 1: GRAPHRAG - RETRIEVE CONTEXT (rule-based trước, LLM fallback)
+        # ============================================
+        # ✅ Rule-based chạy TRƯỚC trong retrieve_context() → extract_entities()
+        # LLM chỉ được gọi khi rule-based không đủ hoặc không hiểu
         context = self.rag.retrieve_context(
             query,
             max_entities=5,
@@ -200,9 +206,10 @@ class KpopChatbot:
         
         # 2.5. Check if this is a membership Yes/No question - use reasoning directly
         import re
-        # Làm sạch dấu câu để match tốt hơn (ví dụ "1the9," -> "1the9")
         query_clean = re.sub(r"[^\w\s\-]", " ", query.lower())
-        query_lower = " ".join(query_clean.split())  # normalize spaces
+        query_lower = " ".join(query_clean.split())
+        
+        # ✅ Rule-based intent detection TRƯỚC
         is_membership_question = (
             any(kw in query_lower for kw in ['có phải', 'phải', 'là thành viên', 'is a member', 'belongs to', 'có thành viên']) and
             any(kw in query_lower for kw in ['thành viên', 'member'])
@@ -214,8 +221,38 @@ class KpopChatbot:
             'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên'
         ]) and 'có phải' not in query_lower and 'không' not in query_lower
         
+        # Check if this is an "artist group" question: "Lisa thuộc nhóm nhạc nào"
+        is_artist_group_question = any(kw in query_lower for kw in [
+            'thuộc nhóm', 'thuộc nhóm nhạc', 'nhóm nào', 'nhóm nhạc nào',
+            'belongs to group', 'group of', 'nhóm của'
+        ]) and 'cùng' not in query_lower  # Tránh nhầm với "cùng nhóm"
+        
         # Check if this is a "same group" question - use reasoning directly
-        is_same_group_question = any(kw in query_lower for kw in ['cùng nhóm', 'cùng nhóm nhạc', 'same group', 'cùng ban nhạc'])
+        is_same_group_question = any(kw in query_lower for kw in [
+            'cùng nhóm', 'cùng nhóm nhạc', 'cùng một nhóm', 'cùng một nhóm nhạc',
+            'same group', 'cùng ban nhạc', 'chung nhóm', 'chung nhóm nhạc'
+        ])
+        
+        # ✅ LLM FALLBACK: Chỉ gọi LLM khi rule-based không detect được intent
+        # Ví dụ: "cùng một nhóm nhạc" có thể không match pattern nếu rule-based miss từ "một"
+        llm_intent = None
+        if self.rag.llm_for_understanding and not (is_same_group_question or is_artist_group_question or is_membership_question or is_list_members_question):
+            # Rule-based không detect được → dùng LLM để hiểu biến thể ngôn ngữ
+            try:
+                llm_result = self.rag._extract_entities_with_llm(query)
+                if llm_result and len(llm_result) > 0:
+                    llm_intent = llm_result[0].get('intent', '')
+                    # Update intent flags dựa trên LLM
+                    if llm_intent == 'same_group':
+                        is_same_group_question = True
+                    elif llm_intent == 'membership':
+                        if 'nhóm' in query_lower:
+                            is_artist_group_question = True
+                        else:
+                            is_membership_question = True
+            except Exception as e:
+                # Nếu LLM fail, giữ nguyên rule-based
+                pass
         
         # Check if this is a "same company" question - use reasoning directly
         # Mở rộng patterns để detect nhiều cách hỏi hơn
@@ -308,13 +345,37 @@ class KpopChatbot:
             is_song_company_chain_question
             )
             
-            if is_same_group_question or is_same_company_question or is_list_members_question:
-                # LUÔN force extract entities bằng rule-based (nhanh, chính xác)
-                # Bỏ qua GraphRAG nếu không tìm đủ (GraphRAG có thể extract sai)
+            if is_same_group_question or is_same_company_question or is_list_members_question or is_artist_group_question:
+                # ✅ CHIẾN LƯỢC HYBRID: Rule-based + LLM understanding
+                # 1. Thử rule-based trước (nhanh, chính xác cho tên chuẩn)
                 extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
                 
-                # Với list_members_question, chỉ cần 1 entity (group)
-                min_entities = 1 if is_list_members_question else 2
+                # Với list_members_question và artist_group_question, chỉ cần 1 entity
+                min_entities = 1 if (is_list_members_question or is_artist_group_question) else 2
+                
+                # 2. Nếu rule-based không đủ → dùng LLM understanding (fallback)
+                if len(extracted) < min_entities and self.rag.llm_for_understanding:
+                    try:
+                        # Gọi LLM để extract entities
+                        llm_entities = self.rag._extract_entities_with_llm(query)
+                        # Validate và thêm vào extracted
+                        for llm_e in llm_entities:
+                            entity_id = llm_e.get('text', '')
+                            if entity_id and entity_id not in extracted:
+                                # Validate với KG
+                                entity_data = self.kg.get_entity(entity_id)
+                                if entity_data:
+                                    extracted.append(entity_id)
+                                    # Update context
+                                    if not any(existing['id'].lower() == entity_id.lower() for existing in context['entities']):
+                                        context['entities'].append({
+                                            'id': entity_id,
+                                            'type': entity_data.get('label', 'Unknown'),
+                                            'score': llm_e.get('score', 0.8)
+                                        })
+                    except Exception as e:
+                        # Nếu LLM fail, tiếp tục với rule-based
+                        pass
                 
                 if len(extracted) >= min_entities:
                     # ✅ VALIDATE: Verify tất cả entities với KG trước khi reasoning
@@ -343,6 +404,13 @@ class KpopChatbot:
                                         'type': entity_data.get('label', 'Unknown'),
                                         'score': 0.9  # High score vì đã verify với KG
                                     })
+                elif len(extracted) == 1 and (is_artist_group_question or is_list_members_question):
+                    # Chỉ có 1 entity và đây là câu hỏi chỉ cần 1 entity → OK
+                    reasoning_result = self.reasoner.reason(
+                        query,
+                        start_entities=extracted,
+                        max_hops=max_hops
+                    )
                 elif len(extracted) == 1:
                     # Chỉ có 1 entity → vẫn thử reasoning (có thể tìm thêm từ graph)
                     reasoning_result = self.reasoner.reason(
@@ -357,7 +425,7 @@ class KpopChatbot:
                         start_entities=[],
                         max_hops=max_hops
                     )
-            elif eval_pattern_question and len(context['entities']) < 2:
+            elif (eval_pattern_question or is_artist_group_question) and len(context['entities']) < 2:
                 # Membership question: try to extract entities nếu GraphRAG không tìm đủ
                 extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
                 if extracted:
@@ -447,25 +515,13 @@ class KpopChatbot:
         if (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
             # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
             # Reasoning is more accurate than LLM for factual checks
-            if reasoning_result.confidence >= 0.6:  # Lower threshold để ưu tiên reasoning
-                # Use reasoning result directly (more accurate, tránh LLM hallucinate)
-                response = reasoning_result.answer_text
-                if reasoning_result.answer_entities:
-                    entities_str = ", ".join(reasoning_result.answer_entities[:10])
-                    if entities_str and entities_str not in response:
-                        response += f"\n\nDanh sách: {entities_str}"
-            else:
-                # Low confidence, still use LLM but with reasoning context
-                if self.llm and use_llm:
-                    formatted_context += f"\n\n=== KẾT QUẢ SUY LUẬN ===\n{reasoning_result.answer_text}\n{reasoning_result.explanation}\n\nHãy sử dụng kết quả suy luận này để trả lời."
-                    history = session.get_history(max_turns=3)
-                    response = self.llm.generate(
-                        query,
-                        context=formatted_context,
-                        history=history
-                    )
-                else:
-                    response = reasoning_result.answer_text
+            # ✅ QUAN TRỌNG: LUÔN dùng reasoning result trực tiếp, KHÔNG qua LLM để tránh hallucination
+            response = reasoning_result.answer_text
+            if reasoning_result.answer_entities:
+                entities_str = ", ".join(reasoning_result.answer_entities[:10])
+                if entities_str and entities_str not in response:
+                    response += f"\n\nDanh sách: {entities_str}"
+            # ✅ Bỏ qua LLM generation cho same_group/same_company questions để tránh trả lời sai
         elif self.llm and use_llm:
             # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (đúng yêu cầu)
             history = session.get_history(max_turns=3)

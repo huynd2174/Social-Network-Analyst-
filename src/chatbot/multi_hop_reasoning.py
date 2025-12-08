@@ -317,6 +317,27 @@ class MultiHopReasoner:
                 entity_type = self.kg.get_entity_type(entity)
                 if entity_type == 'Group':
                     return self.get_group_members(entity)
+        
+        # 1c. Câu hỏi về nhóm nhạc của artist: "Lisa thuộc nhóm nhạc nào", "Nhóm nào có Lisa"
+        if any(kw in query_lower for kw in ['thuộc nhóm', 'thuộc nhóm nhạc', 'nhóm nào', 'nhóm nhạc nào', 'belongs to group', 'group of']):
+            # Tìm artist entity từ start_entities
+            artist_entity = None
+            for entity in start_entities:
+                entity_type = self.kg.get_entity_type(entity)
+                if entity_type == 'Artist':
+                    artist_entity = entity
+                    break
+            
+            # Nếu không tìm được từ start_entities, extract từ query
+            if not artist_entity:
+                extracted = self._extract_entities_from_query(query)
+                for e in extracted:
+                    if self.kg.get_entity_type(e) == 'Artist':
+                        artist_entity = e
+                        break
+            
+            if artist_entity:
+                return self.get_artist_groups(artist_entity)
                     
         # 2. Câu hỏi về công ty: "Công ty nào quản lý BTS", "BLACKPINK thuộc công ty nào"
         if any(kw in query_lower for kw in ['công ty', 'company', 'label', 'hãng', 'quản lý']):
@@ -342,9 +363,15 @@ class MultiHopReasoner:
                 return self.check_same_company(start_entities[0], start_entities[1])
         
         # 3.5. Câu hỏi so sánh nhóm nhạc: "Lisa và Jennie có cùng nhóm nhạc không"
-        if any(kw in query_lower for kw in ['cùng nhóm', 'cùng nhóm nhạc', 'same group', 'cùng ban nhạc']):
+        if any(kw in query_lower for kw in [
+            'cùng nhóm', 'cùng nhóm nhạc', 'cùng một nhóm', 'cùng một nhóm nhạc',
+            'same group', 'cùng ban nhạc', 'chung nhóm', 'chung nhóm nhạc'
+        ]):
+            # ✅ Ưu tiên dùng start_entities nếu đã có đủ 2
+            if len(start_entities) >= 2:
+                return self.check_same_group(start_entities[0], start_entities[1])
             # Nếu không có đủ 2 entities, tự extract từ query
-            if len(start_entities) < 2:
+            elif len(start_entities) < 2:
                 # Tự extract entities từ query (case-insensitive)
                 extracted = self._extract_entities_from_query(query)
                 if len(extracted) >= 2:
@@ -352,8 +379,17 @@ class MultiHopReasoner:
                 elif len(extracted) == 1 and len(start_entities) == 1:
                     # Có 1 từ query, 1 từ start_entities
                     return self.check_same_group(start_entities[0], extracted[0])
-            elif len(start_entities) >= 2:
-                return self.check_same_group(start_entities[0], start_entities[1])
+                elif len(extracted) == 1:
+                    # Chỉ có 1 entity → không đủ để so sánh
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text="Không tìm đủ thông tin để so sánh. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                        confidence=0.0,
+                        explanation="Cần ít nhất 2 entities để so sánh cùng nhóm"
+                    )
                 
         # 4. Câu hỏi về nhóm cùng công ty: "Các nhóm cùng công ty với BTS"
         if any(kw in query_lower for kw in ['nhóm cùng công ty', 'groups same company', 'labelmates', 'cùng công ty với']):
@@ -945,6 +981,41 @@ class MultiHopReasoner:
             confidence=1.0,
             explanation=f"1-hop: {group_name} → MEMBER_OF → Artists"
         )
+    
+    def get_artist_groups(self, artist_name: str) -> ReasoningResult:
+        """Get all groups that an artist belongs to (1-hop)."""
+        groups = self.kg.get_artist_groups(artist_name)
+        
+        step = ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist_name],
+            relationship='MEMBER_OF',
+            target_entities=groups,
+            explanation=f"Lấy nhóm nhạc của {artist_name}"
+        )
+        
+        if groups:
+            groups_str = ', '.join(groups)
+            return ReasoningResult(
+                query=f"Nhóm nhạc của {artist_name}",
+                reasoning_type=ReasoningType.CHAIN,
+                steps=[step],
+                answer_entities=groups,
+                answer_text=f"{artist_name} thuộc nhóm nhạc: {groups_str}",
+                confidence=1.0,
+                explanation=f"1-hop: {artist_name} → MEMBER_OF → {groups_str}"
+            )
+        else:
+            return ReasoningResult(
+                query=f"Nhóm nhạc của {artist_name}",
+                reasoning_type=ReasoningType.CHAIN,
+                steps=[step],
+                answer_entities=[],
+                answer_text=f"{artist_name} không thuộc nhóm nhạc nào",
+                confidence=1.0,
+                explanation=f"1-hop: {artist_name} không có quan hệ MEMBER_OF với nhóm nhạc nào"
+            )
         
     def get_company_of_group(self, group_name: str) -> ReasoningResult:
         """Get company managing a group (1-hop)."""
