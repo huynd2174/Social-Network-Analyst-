@@ -1340,8 +1340,6 @@ class MultiHopReasoner:
                                 words_in_matched_full_names.update(normalized_name.split())
                             matched_in_ngram = True
                             break
-                if matched_in_ngram:
-                    break
                     # QUAN TRỌNG: Xử lý tên có dash trước khi check substring
                     # Normalize cả 2 về cùng format để so sánh chính xác hơn
                     elif '-' in variant or '-' in ngram:
@@ -1356,6 +1354,7 @@ class MultiHopReasoner:
                                 # Track các từ trong tên đầy đủ đã match
                                 if base_name_word_count >= 2:
                                     words_in_matched_full_names.update(variant_normalized.split())
+                                matched_in_ngram = True
                                 break
                         # So sánh parts: nếu có ít nhất 2 parts giống nhau → match
                         variant_parts = set(variant_normalized.split())
@@ -1367,6 +1366,7 @@ class MultiHopReasoner:
                                 # Track các từ trong tên đầy đủ đã match
                                 if base_name_word_count >= 2:
                                     words_in_matched_full_names.update(variant_normalized.split())
+                                matched_in_ngram = True
                                 break
                     # Substring match (variant trong ngram hoặc ngược lại) - chỉ khi không có dash
                     elif variant in ngram or ngram in variant:
