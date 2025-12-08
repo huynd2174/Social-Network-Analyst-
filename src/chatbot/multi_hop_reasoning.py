@@ -1496,6 +1496,10 @@ class MultiHopReasoner:
                 # Xử lý tên có dấu gạch ngang: "g-dragon" match với "g" và "dragon"
                 # Chỉ match nếu có đủ các parts trong query
                 if '-' in base_name_lower:
+                    # QUAN TRỌNG: Check xem từ này đã được match trong tên đầy đủ nào chưa
+                    if word in words_in_matched_full_names:
+                        continue  # Đã được match trong tên đầy đủ, không match single word nữa
+                    
                     base_parts = base_name_lower.split('-')
                     if word in base_parts and len(word) >= 3:
                         # Check xem có part khác cũng trong query không (phải có ít nhất 2 parts)
