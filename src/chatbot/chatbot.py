@@ -594,7 +594,8 @@ class KpopChatbot:
     def answer_yes_no(
         self,
         query: str,
-        return_details: bool = False
+        return_details: bool = False,
+        max_hops_override: int = None
     ) -> Dict:
         """
         Answer a Yes/No question.
@@ -614,7 +615,7 @@ class KpopChatbot:
         
         # Perform reasoning
         entities = [e['id'] for e in context['entities']]
-        reasoning_result = self.reasoner.reason(query, entities, max_hops=2)
+        reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 2)
         
         # Check if reasoning result already has a Yes/No answer
         if reasoning_result and reasoning_result.answer_text:

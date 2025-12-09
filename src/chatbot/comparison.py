@@ -182,8 +182,9 @@ class ChatbotComparison:
             
             try:
                 if q['question_type'] == 'true_false':
-                    result = self.kpop_chatbot.answer_yes_no(q['question'])
-                    predicted = "Đúng" if result['answer'] in ['Có', 'Đúng', 'Yes'] else "Sai"
+                    result = self.kpop_chatbot.answer_yes_no(q['question'], max_hops_override=3)
+                    answer_upper = result['answer'].upper()
+                    predicted = "Đúng" if any(word in answer_upper for word in ['ĐÚNG', 'TRUE', 'YES', 'CÓ']) else "Sai"
                 elif q['question_type'] == 'yes_no':
                     result = self.kpop_chatbot.answer_yes_no(q['question'])
                     predicted = result['answer']

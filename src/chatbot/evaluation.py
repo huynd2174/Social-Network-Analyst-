@@ -208,29 +208,29 @@ class EvaluationDatasetGenerator:
             # Templating cho câu hỏi
             if is_direct:
                 true_templates = [
-                    lambda: f"{member} thuộc công ty {company}.",
-                    lambda: f"{member} có phải trực thuộc {company} không?",
-                    lambda: f"{member} do {company} quản lý.",
-                    lambda: f"{member} được quản lý bởi {company}.",
+                    lambda: f"{member} thuộc công ty {company}, đúng hay sai?",
+                    lambda: f"{member} có phải trực thuộc {company} không, đúng hay sai?",
+                    lambda: f"{member} do {company} quản lý, đúng hay sai?",
+                    lambda: f"{member} được quản lý bởi {company}, đúng hay sai?",
                 ]
                 false_templates = [
-                    lambda wc: f"{member} thuộc công ty {wc}.",
-                    lambda wc: f"{member} có phải trực thuộc {wc} không?",
-                    lambda wc: f"{member} do {wc} quản lý.",
-                    lambda wc: f"{member} được quản lý bởi {wc}.",
+                    lambda wc: f"{member} thuộc công ty {wc}, đúng hay sai?",
+                    lambda wc: f"{member} có phải trực thuộc {wc} không, đúng hay sai?",
+                    lambda wc: f"{member} do {wc} quản lý, đúng hay sai?",
+                    lambda wc: f"{member} được quản lý bởi {wc}, đúng hay sai?",
                 ]
             else:
                 true_templates = [
-                    lambda: f"{member} thuộc công ty {company}.",
-                    lambda: f"{member} có phải trực thuộc {company} qua nhóm {group} không?",
-                    lambda: f"{member} (nhóm {group}) do {company} quản lý.",
-                    lambda: f"{member} là thành viên {group} thuộc {company}.",
+                    lambda: f"{member} thuộc công ty {company}, đúng hay sai?",
+                    lambda: f"{member} có phải trực thuộc {company} qua nhóm {group} không, đúng hay sai?",
+                    lambda: f"{member} (nhóm {group}) do {company} quản lý, đúng hay sai?",
+                    lambda: f"{member} là thành viên {group} thuộc {company}, đúng hay sai?",
                 ]
                 false_templates = [
-                    lambda wc: f"{member} thuộc công ty {wc}.",
-                    lambda wc: f"{member} có phải trực thuộc {wc} qua nhóm {group} không?",
-                    lambda wc: f"{member} (nhóm {group}) do {wc} quản lý.",
-                    lambda wc: f"{member} là thành viên {group} thuộc {wc}.",
+                    lambda wc: f"{member} thuộc công ty {wc}, đúng hay sai?",
+                    lambda wc: f"{member} có phải trực thuộc {wc} qua nhóm {group} không, đúng hay sai?",
+                    lambda wc: f"{member} (nhóm {group}) do {wc} quản lý, đúng hay sai?",
+                    lambda wc: f"{member} là thành viên {group} thuộc {wc}, đúng hay sai?",
                 ]
             
             if random.random() > 0.5:
@@ -508,16 +508,16 @@ class EvaluationDatasetGenerator:
         for _ in range(actual_count):
             song, artist, group, company = random.choice(candidates)
             true_templates = [
-                lambda: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {company}.",
-                lambda: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {company}.",
-                lambda: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {company}.",
-                lambda: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {company}.",
+                lambda: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {company}, đúng hay sai?",
+                lambda: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {company}, đúng hay sai?",
+                lambda: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {company}, đúng hay sai?",
+                lambda: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {company}, đúng hay sai?",
             ]
             false_templates = [
-                lambda wc: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {wc}.",
-                lambda wc: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {wc}.",
-                lambda wc: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {wc}.",
-                lambda wc: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {wc}.",
+                lambda wc: f"{song} do {artist} (nhóm {group}) thực hiện, nhóm đó thuộc công ty {wc}, đúng hay sai?",
+                lambda wc: f"{song} là bài của {artist} (nhóm {group}); nhóm này trực thuộc {wc}, đúng hay sai?",
+                lambda wc: f"{song} do {artist} hát trong nhóm {group}; nhóm {group} thuộc {wc}, đúng hay sai?",
+                lambda wc: f"{artist} của nhóm {group} hát {song}; {group} được quản lý bởi {wc}, đúng hay sai?",
             ]
             
             if random.random() > 0.5:
