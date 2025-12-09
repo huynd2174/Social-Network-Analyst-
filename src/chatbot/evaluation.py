@@ -887,8 +887,7 @@ class EvaluationDatasetGenerator:
 def main():
     """Generate evaluation dataset."""
     generator = EvaluationDatasetGenerator()
-    # Tăng target_count để tạo nhiều câu hỏi hơn
-    stats = generator.generate_full_dataset(target_count=4800, output_path="data/kpop_eval_2000_multihop_max3hop.json")
+    stats = generator.generate_full_dataset(target_count=2000, output_path="data/kpop_eval_2000_multihop_max3hop.json")
     
     print("\n📊 Dataset Statistics:")
     for key, value in stats.items():
