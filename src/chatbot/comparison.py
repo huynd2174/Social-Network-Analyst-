@@ -186,12 +186,13 @@ class ChatbotComparison:
                     answer_upper = result['answer'].upper()
                     predicted = "Đúng" if any(word in answer_upper for word in ['ĐÚNG', 'TRUE', 'YES', 'CÓ']) else "Sai"
                 elif q['question_type'] == 'yes_no':
-                    result = self.kpop_chatbot.answer_yes_no(q['question'])
+                    result = self.kpop_chatbot.answer_yes_no(q['question'], max_hops_override=3)
                     predicted = result['answer']
                 else:  # multiple_choice
                     result = self.kpop_chatbot.answer_multiple_choice(
                         q['question'],
-                        q['choices']
+                        q['choices'],
+                        max_hops_override=3
                     )
                     predicted = result['selected_letter']
                     

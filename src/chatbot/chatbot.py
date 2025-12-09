@@ -610,12 +610,12 @@ class KpopChatbot:
         query_lower = query.lower()
         
         # Get context
-        context = self.rag.retrieve_context(query, max_entities=5, max_hops=2)
+        context = self.rag.retrieve_context(query, max_entities=5, max_hops=max_hops_override or 3)
         formatted_context = self.rag.format_context_for_llm(context)
         
         # Perform reasoning
         entities = [e['id'] for e in context['entities']]
-        reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 2)
+        reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 3)
         
         # Check if reasoning result already has a Yes/No answer
         if reasoning_result and reasoning_result.answer_text:
@@ -764,7 +764,8 @@ class KpopChatbot:
         self,
         query: str,
         choices: List[str],
-        return_details: bool = False
+        return_details: bool = False,
+        max_hops_override: int = None
     ) -> Dict:
         """
         Answer a multiple choice question.
@@ -780,12 +781,12 @@ class KpopChatbot:
         query_lower = query.lower()
         
         # Get context
-        context = self.rag.retrieve_context(query, max_entities=5, max_hops=2)
+        context = self.rag.retrieve_context(query, max_entities=5, max_hops=max_hops_override or 3)
         formatted_context = self.rag.format_context_for_llm(context)
         
         # Perform reasoning
         entities = [e['id'] for e in context['entities']]
-        reasoning_result = self.reasoner.reason(query, entities, max_hops=2)
+        reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 3)
         
         selected_index = None
         selected_choice = None
