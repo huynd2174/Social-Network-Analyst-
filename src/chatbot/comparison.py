@@ -140,7 +140,7 @@ class ChatbotComparison:
             
     def load_evaluation_dataset(
         self,
-        path: str = "data/evaluation_dataset.json"
+        path: str = "data/kpop_eval_2000_multihop_max3hop (1).json"
     ) -> List[Dict]:
         """Load evaluation dataset."""
         with open(path, 'r', encoding='utf-8') as f:

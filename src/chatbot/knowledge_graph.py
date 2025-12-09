@@ -22,7 +22,7 @@ class KpopKnowledgeGraph:
     - Multi-hop traversal and reasoning
     """
     
-    def __init__(self, data_path: str = "data/merged_kpop_data.json"):
+    def __init__(self, data_path: str = "data/korean_artists_graph_bfs.json"):
         """Initialize knowledge graph from merged data."""
         self.data_path = data_path
         self.graph = nx.DiGraph()

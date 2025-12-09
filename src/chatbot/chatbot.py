@@ -75,7 +75,7 @@ class KpopChatbot:
     
     def __init__(
         self,
-        data_path: str = "data/merged_kpop_data.json",
+        data_path: str = "data/korean_artists_graph_bfs.json",
         llm_model: str = "qwen2-0.5b",
         use_embeddings: bool = True,
         verbose: bool = True

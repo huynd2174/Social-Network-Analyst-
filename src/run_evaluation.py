@@ -27,7 +27,7 @@ def main():
     print("="*70)
     
     # Check dataset
-    dataset_path = "data/evaluation_dataset.json"
+    dataset_path = "data/kpop_eval_2000_multihop_max3hop (1).json"
     if not os.path.exists(dataset_path):
         print(f"\n❌ Dataset không tồn tại: {dataset_path}")
         print("   Chạy: python src/run_chatbot.py --mode eval")
