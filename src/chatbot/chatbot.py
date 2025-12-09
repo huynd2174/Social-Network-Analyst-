@@ -710,20 +710,53 @@ class KpopChatbot:
                 answer = "Sai"
                 confidence = 0.7
                 
-        # Pattern 3: "X và Y có cùng công ty không?"
-        elif 'cùng công ty' in query_lower or 'same company' in query_lower:
+        # Ensure we have at least two entities for same-company / same-group checks
+        if (('cùng công ty' in query_lower or 'same company' in query_lower or 'thuộc cùng công ty' in query_lower)
+            or ('cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower)) \
+            and len(context['entities']) < 2:
+            extracted = self._extract_entities_for_membership(
+                query,
+                expected_labels={'Artist', 'Group', 'Company'}
+            )
+            for ent in extracted:
+                if not any(e['id'] == ent for e in context['entities']):
+                    context['entities'].append({'id': ent, 'type': self.kg.get_entity_type(ent) or 'Unknown'})
+        
+        # Pattern 3: "X và Y có cùng công ty không?" hoặc mệnh đề khẳng định "thuộc cùng công ty"
+        elif 'cùng công ty' in query_lower or 'same company' in query_lower or 'thuộc cùng công ty' in query_lower:
             if len(context['entities']) >= 2:
-                result = self.reasoner.check_same_company(
-                    context['entities'][0]['id'],
-                    context['entities'][1]['id']
-                )
+                a = context['entities'][0]['id']
+                b = context['entities'][1]['id']
+                # Dùng reasoner trước
+                result = self.reasoner.check_same_company(a, b)
                 if result.answer_entities:
                     answer = "Có"
                     confidence = 1.0
                 else:
+                    # Thử giao tập công ty nếu là artist/group
+                    companies_a = set(self.kg.get_artist_companies(a) + self.kg.get_group_companies(a))
+                    companies_b = set(self.kg.get_artist_companies(b) + self.kg.get_group_companies(b))
+                    if companies_a and companies_b and companies_a.intersection(companies_b):
+                        answer = "Có"
+                        confidence = 0.95
+                    else:
+                        answer = "Không"
+                        confidence = 0.9
+                    
+        # Pattern 4: "X và Y có cùng nhóm không?" (same group)
+        elif 'cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower:
+            if len(context['entities']) >= 2:
+                a = context['entities'][0]['id']
+                b = context['entities'][1]['id']
+                groups_a = set(self.kg.get_artist_groups(a)) if self.kg.get_entity_type(a) == 'Artist' else {a} if self.kg.get_entity_type(a) == 'Group' else set()
+                groups_b = set(self.kg.get_artist_groups(b)) if self.kg.get_entity_type(b) == 'Artist' else {b} if self.kg.get_entity_type(b) == 'Group' else set()
+                if groups_a and groups_b and groups_a.intersection(groups_b):
+                    answer = "Có"
+                    confidence = 0.95
+                else:
                     answer = "Không"
                     confidence = 0.9
-                    
+        
         # Fallback: Use reasoning result
         if answer is None:
             answer_text = reasoning_result.answer_text.lower() if reasoning_result else ""
