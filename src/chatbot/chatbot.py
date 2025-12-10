@@ -591,6 +591,63 @@ class KpopChatbot:
             
         return result
         
+    def _resolve_pronouns(self, query: str, context: Dict) -> str:
+        """
+        Resolve pronouns like "nhóm đó", "nhóm này", "công ty đó" to actual entity names.
+        
+        Args:
+            query: Original query
+            context: Context with extracted entities
+            
+        Returns:
+            Query with pronouns resolved
+        """
+        import re
+        
+        resolved_query = query
+        entities = context.get('entities', [])
+        
+        if not entities:
+            return resolved_query
+        
+        # Find the most recently mentioned entity of each type
+        groups = [e for e in entities if self.kg.get_entity_type(e['id']) == 'Group']
+        companies = [e for e in entities if self.kg.get_entity_type(e['id']) == 'Company']
+        artists = [e for e in entities if self.kg.get_entity_type(e['id']) == 'Artist']
+        
+        # Also extract from query text directly (for cases like "Tiffany (nhóm Girls' Generation-TTS)")
+        # Extract group names mentioned in parentheses
+        group_pattern = r'\(nhóm\s+([^)]+)\)'
+        for match in re.finditer(group_pattern, query, re.IGNORECASE):
+            group_name = match.group(1).strip()
+            # Try to find this group in KG
+            group_entity = self.kg.get_entity(group_name)
+            if group_entity:
+                if not any(e['id'] == group_name for e in groups):
+                    groups.append({'id': group_name, 'type': 'Group'})
+        
+        # Resolve "nhóm đó", "nhóm này"
+        if groups:
+            latest_group = groups[-1]['id']  # Most recent group
+            resolved_query = re.sub(
+                r'\b(nhóm|group)\s+(đó|này|kia)\b',
+                latest_group,
+                resolved_query,
+                flags=re.IGNORECASE
+            )
+        
+        # Resolve "công ty đó", "công ty này"
+        if companies:
+            latest_company = companies[-1]['id']  # Most recent company
+            resolved_query = re.sub(
+                r'\b(công ty|company)\s+(đó|này|kia)\b',
+                latest_company,
+                resolved_query,
+                flags=re.IGNORECASE
+            )
+        
+        return resolved_query
+    
     def answer_yes_no(
         self,
         query: str,
@@ -607,15 +664,32 @@ class KpopChatbot:
         Returns:
             Answer dictionary
         """
-        query_lower = query.lower()
-        
-        # Get context
-        context = self.rag.retrieve_context(query, max_entities=5, max_hops=max_hops_override or 3)
-        formatted_context = self.rag.format_context_for_llm(context)
-        
-        # Perform reasoning
-        entities = [e['id'] for e in context['entities']]
-        reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 3)
+        try:
+            query_lower = query.lower()
+            
+            # Get context
+            context = self.rag.retrieve_context(query, max_entities=5, max_hops=max_hops_override or 3)
+            
+            # Resolve pronouns BEFORE reasoning
+            resolved_query = self._resolve_pronouns(query, context)
+            if resolved_query != query:
+                # Re-retrieve context with resolved query for better entity extraction
+                context = self.rag.retrieve_context(resolved_query, max_entities=5, max_hops=max_hops_override or 3)
+                query_lower = resolved_query.lower()
+            
+            formatted_context = self.rag.format_context_for_llm(context)
+            
+            # Perform reasoning
+            entities = [e['id'] for e in context['entities']]
+            reasoning_result = self.reasoner.reason(query, entities, max_hops=max_hops_override or 3)
+        except Exception as e:
+            # Error handling - return a safe default
+            return {
+                "query": query,
+                "answer": "Không",
+                "confidence": 0.0,
+                "explanation": f"Error during processing: {str(e)}"
+            }
         
         # Check if reasoning result already has a Yes/No answer
         if reasoning_result and reasoning_result.answer_text:
@@ -638,6 +712,12 @@ class KpopChatbot:
         # Rule-based answer FIRST (more accurate for knowledge graph queries)
         answer = None
         confidence = 0.0
+        
+        # ============================================
+        # QUAN TRỌNG: Thứ tự pattern matching
+        # Ưu tiên pattern đơn giản (1-hop) trước pattern phức tạp (2-hop, 3-hop)
+        # Để tránh conflict và đảm bảo 1-hop questions được xử lý đúng
+        # ============================================
         
         # Pattern 1: "X có phải là thành viên của Y không?" 
         if 'thành viên' in query_lower or 'member' in query_lower:
@@ -692,21 +772,156 @@ class KpopChatbot:
                 answer = "Không"
                 confidence = 0.7
                 
-        # Pattern 2: "X thuộc công ty Y" (True/False check)
-        elif 'thuộc công ty' in query_lower or 'thuộc company' in query_lower:
-            # Extract company name from query (after "thuộc công ty")
-            for entity in context['entities']:
-                if entity['type'] == 'Group':
-                    company = self.kg.get_group_company(entity['id'])
-                    if company and company.lower() in query_lower:
-                        answer = "Đúng"
-                        confidence = 1.0
+        # Pattern 2: "X thuộc công ty Y" hoặc "nhóm đó thuộc công ty Y" (True/False check)
+        # QUAN TRỌNG: Chỉ match khi KHÔNG có "cùng công ty" hoặc "và" (để tránh conflict với Pattern 3)
+        # Include: "thuộc công ty", "do ... quản lý", "được quản lý bởi"
+        elif (('thuộc công ty' in query_lower or 'thuộc company' in query_lower or 
+               ('do' in query_lower and 'quản lý' in query_lower) or
+               'được quản lý bởi' in query_lower)) \
+             and 'và' not in query_lower \
+             and 'cùng công ty' not in query_lower \
+             and 'chung công ty' not in query_lower \
+             and 'đều' not in query_lower:
+            # Extract company name from query
+            import re
+            company_match = re.search(r'(?:company_|công ty\s+)([\w\s]+)', query_lower)
+            query_company = None
+            if company_match:
+                query_company = 'Company_' + company_match.group(1).strip()
+            
+            # Try to find company entity
+            if not query_company:
+                for entity in context['entities']:
+                    if self.kg.get_entity_type(entity['id']) == 'Company':
+                        query_company = entity['id']
                         break
-                    elif company:
+            
+            entity_found = False
+            matched_entity = None
+            
+            # Xử lý cả Artist và Group - ưu tiên Group nếu có "nhóm" trong query
+            entities_to_check = context['entities']
+            
+            # Nếu query có "nhóm đó" hoặc group mention, ưu tiên check groups
+            if 'nhóm' in query_lower:
+                entities_to_check = [e for e in entities_to_check if self.kg.get_entity_type(e['id']) == 'Group'] or entities_to_check
+            
+            for entity in entities_to_check:
+                entity_id = entity['id']
+                entity_type = self.kg.get_entity_type(entity_id) or entity.get('type', 'Unknown')
+                
+                # Lấy công ty của entity
+                companies = set()
+                if entity_type == 'Group':
+                    company = self.kg.get_group_company(entity_id)
+                    if company:
+                        companies.add(company)
+                    # Also get all companies
+                    companies.update(self.kg.get_group_companies(entity_id))
+                elif entity_type == 'Artist':
+                    # Artist có thể thuộc công ty qua Group hoặc trực tiếp
+                    companies.update(self.kg.get_artist_companies(entity_id))
+                    # Thử qua Group
+                    groups = self.kg.get_artist_groups(entity_id)
+                    for group in groups:
+                        companies.update(self.kg.get_group_companies(group))
+                
+                # Kiểm tra công ty có trong query không
+                if companies and query_company:
+                    entity_found = True
+                    # Normalize company names for comparison
+                    query_company_norm = query_company.lower().replace('company_', '').strip()
+                    for comp in companies:
+                        comp_norm = comp.lower().replace('company_', '').strip()
+                        # Check exact match or substring
+                        if query_company_norm == comp_norm or query_company_norm in comp_norm or comp_norm in query_company_norm:
+                            answer = "Đúng"
+                            confidence = 1.0
+                            matched_entity = entity_id
+                            break
+                        # Also check if company entity ID matches
+                        if comp.lower() == query_company.lower():
+                            answer = "Đúng"
+                            confidence = 1.0
+                            matched_entity = entity_id
+                            break
+                    
+                    if answer == "Đúng":
+                        break
+                    
+                    # Nếu đã check nhưng không match
+                    if not matched_entity:
                         answer = "Sai"
                         confidence = 0.9
+                        matched_entity = entity_id
+            
+            if not entity_found:
+                # Không tìm thấy entity hoặc entity không có công ty
+                answer = "Sai"
+                confidence = 0.7
+                
+        # Pattern 2b: "X và Y thuộc cùng công ty quản lý" (True/False check - two entities)
+        # Chỉ xử lý câu khẳng định, không phải câu hỏi yes/no
+        elif ('thuộc cùng công ty' in query_lower or ('thuộc' in query_lower and 'cùng công ty' in query_lower)) \
+             and 'có' not in query_lower and 'không' not in query_lower:
+            # Ensure we have at least two entities
+            if len(context['entities']) < 2:
+                extracted = self._extract_entities_for_membership(
+                    query,
+                    expected_labels={'Artist', 'Group', 'Company'}
+                )
+                for ent in extracted:
+                    if not any(e['id'] == ent for e in context['entities']):
+                        ent_type = self.kg.get_entity_type(ent) or 'Unknown'
+                        context['entities'].append({'id': ent, 'type': ent_type})
+            
+            if len(context['entities']) >= 2:
+                # Thử TẤT CẢ cặp entity (Artist-Artist, Artist-Group, Group-Group)
+                found_match = False
+                for i in range(len(context['entities'])):
+                    if found_match:
                         break
-            if answer is None:
+                    for j in range(i + 1, len(context['entities'])):
+                        a = context['entities'][i]['id']
+                        b = context['entities'][j]['id']
+                        a_type = self.kg.get_entity_type(a) or context['entities'][i].get('type', 'Unknown')
+                        b_type = self.kg.get_entity_type(b) or context['entities'][j].get('type', 'Unknown')
+                        
+                        # Lấy công ty của cả hai entity (xử lý cả Artist và Group)
+                        companies_a = set()
+                        if a_type == 'Artist':
+                            companies_a.update(self.kg.get_artist_companies(a))
+                            # Thêm công ty qua Group
+                            for group in self.kg.get_artist_groups(a):
+                                group_companies = self.kg.get_group_companies(group)
+                                companies_a.update(group_companies)
+                        elif a_type == 'Group':
+                            companies_a.update(self.kg.get_group_companies(a))
+                        elif a_type == 'Company':
+                            companies_a.add(a)
+                        
+                        companies_b = set()
+                        if b_type == 'Artist':
+                            companies_b.update(self.kg.get_artist_companies(b))
+                            # Thêm công ty qua Group
+                            for group in self.kg.get_artist_groups(b):
+                                group_companies = self.kg.get_group_companies(group)
+                                companies_b.update(group_companies)
+                        elif b_type == 'Group':
+                            companies_b.update(self.kg.get_group_companies(b))
+                        elif b_type == 'Company':
+                            companies_b.add(b)
+                        
+                        # Kiểm tra giao tập công ty
+                        if companies_a and companies_b and companies_a.intersection(companies_b):
+                            answer = "Đúng"
+                            confidence = 0.95
+                            found_match = True
+                            break
+                if not found_match:
+                    answer = "Sai"
+                    confidence = 0.9
+            else:
                 answer = "Sai"
                 confidence = 0.7
                 
@@ -722,40 +937,223 @@ class KpopChatbot:
                 if not any(e['id'] == ent for e in context['entities']):
                     context['entities'].append({'id': ent, 'type': self.kg.get_entity_type(ent) or 'Unknown'})
         
-        # Pattern 3: "X và Y có cùng công ty không?" hoặc mệnh đề khẳng định "thuộc cùng công ty"
-        elif 'cùng công ty' in query_lower or 'same company' in query_lower or 'thuộc cùng công ty' in query_lower:
+        # Pattern 3: "X và Y có cùng công ty không?" hoặc "X có chung công ty với Y không?" (Yes/No question)
+        # Chỉ xử lý câu hỏi yes/no, không phải câu khẳng định true/false
+        # Lưu ý: "có chung công ty với" có thể có negation, cần kiểm tra kỹ
+        # Patterns: "cùng công ty", "cùng thuộc một công ty", "chung công ty với", "đồng công ty", "same company"
+        # QUAN TRỌNG: Chỉ match khi có "và" hoặc "với" (2 entities) để tránh conflict với Pattern 2
+        elif (('cùng công ty' in query_lower or 'cùng thuộc một công ty' in query_lower or
+               'same company' in query_lower or 'chung công ty' in query_lower or 'đồng công ty' in query_lower) \
+             and ('có' in query_lower or 'không' in query_lower or 'chứ' in query_lower or 'phải không' in query_lower) \
+             and ('và' in query_lower or 'với' in query_lower or len(context['entities']) >= 2)) \
+             and 'thuộc cùng công ty' not in query_lower:
             if len(context['entities']) >= 2:
-                a = context['entities'][0]['id']
-                b = context['entities'][1]['id']
-                # Dùng reasoner trước
-                result = self.reasoner.check_same_company(a, b)
-                if result.answer_entities:
-                    answer = "Có"
-                    confidence = 1.0
-                else:
-                    # Thử giao tập công ty nếu là artist/group
-                    companies_a = set(self.kg.get_artist_companies(a) + self.kg.get_group_companies(a))
-                    companies_b = set(self.kg.get_artist_companies(b) + self.kg.get_group_companies(b))
-                    if companies_a and companies_b and companies_a.intersection(companies_b):
-                        answer = "Có"
-                        confidence = 0.95
-                    else:
-                        answer = "Không"
-                        confidence = 0.9
-                    
-        # Pattern 4: "X và Y có cùng nhóm không?" (same group)
-        elif 'cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower:
-            if len(context['entities']) >= 2:
-                a = context['entities'][0]['id']
-                b = context['entities'][1]['id']
-                groups_a = set(self.kg.get_artist_groups(a)) if self.kg.get_entity_type(a) == 'Artist' else {a} if self.kg.get_entity_type(a) == 'Group' else set()
-                groups_b = set(self.kg.get_artist_groups(b)) if self.kg.get_entity_type(b) == 'Artist' else {b} if self.kg.get_entity_type(b) == 'Group' else set()
-                if groups_a and groups_b and groups_a.intersection(groups_b):
-                    answer = "Có"
-                    confidence = 0.95
-                else:
+                # Thử TẤT CẢ cặp entity (Artist-Artist, Artist-Group, Group-Group)
+                found_match = False
+                for i in range(len(context['entities'])):
+                    if found_match:
+                        break
+                    for j in range(i + 1, len(context['entities'])):
+                        a = context['entities'][i]['id']
+                        b = context['entities'][j]['id']
+                        a_type = self.kg.get_entity_type(a) or context['entities'][i].get('type', 'Unknown')
+                        b_type = self.kg.get_entity_type(b) or context['entities'][j].get('type', 'Unknown')
+                        
+                        # Dùng reasoner trước (nếu có)
+                        try:
+                            result = self.reasoner.check_same_company(a, b)
+                            if result.answer_entities:
+                                answer = "Có"
+                                confidence = 1.0
+                                found_match = True
+                                break
+                        except:
+                            pass
+                        
+                        # Fallback: Thử giao tập công ty (xử lý cả Artist và Group)
+                        companies_a = set()
+                        if a_type == 'Artist':
+                            companies_a.update(self.kg.get_artist_companies(a))
+                            # Thêm công ty qua Group
+                            for group in self.kg.get_artist_groups(a):
+                                group_companies = self.kg.get_group_companies(group)
+                                companies_a.update(group_companies)
+                        elif a_type == 'Group':
+                            companies_a.update(self.kg.get_group_companies(a))
+                        elif a_type == 'Company':
+                            companies_a.add(a)
+                        
+                        companies_b = set()
+                        if b_type == 'Artist':
+                            companies_b.update(self.kg.get_artist_companies(b))
+                            # Thêm công ty qua Group
+                            for group in self.kg.get_artist_groups(b):
+                                group_companies = self.kg.get_group_companies(group)
+                                companies_b.update(group_companies)
+                        elif b_type == 'Group':
+                            companies_b.update(self.kg.get_group_companies(b))
+                        elif b_type == 'Company':
+                            companies_b.add(b)
+                        
+                        # Kiểm tra giao tập công ty
+                        if companies_a and companies_b and companies_a.intersection(companies_b):
+                            answer = "Có"
+                            confidence = 0.95
+                            found_match = True
+                            break
+                if not found_match:
                     answer = "Không"
                     confidence = 0.9
+                    
+        # Pattern 3a: "X đều trực thuộc Company_Y" hoặc "X và Y đều trực thuộc Company_Z"
+        # QUAN TRỌNG: Chỉ match khi có "đều trực thuộc" (không phải chỉ "company")
+        elif 'đều trực thuộc' in query_lower:
+            # Extract company name from query
+            import re
+            company_match = re.search(r'(?:company_|công ty\s+)([\w\s]+)', query_lower)
+            query_company = None
+            if company_match:
+                query_company = 'Company_' + company_match.group(1).strip()
+            
+            # Find company entity
+            if not query_company:
+                for entity in context['entities']:
+                    if self.kg.get_entity_type(entity['id']) == 'Company':
+                        query_company = entity['id']
+                        break
+            
+            if query_company:
+                # Check all entities (Artist or Group) belong to this company
+                all_belong = True
+                entities_to_check = [e for e in context['entities'] if self.kg.get_entity_type(e['id']) in ['Artist', 'Group']]
+                
+                if not entities_to_check:
+                    # Try to extract more entities
+                    extracted = self._extract_entities_for_membership(
+                        query,
+                        expected_labels={'Artist', 'Group'}
+                    )
+                    for ent in extracted:
+                        entities_to_check.append({'id': ent, 'type': self.kg.get_entity_type(ent) or 'Unknown'})
+                
+                for entity in entities_to_check:
+                    entity_id = entity['id']
+                    entity_type = self.kg.get_entity_type(entity_id) or entity.get('type', 'Unknown')
+                    
+                    companies = set()
+                    if entity_type == 'Artist':
+                        companies.update(self.kg.get_artist_companies(entity_id))
+                        for group in self.kg.get_artist_groups(entity_id):
+                            companies.update(self.kg.get_group_companies(group))
+                    elif entity_type == 'Group':
+                        companies.update(self.kg.get_group_companies(entity_id))
+                    
+                    # Normalize company names for comparison
+                    query_company_norm = query_company.lower().replace('company_', '').strip()
+                    found = False
+                    for comp in companies:
+                        comp_norm = comp.lower().replace('company_', '').strip()
+                        if query_company_norm == comp_norm or query_company_norm in comp_norm or comp_norm in query_company_norm:
+                            found = True
+                            break
+                        if comp.lower() == query_company.lower():
+                            found = True
+                            break
+                    
+                    if not found:
+                        all_belong = False
+                        break
+                
+                answer = "Có" if all_belong else "Không"
+                confidence = 0.95
+            else:
+                answer = "Không"
+                confidence = 0.7
+        
+        # Pattern 3b: "X đều thuộc nhóm Y" hoặc "X và Y đều thuộc nhóm Z"
+        elif ('đều thuộc nhóm' in query_lower or 'đều là thành viên' in query_lower) and 'cùng' not in query_lower:
+            # Extract group name from query
+            group_mentioned = None
+            for entity in context['entities']:
+                if self.kg.get_entity_type(entity['id']) == 'Group':
+                    group_mentioned = entity['id']
+                    break
+            
+            # If no group found in entities, try to extract from query text
+            if not group_mentioned:
+                # Look for group names in query
+                all_groups = self.kg.get_entities_by_type('Group')
+                for group in all_groups:
+                    if group.lower() in query_lower:
+                        group_mentioned = group
+                        break
+            
+            if group_mentioned:
+                # Check all artists in context are members of this group
+                all_in_group = True
+                for entity in context['entities']:
+                    if self.kg.get_entity_type(entity['id']) == 'Artist':
+                        groups = self.kg.get_artist_groups(entity['id'])
+                        if group_mentioned not in groups:
+                            all_in_group = False
+                            break
+                
+                answer = "Có" if all_in_group else "Không"
+                confidence = 0.95
+            else:
+                answer = "Không"
+                confidence = 0.7
+        
+        # Pattern 4: "X và Y có cùng nhóm không?" hoặc "X có chung nhóm với Y không?" (same group)
+        elif ('cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower or 'chung nhóm' in query_lower):
+            # Ensure we have at least two entities
+            if len(context['entities']) < 2:
+                extracted = self._extract_entities_for_membership(
+                    query,
+                    expected_labels={'Artist', 'Group'}
+                )
+                for ent in extracted:
+                    if not any(e['id'] == ent for e in context['entities']):
+                        ent_type = self.kg.get_entity_type(ent) or 'Unknown'
+                        context['entities'].append({'id': ent, 'type': ent_type})
+            
+            if len(context['entities']) >= 2:
+                # Thử TẤT CẢ cặp entity (Artist-Artist, Artist-Group, Group-Group)
+                found_match = False
+                for i in range(len(context['entities'])):
+                    if found_match:
+                        break
+                    for j in range(i + 1, len(context['entities'])):
+                        a = context['entities'][i]['id']
+                        b = context['entities'][j]['id']
+                        a_type = self.kg.get_entity_type(a) or context['entities'][i].get('type', 'Unknown')
+                        b_type = self.kg.get_entity_type(b) or context['entities'][j].get('type', 'Unknown')
+                        
+                        # Lấy nhóm của cả hai entity
+                        groups_a = set()
+                        if a_type == 'Artist':
+                            groups_a.update(self.kg.get_artist_groups(a))
+                        elif a_type == 'Group':
+                            groups_a.add(a)  # Group chính nó
+                        
+                        groups_b = set()
+                        if b_type == 'Artist':
+                            groups_b.update(self.kg.get_artist_groups(b))
+                        elif b_type == 'Group':
+                            groups_b.add(b)  # Group chính nó
+                        
+                        # Kiểm tra giao tập nhóm
+                        if groups_a and groups_b and groups_a.intersection(groups_b):
+                            answer = "Có"
+                            confidence = 0.95
+                            found_match = True
+                            break
+                if not found_match:
+                    answer = "Không"
+                    confidence = 0.9
+            else:
+                answer = "Không"
+                confidence = 0.7
         
         # Fallback: Use reasoning result
         if answer is None:
@@ -813,8 +1211,14 @@ class KpopChatbot:
         """
         query_lower = query.lower()
         
-        # Get context
-        context = self.rag.retrieve_context(query, max_entities=5, max_hops=max_hops_override or 3)
+        # Resolve pronouns BEFORE context retrieval (for MC questions with "nhóm đó", "nhóm này")
+        context_pre = self.rag.retrieve_context(query, max_entities=3, max_hops=1)  # Quick initial retrieval
+        resolved_query = self._resolve_pronouns(query, context_pre)
+        query_to_use = resolved_query if resolved_query != query else query
+        query_lower = query_to_use.lower()
+        
+        # Get context with resolved query
+        context = self.rag.retrieve_context(query_to_use, max_entities=5, max_hops=max_hops_override or 3)
         formatted_context = self.rag.format_context_for_llm(context)
         
         # Perform reasoning
@@ -829,8 +1233,8 @@ class KpopChatbot:
         # SMART ANSWER SELECTION BASED ON QUERY TYPE
         # ============================================
         
-        # Pattern 1: "Công ty nào quản lý X?" - find company in choices
-        if 'công ty' in query_lower or 'company' in query_lower:
+        # Pattern 1: "Công ty nào quản lý X?" hoặc "X thuộc hãng nào?" - find company in choices
+        if 'công ty' in query_lower or 'company' in query_lower or 'hãng nào' in query_lower:
             for entity in context['entities']:
                 if entity['type'] == 'Group':
                     company = self.kg.get_group_company(entity['id'])
@@ -860,21 +1264,54 @@ class KpopChatbot:
                             break
                     break
                     
-        # Pattern 3: "Nhóm nào cùng công ty với X?" - find labelmates in choices
-        elif 'cùng công ty' in query_lower or 'labelmate' in query_lower:
+        # Pattern 3: "Nhóm nào cùng công ty với X?" hoặc "Nhóm nào là đồng công ty với X?" hoặc "Nhóm nào giống X?"
+        elif 'cùng công ty' in query_lower or 'đồng công ty' in query_lower or 'labelmate' in query_lower or ('giống' in query_lower and 'nhóm nào' in query_lower):
+            # Find the reference group/entity
+            ref_entity = None
             for entity in context['entities']:
                 if entity['type'] == 'Group':
-                    labelmates = self.reasoner.get_labelmates(entity['id'])
-                    for labelmate in labelmates.answer_entities:
-                        for i, choice in enumerate(choices):
-                            if labelmate.lower() in choice.lower() or choice.lower() in labelmate.lower():
-                                selected_index = i
-                                selected_choice = choices[i]
-                                confidence = 0.9
-                                break
-                        if selected_index is not None:
-                            break
+                    ref_entity = entity['id']
                     break
+            
+            # If no group found but "giống X" pattern, try to extract
+            if not ref_entity and 'giống' in query_lower:
+                # Extract entity name before "giống"
+                import re
+                match = re.search(r'giống\s+([^?]+)', query_lower)
+                if match:
+                    entity_name = match.group(1).strip()
+                    # Try to find group with this name
+                    all_groups = self.kg.get_entities_by_type('Group')
+                    for group in all_groups:
+                        if entity_name.lower() in group.lower() or group.lower() in entity_name.lower():
+                            ref_entity = group
+                            break
+            
+            if ref_entity:
+                # Get labelmates (groups with same company)
+                labelmates = self.reasoner.get_labelmates(ref_entity)
+                labelmate_set = set(labelmates.answer_entities) if hasattr(labelmates, 'answer_entities') else set()
+                
+                # Also try direct company matching
+                ref_companies = self.kg.get_group_companies(ref_entity)
+                if ref_companies:
+                    all_groups = self.kg.get_entities_by_type('Group')
+                    for group in all_groups:
+                        if group != ref_entity:
+                            group_companies = self.kg.get_group_companies(group)
+                            if ref_companies.intersection(group_companies):
+                                labelmate_set.add(group)
+                
+                # Find matching choice
+                for labelmate in labelmate_set:
+                    for i, choice in enumerate(choices):
+                        if labelmate.lower() in choice.lower() or choice.lower() in labelmate.lower():
+                            selected_index = i
+                            selected_choice = choices[i]
+                            confidence = 0.9
+                            break
+                    if selected_index is not None:
+                        break
         
         # Fallback: Score-based selection using context and reasoning result
         if selected_index is None:
@@ -991,9 +1428,29 @@ class KpopChatbot:
             return list(variants)  # Loại bỏ trùng lặp
 
         # ===== Graph -> Query: quét n-gram (1-4 words) để bắt cặp tên liền nhau =====
+        # QUAN TRỌNG: Extract suffix từ query trước khi strip để ưu tiên match
+        # Ví dụ: "F(x) (nhóm nhạc)" → suffix = "(nhóm nhạc)"
+        import re
+        # Extract các suffix patterns từ query
+        suffix_patterns = re.findall(r'\([^)]+\)', query_lower)
+        query_suffixes = set()  # Lưu các suffix đã tìm thấy
+        for suffix in suffix_patterns:
+            # Normalize suffix: "(nhóm nhạc)", "(ca sĩ)", etc.
+            suffix_clean = suffix.strip('()').lower()
+            if 'nhóm' in suffix_clean or 'group' in suffix_clean:
+                query_suffixes.add('(nhóm nhạc)')
+            elif 'ca sĩ' in suffix_clean or 'singer' in suffix_clean or 'artist' in suffix_clean:
+                query_suffixes.add('(ca sĩ)')
+            else:
+                query_suffixes.add(suffix)  # Giữ nguyên các suffix khác
+        
+        # Strip hậu tố trong query để tạo tokens
+        query_cleaned = re.sub(r'\s*\([^)]+\)\s*', ' ', query_lower)
+        query_cleaned = ' '.join(query_cleaned.split())  # Normalize spaces
+        
         # QUAN TRỌNG: Xử lý tokens có dash trong đó (như "won-young")
         # Tách tokens, nhưng cũng tách các token có dash thành nhiều parts
-        tokens = query_lower.split()
+        tokens = query_cleaned.split()
         expanded_tokens = []
         for token in tokens:
             expanded_tokens.append(token)  # Giữ nguyên token gốc
@@ -1022,54 +1479,154 @@ class KpopChatbot:
         # Loại bỏ trùng lặp
         ngrams = list(dict.fromkeys(ngrams))
 
+        # QUAN TRỌNG: Định nghĩa query_words_list TRƯỚC khi sử dụng
+        # Sử dụng query_cleaned (đã strip hậu tố) thay vì query_lower để match tốt hơn
+        query_words_list = query_cleaned.split()  # List để giữ thứ tự
+        query_words_list_original = query_lower.split()  # Giữ bản gốc để fallback
+
         matched_from_graph = []
         candidate_scores = []  # list of (name, score, label)
-        token_set = set(tokens)
+        token_set = set(tokens)  # Từ query_cleaned (đã strip hậu tố)
+        token_set_original = set(query_words_list_original)  # Từ query gốc (fallback)
 
         # Track normalized names để tránh duplicate (ví dụ: "Rosé" và "Rosé (ca sĩ)" → chỉ giữ 1)
         normalized_seen = set()
         # Track các từ đã được match trong tên đầy đủ để tránh match single word khi đã có match đầy đủ
         # Ví dụ: nếu đã match "Yoo Jeong-yeon", thì không match "Yoo" nữa
         words_in_matched_full_names = set()
-        
-        # QUAN TRỌNG: Định nghĩa query_words_list TRƯỚC function _match_list để có thể sử dụng
-        query_words_list = query_lower.split()  # List để giữ thứ tự
 
-        # Thu thập ứng viên từ variant_map bằng n-gram (graph -> query)
-        # QUAN TRỌNG: Normalize và lookup với nhiều variants để cover mọi trường hợp
+        # ============================================
+        # BƯỚC 1: LOOKUP TỪ VARIANT_MAP (ƯU TIÊN - NHANH VÀ CHÍNH XÁC)
+        # ============================================
+        # QUAN TRỌNG: Variant map đã được build với tất cả biến thể từ graph
+        # Ưu tiên lookup từ variant_map trước vì đã được index sẵn và có scoring chính xác
+        
+        # Tạo thêm các biến thể n-gram từ query_cleaned (đã strip hậu tố)
+        cleaned_ngrams = []
+        cleaned_tokens = query_cleaned.split()
+        for n in [1, 2, 3, 4]:
+            for i in range(len(cleaned_tokens) - n + 1):
+                ngram = " ".join(cleaned_tokens[i:i+n])
+                cleaned_ngrams.append(ngram)
+                cleaned_ngrams.append(ngram.replace(" ", ""))
+                cleaned_ngrams.append(ngram.replace(" ", "-"))
+                if '-' in ngram:
+                    cleaned_ngrams.append(ngram.replace("-", " "))
+                    cleaned_ngrams.append(ngram.replace("-", ""))
+        
+        # Kết hợp cả ngrams từ query gốc và query đã cleaned
+        all_ngrams = list(dict.fromkeys(ngrams + cleaned_ngrams))
+        
         seen_entities = set()  # Tránh trùng lặp
-        for ng in ngrams:
+        
+        for ng in all_ngrams:
             if len(ng) < 2:
                 continue
-            # Normalize n-gram (loại bỏ spaces thừa)
+            # Normalize n-gram (loại bỏ spaces thừa, ký tự đặc biệt)
             ng_normalized = " ".join(ng.split())
-            # Tạo các lookup keys: original, normalized, lowercase
-            lookup_keys = [ng, ng_normalized, ng.lower(), ng_normalized.lower()]
+            # Loại bỏ ký tự đặc biệt như *, (), [] nhưng giữ lại dash và space
+            import re
+            ng_clean = re.sub(r'[^\w\s-]', '', ng_normalized)
+            # Tạo các lookup keys: original, normalized, lowercase, cleaned
+            # QUAN TRỌNG: Thử nhiều biến thể của n-gram để match tốt hơn
+            lookup_keys = [
+                ng, 
+                ng_normalized, 
+                ng.lower(), 
+                ng_normalized.lower(), 
+                ng_clean.lower(),
+                ng_clean,  # Thêm cả cleaned không lowercase
+                ng.replace(' ', '-').lower(),  # Thêm variant với dash
+                ng.replace('-', ' ').lower(),  # Thêm variant với space
+            ]
             # Loại bỏ trùng lặp
             lookup_keys = list(dict.fromkeys(lookup_keys))
             
             for lookup_key in lookup_keys:
                 if lookup_key in variant_map:
+                    # Variant map đã được sort theo score (highest first)
+                    # Ưu tiên lấy entity có score cao nhất (exact match)
+                    # QUAN TRỌNG: Ưu tiên entities có suffix khớp với query
+                    entities_with_suffix = []  # Entities có suffix khớp
+                    entities_without_suffix = []  # Entities không có suffix hoặc không khớp
+                    
                     for ent in variant_map[lookup_key]:
-                        if ent["label"] in ['Artist', 'Group']:
-                            entity_name = ent["name"]
-                            normalized = self._normalize_entity_name(entity_name).lower()
-                            # Tránh trùng lặp bằng normalized name
-                            if normalized not in normalized_seen:
-                                normalized_seen.add(normalized)
-                                seen_entities.add(entity_name)
-                                label = ent.get("label", "Artist")
-                                candidate_scores.append((entity_name, ent.get("score", 1.5), label))
-                                matched_from_graph.append({"name": entity_name, "score": ent.get("score", 1.5)})
+                        entity_name = ent["name"]
+                        normalized = self._normalize_entity_name(entity_name).lower()
+                        label = ent.get("label", "Unknown")
+                        
+                        # Filter theo expected_labels nếu có
+                        if expected_labels and label not in expected_labels:
+                            continue
+                        
+                        # Check nếu entity có suffix khớp với query
+                        has_matching_suffix = False
+                        if query_suffixes:
+                            entity_suffixes = re.findall(r'\([^)]+\)', entity_name.lower())
+                            for entity_suffix in entity_suffixes:
+                                entity_suffix_clean = entity_suffix.strip('()').lower()
+                                for query_suffix in query_suffixes:
+                                    query_suffix_clean = query_suffix.strip('()').lower()
+                                    if query_suffix_clean in entity_suffix_clean or entity_suffix_clean in query_suffix_clean:
+                                        has_matching_suffix = True
+                                        break
+                                if has_matching_suffix:
+                                    break
+                        
+                        # Phân loại entities theo suffix match
+                        if has_matching_suffix:
+                            entities_with_suffix.append((ent, entity_name, normalized, label))
+                        else:
+                            entities_without_suffix.append((ent, entity_name, normalized, label))
+                    
+                    # Xử lý entities có suffix khớp TRƯỚC (ưu tiên cao hơn)
+                    for ent, entity_name, normalized, label in entities_with_suffix:
+                        if normalized not in normalized_seen:
+                            normalized_seen.add(normalized)
+                            seen_entities.add(entity_name)
+                            entity_score = ent.get("score", 1.5)
+                            # Bonus lớn cho suffix match (ưu tiên cao nhất)
+                            entity_score += 1.0
+                            if lookup_key == normalized:
+                                entity_score += 0.5
+                            candidate_scores.append((entity_name, entity_score, label))
+                            matched_from_graph.append({"name": entity_name, "score": entity_score})
+                    
+                    # Sau đó mới xử lý entities không có suffix match
+                    for ent, entity_name, normalized, label in entities_without_suffix:
+                        if normalized not in normalized_seen:
+                            normalized_seen.add(normalized)
+                            seen_entities.add(entity_name)
+                            entity_score = ent.get("score", 1.5)
+                            if lookup_key == normalized:
+                                entity_score += 0.5
+                            candidate_scores.append((entity_name, entity_score, label))
+                            matched_from_graph.append({"name": entity_name, "score": entity_score})
 
-        # Search for group/company/song/album/genre/occupation in query (case-insensitive) - ưu tiên match exact/variant
-        # QUAN TRỌNG: Ưu tiên match đầy đủ tên (n-gram) trước single word
-        def _match_list(nodes: List[str], score_val: float, label: str):
-            # Tạo n-grams từ query (2-4 words) để ưu tiên match đầy đủ tên
+        # ============================================
+        # BƯỚC 2: FALLBACK - MATCH TRỰC TIẾP CHO CÁC ENTITY CHƯA TÌM THẤY
+        # ============================================
+        # Chỉ match các entity chưa được tìm thấy qua variant_map
+        # Ưu tiên match đầy đủ tên (n-gram) trước single word
+        
+        def _match_list_fallback(nodes: List[str], score_val: float, label: str):
+            """Match trực tiếp cho các entity chưa có trong variant_map."""
+            # Tạo n-grams từ query_cleaned (đã strip hậu tố) và query gốc để match tốt hơn
             query_ngrams_for_match = []
+            # Sử dụng query_cleaned (đã strip hậu tố) để match tốt hơn
             for n in [2, 3, 4]:
+                # Từ query_cleaned
                 for i in range(len(query_words_list) - n + 1):
                     ngram = " ".join(query_words_list[i:i+n])
+                    query_ngrams_for_match.append(ngram)
+                    query_ngrams_for_match.append(ngram.replace(" ", ""))
+                    query_ngrams_for_match.append(ngram.replace(" ", "-"))
+                    if '-' in ngram:
+                        query_ngrams_for_match.append(ngram.replace("-", " "))
+                        query_ngrams_for_match.append(ngram.replace("-", ""))
+                # Từ query gốc (fallback)
+                for i in range(len(query_words_list_original) - n + 1):
+                    ngram = " ".join(query_words_list_original[i:i+n])
                     query_ngrams_for_match.append(ngram)
                     query_ngrams_for_match.append(ngram.replace(" ", ""))
                     query_ngrams_for_match.append(ngram.replace(" ", "-"))
@@ -1080,9 +1637,23 @@ class KpopChatbot:
             
             for node in nodes:
                 normalized = self._normalize_entity_name(node).lower()
-                # Check duplicate bằng normalized name
+                # Check duplicate bằng normalized name (đã match qua variant_map)
                 if normalized in normalized_seen:
                     continue
+                
+                # Check nếu entity có suffix khớp với query (ưu tiên cao hơn)
+                has_matching_suffix = False
+                if query_suffixes:
+                    entity_suffixes = re.findall(r'\([^)]+\)', node.lower())
+                    for entity_suffix in entity_suffixes:
+                        entity_suffix_clean = entity_suffix.strip('()').lower()
+                        for query_suffix in query_suffixes:
+                            query_suffix_clean = query_suffix.strip('()').lower()
+                            if query_suffix_clean in entity_suffix_clean or entity_suffix_clean in query_suffix_clean:
+                                has_matching_suffix = True
+                                break
+                        if has_matching_suffix:
+                            break
                 
                 variants = _variants(node)
                 hit = False
@@ -1100,8 +1671,11 @@ class KpopChatbot:
                             # Exact match hoặc substring match
                             if variant == ngram or variant in ngram or ngram in variant:
                                 base_score = score_val + 0.5  # Bonus cho n-gram match
-                                if variant in token_set:
+                                if variant in token_set or variant in token_set_original:
                                     base_score += 0.4  # ưu tiên match đúng token
+                                # QUAN TRỌNG: Bonus lớn cho suffix match (ưu tiên cao nhất)
+                                if has_matching_suffix:
+                                    base_score += 1.0
                                 candidate_scores.append((node, base_score, label))
                                 hit = True
                                 break
@@ -1115,10 +1689,14 @@ class KpopChatbot:
                             continue
                         # Chỉ match single word nếu base_name chỉ có 1 từ
                         if base_name_word_count == 1:
-                            if variant in query_lower:
+                            # Thử cả query_cleaned và query_lower
+                            if variant in query_cleaned or variant in query_lower:
                                 base_score = score_val
-                                if variant in token_set:
+                                if variant in token_set or variant in token_set_original:
                                     base_score += 0.4  # ưu tiên match đúng token
+                                # QUAN TRỌNG: Bonus lớn cho suffix match (ưu tiên cao nhất)
+                                if has_matching_suffix:
+                                    base_score += 1.0
                                 candidate_scores.append((node, base_score, label))
                                 hit = True
                                 break
@@ -1126,10 +1704,15 @@ class KpopChatbot:
                         elif base_name_word_count > 1:
                             variant_words = set(variant.split())
                             query_words_set = set(query_words_list)
-                            if variant_words.issubset(query_words_set):
+                            query_words_set_original = set(query_words_list_original)
+                            # Kiểm tra cả query_cleaned và query gốc
+                            if variant_words.issubset(query_words_set) or variant_words.issubset(query_words_set_original):
                                 base_score = score_val
-                                if variant in token_set:
+                                if variant in token_set or variant in token_set_original:
                                     base_score += 0.4
+                                # QUAN TRỌNG: Bonus lớn cho suffix match (ưu tiên cao nhất)
+                                if has_matching_suffix:
+                                    base_score += 1.0
                                 candidate_scores.append((node, base_score, label))
                                 hit = True
                                 break
@@ -1139,12 +1722,13 @@ class KpopChatbot:
                     normalized_seen.add(normalized)
                     # không break để có thể thêm nhiều thực thể, nhưng tránh trùng lặp
         
-        _match_list(all_groups, 1.6, 'Group')
-        _match_list(all_companies, 1.3, 'Company')
-        _match_list(all_songs, 1.2, 'Song')
-        _match_list(all_albums, 1.2, 'Album')
-        _match_list(all_genres, 1.1, 'Genre')
-        _match_list(all_occupations, 1.0, 'Occupation')
+        # Match các entity types chưa được cover trong variant_map (Company, Song, Album, Genre, Occupation)
+        # Artists và Groups đã được xử lý qua variant_map và logic riêng ở trên
+        _match_list_fallback(all_companies, 1.3, 'Company')
+        _match_list_fallback(all_songs, 1.2, 'Song')
+        _match_list_fallback(all_albums, 1.2, 'Album')
+        _match_list_fallback(all_genres, 1.1, 'Genre')
+        _match_list_fallback(all_occupations, 1.0, 'Occupation')
         
         # ============================================
         # KEY STRATEGY: Match by length (longest first)
@@ -1286,43 +1870,26 @@ class KpopChatbot:
         entities.extend(found_artists)
         
         # ============================================
-        # MATCH OTHER ENTITY TYPES (Groups, etc.)
+        # THÊM ENTITIES TỪ VARIANT_MAP VÀO KẾT QUẢ
         # ============================================
-        def _match_list(nodes: List[str], score_val: float, label: str):
-            for node in nodes:
-                normalized = self._normalize_entity_name(node).lower()
-                if normalized in normalized_seen:
-                    continue
-                
-                variants = self._generate_variants(node)
-                
-                # Simple matching (no span tracking for non-artists)
-                for variant in variants:
-                    if variant in query_lower and len(variant) >= 3:
-                        # Check if it's a full word match or n-gram match
-                        if variant in query_words_list or all(w in query_lower for w in variant.split()):
-                            entities.append(node)
-                            normalized_seen.add(normalized)
-                            candidate_scores.append((node, score_val, label))
-                            break
-        
-        _match_list(all_groups, 1.6, 'Group')
-        _match_list(all_companies, 1.3, 'Company')
-        _match_list(all_songs, 1.2, 'Song')
-        _match_list(all_albums, 1.2, 'Album')
-        _match_list(all_genres, 1.1, 'Genre')
-        _match_list(all_occupations, 1.0, 'Occupation')
+        # Đảm bảo tất cả entities từ variant_map được thêm vào
+        if matched_from_graph:
+            for m in matched_from_graph:
+                if m['name'] not in entities:
+                    entities.append(m['name'])
         
         # ============================================
         # SORT AND RETURN
         # ============================================
+        # QUAN TRỌNG: Ưu tiên score cao nhất (exact match) trước, sau đó mới đến label priority
         if candidate_scores:
             label_priority = {'Group': 7, 'Artist': 6, 'Company': 5, 'Song': 4, 'Album': 3, 'Genre': 2, 'Occupation': 1}
             ordered = []
             seen = set()
+            # Sort theo: score (cao nhất), label priority, độ dài tên (dài hơn ưu tiên hơn)
             for item in sorted(
                 candidate_scores,
-                key=lambda x: (label_priority.get(x[2] if len(x) > 2 else None, 0), x[1], len(x[0])),
+                key=lambda x: (x[1], label_priority.get(x[2] if len(x) > 2 else None, 0), len(x[0])),
                 reverse=True
             ):
                 name = item[0]
@@ -1460,9 +2027,12 @@ class KpopChatbot:
         """
         Build một map variant -> [entity] để tra cứu nhanh (graph -> query).
         Chỉ giữ label Artist/Group; thêm alias thủ công cho một số case dễ nhầm.
+        ƯU TIÊN: Tạo nhiều biến thể để đảm bảo matching chính xác từ graph → query.
         """
         if hasattr(self, "_entity_variant_map") and self._entity_variant_map is not None:
             return
+        
+        import re
         
         alias_map = {
             # LOONA / LOOΠΔ
@@ -1476,9 +2046,14 @@ class KpopChatbot:
         }
         
         variant_map: Dict[str, List[Dict[str, Any]]] = {}
+        # QUAN TRỌNG: Build variant map cho TẤT CẢ entity types, không chỉ Artist/Group
+        # Ưu tiên Artist và Group vì chúng quan trọng nhất, nhưng cũng index cả Company, Song, Album, etc.
+        entity_type_priority = ['Artist', 'Group', 'Company', 'Song', 'Album', 'Genre', 'Occupation']
+        
         for node, data in self.kg.graph.nodes(data=True):
             label = data.get('label')
-            if label not in ['Artist', 'Group']:
+            # Chỉ index các entity types có trong priority list (để tránh nhiễu)
+            if label not in entity_type_priority:
                 continue
             
             base_name = self._normalize_entity_name(node)
@@ -1500,28 +2075,99 @@ class KpopChatbot:
             all_variants.add(node.lower())
             all_variants.add(base_name.lower())
             
+            # QUAN TRỌNG: Tạo thêm các biến thể từ node name (có thể có hậu tố)
+            # Ví dụ: "Luna (ca sĩ)" → tạo variants cho cả "Luna (ca sĩ)" và "Luna"
+            node_lower = node.lower()
+            main_name = None
+            if '(' in node_lower:
+                # Tách phần tên và hậu tố
+                parts = re.split(r'\s*\([^)]+\)\s*', node_lower)
+                main_name = parts[0].strip()
+                if main_name:
+                    all_variants.add(main_name)
+                    # Tạo variants từ main_name
+                    main_variants = self._generate_variants(main_name)
+                    all_variants.update(main_variants)
+            
+            # QUAN TRỌNG: Tạo n-grams từ tên entity để match tốt hơn
+            # Ví dụ: "Jang Won-young" → ["jang", "won", "young", "jang won", "won young", "jang won young"]
+            base_words = base_name.lower().replace('-', ' ').split()
+            if len(base_words) > 1:
+                # Tạo các n-grams (1-word, 2-word, 3-word, etc.)
+                for n in range(1, min(len(base_words) + 1, 5)):  # Tối đa 4 words
+                    for i in range(len(base_words) - n + 1):
+                        ngram = " ".join(base_words[i:i+n])
+                        all_variants.add(ngram)
+                        # Thêm variants của ngram
+                        ngram_variants = self._generate_variants(ngram)
+                        all_variants.update(ngram_variants)
+            
+            # QUAN TRỌNG: Xử lý ký tự đặc biệt và số
+            # Loại bỏ ký tự đặc biệt như *, (), [] nhưng giữ lại dash và space
+            base_clean = re.sub(r'[^\w\s-]', '', base_name.lower())
+            if base_clean != base_name.lower():
+                all_variants.add(base_clean)
+                base_clean_variants = self._generate_variants(base_clean)
+                all_variants.update(base_clean_variants)
+            
+            # QUAN TRỌNG: Tạo variants không có số (nếu có)
+            base_no_numbers = re.sub(r'\d+', '', base_name.lower())
+            if base_no_numbers != base_name.lower():
+                base_no_numbers = " ".join(base_no_numbers.split())
+                if base_no_numbers:
+                    all_variants.add(base_no_numbers)
+                    base_no_numbers_variants = self._generate_variants(base_no_numbers)
+                    all_variants.update(base_no_numbers_variants)
+            
             for v in all_variants:
                 if len(v) < 2:
                     continue
                 # Normalize: loại bỏ spaces thừa
-                v = " ".join(v.split())
-                if len(v) < 2:
+                v_normalized = " ".join(v.split())
+                if len(v_normalized) < 2:
                     continue
+                
+                # Thêm cả normalized và original vào map
+                for variant_key in [v, v_normalized]:
+                    if len(variant_key) < 2:
+                        continue
                     
-                if v not in variant_map:
-                    variant_map[v] = []
-                # Score: alias cao hơn một chút, base name variants cao hơn node variants
-                if v in extra_alias:
-                    score = 2.0
-                elif v in base_name_variants:
-                    score = 1.6
-                else:
-                    score = 1.5
-                variant_map[v].append({
-                    "name": node,
-                    "label": label,
-                    "score": score
-                })
+                    if variant_key not in variant_map:
+                        variant_map[variant_key] = []
+                    
+                    # Score: Ưu tiên exact match và alias
+                    # Exact match (base_name hoặc node) có score cao nhất
+                    if variant_key == base_name.lower() or variant_key == node.lower():
+                        score = 3.0  # Highest priority
+                    elif variant_key in extra_alias:
+                        score = 2.5  # High priority for aliases
+                    elif variant_key in base_name_variants:
+                        score = 2.0  # High priority for base name variants
+                    elif main_name and variant_key == main_name:
+                        score = 1.8  # High priority for main name (without suffix)
+                    else:
+                        # Default score - có thể điều chỉnh theo label
+                        if label in ['Artist', 'Group']:
+                            score = 1.5  # High priority cho Artist/Group
+                        elif label == 'Company':
+                            score = 1.4
+                        elif label in ['Song', 'Album']:
+                            score = 1.3
+                        else:
+                            score = 1.2  # Lower priority cho các types khác
+                    
+                    # Tránh duplicate entries
+                    existing = [e for e in variant_map[variant_key] if e["name"] == node]
+                    if not existing:
+                        variant_map[variant_key].append({
+                            "name": node,
+                            "label": label,
+                            "score": score
+                        })
+        
+        # Sort entries by score (highest first) để ưu tiên exact match
+        for key in variant_map:
+            variant_map[key].sort(key=lambda x: x["score"], reverse=True)
         
         self._entity_variant_map = variant_map
         
