@@ -64,3 +64,4 @@
 9. ✅ "Dynamite là bài của Jungkook (nhóm BTS); nhóm này trực thuộc công ty nào?"
 10. ⚠️ "Dynamite do Jungkook hát trong nhóm BTS; nhóm BTS thuộc hãng nào?" - test "hãng nào"
 
+

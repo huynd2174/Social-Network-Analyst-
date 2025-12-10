@@ -648,6 +648,57 @@ class KpopChatbot:
         
         return resolved_query
     
+    def _normalize_company(self, company_id: str) -> str:
+        """
+        Normalize company id/name for robust matching.
+        Handles common aliases / case / spacing.
+        """
+        if not company_id:
+            return ""
+        
+        cid = company_id.strip()
+        # Remove prefix if present
+        cid = cid.replace("Company_", "")
+        cid_lower = cid.lower()
+        
+        alias_map = {
+            # Major labels
+            "cube": ["cube entertainment", "cube ent", "company_cube"],
+            "yg entertainment": ["yg", "yg ent", "yg entertainment", "company_yg entertainment"],
+            "jyp entertainment": ["jyp", "jyp ent", "jyp entertainment", "company_jyp entertainment"],
+            "sourcemusic": ["source music", "company_source music"],
+            "source music": ["source music", "company_source music"],
+            "big hit entertainment": ["bighit", "big hit", "big hit entertainment", "hybe", "hybe corporation", "company_hybe", "company_big hit entertainment"],
+            "hybe": ["hybe", "hybe corporation", "bighit", "big hit", "big hit entertainment", "company_hybe", "company_big hit entertainment"],
+            "woollim entertainment": ["woollim", "woollim ent", "company_woollim entertainment"],
+            "stone music entertainment": ["stone music", "stone", "company_stone music"],
+            "ist entertainment": ["ist", "play m", "fave", "company_ist entertainment", "company_play m", "company_fave"],
+            "core contents media": ["mbk", "mbk entertainment", "core contents media", "company_core contents media", "company_mbk entertainment"],
+            "emi music japan": ["emi", "emi music japan", "company_emi music japan"],
+            "ymc entertainment": ["ymc", "company_ymc", "ymc entertainment"],
+            "loen entertainment": ["loen", "kakao m", "kakao entertainment", "company_loen entertainment"],
+        }
+        
+        for norm, aliases in alias_map.items():
+            if cid_lower == norm:
+                return norm
+            if cid_lower in aliases:
+                return norm
+        return cid_lower
+
+    def _company_matches(self, company_a: str, company_b: str) -> bool:
+        """
+        Flexible company matching using alias normalization.
+        """
+        if not company_a or not company_b:
+            return False
+        norm_a = self._normalize_company(company_a)
+        norm_b = self._normalize_company(company_b)
+        if norm_a == norm_b:
+            return True
+        # substring check after normalization
+        return norm_a in norm_b or norm_b in norm_a
+
     def answer_yes_no(
         self,
         query: str,
@@ -787,7 +838,7 @@ class KpopChatbot:
             company_match = re.search(r'(?:company_|công ty\s+)([\w\s]+)', query_lower)
             query_company = None
             if company_match:
-                query_company = 'Company_' + company_match.group(1).strip()
+                    query_company = 'Company_' + company_match.group(1).strip()
             
             # Try to find company entity
             if not query_company:
@@ -834,13 +885,7 @@ class KpopChatbot:
                     for comp in companies:
                         comp_norm = comp.lower().replace('company_', '').strip()
                         # Check exact match or substring
-                        if query_company_norm == comp_norm or query_company_norm in comp_norm or comp_norm in query_company_norm:
-                            answer = "Đúng"
-                            confidence = 1.0
-                            matched_entity = entity_id
-                            break
-                        # Also check if company entity ID matches
-                        if comp.lower() == query_company.lower():
+                        if self._company_matches(comp, query_company):
                             answer = "Đúng"
                             confidence = 1.0
                             matched_entity = entity_id
@@ -912,17 +957,168 @@ class KpopChatbot:
                         elif b_type == 'Company':
                             companies_b.add(b)
                         
-                        # Kiểm tra giao tập công ty
-                        if companies_a and companies_b and companies_a.intersection(companies_b):
-                            answer = "Đúng"
-                            confidence = 0.95
-                            found_match = True
-                            break
+                        # Kiểm tra giao tập công ty (dùng alias matching)
+                        if companies_a and companies_b:
+                            matched = False
+                            for ca in companies_a:
+                                for cb in companies_b:
+                                    if self._company_matches(ca, cb):
+                                        matched = True
+                                        break
+                                if matched:
+                                    break
+                            if matched:
+                                answer = "Đúng"
+                                confidence = 0.95
+                                found_match = True
+                                break
                 if not found_match:
                     answer = "Sai"
                     confidence = 0.9
             else:
                 answer = "Sai"
+                confidence = 0.7
+
+        # Pattern 3a: "X đều trực thuộc Company_Y" hoặc "X và Y đều trực thuộc Company_Z"
+        elif 'đều trực thuộc' in query_lower:
+            # Extract company name from query
+            import re
+            company_match = re.search(r'(?:company_|công ty\s+)([\w\s]+)', query_lower)
+            query_company = None
+            if company_match:
+                query_company = 'Company_' + company_match.group(1).strip()
+            
+            # Find company entity
+            if not query_company:
+                for entity in context['entities']:
+                    if self.kg.get_entity_type(entity['id']) == 'Company':
+                        query_company = entity['id']
+                        break
+            
+            if query_company:
+                # Check all entities (Artist or Group) belong to this company
+                all_belong = True
+                entities_to_check = [e for e in context['entities'] if self.kg.get_entity_type(e['id']) in ['Artist', 'Group']]
+                
+                if not entities_to_check:
+                    # Try to extract more entities
+                    extracted = self._extract_entities_for_membership(
+                        query,
+                        expected_labels={'Artist', 'Group'}
+                    )
+                    for ent in extracted:
+                        entities_to_check.append({'id': ent, 'type': self.kg.get_entity_type(ent) or 'Unknown'})
+                
+                for entity in entities_to_check:
+                    entity_id = entity['id']
+                    entity_type = self.kg.get_entity_type(entity_id) or entity.get('type', 'Unknown')
+                    
+                    companies = set()
+                    if entity_type == 'Artist':
+                        companies.update(self.kg.get_artist_companies(entity_id))
+                        for group in self.kg.get_artist_groups(entity_id):
+                            companies.update(self.kg.get_group_companies(group))
+                    elif entity_type == 'Group':
+                        companies.update(self.kg.get_group_companies(entity_id))
+                    
+                    found = False
+                    for comp in companies:
+                        if self._company_matches(comp, query_company):
+                            found = True
+                            break
+                    if not found:
+                        all_belong = False
+                        break
+                
+                answer = "Có" if all_belong else "Không"
+                confidence = 0.95
+            else:
+                answer = "Không"
+                confidence = 0.7
+        
+        # Pattern 3b: "X đều thuộc nhóm Y" hoặc "X và Y đều thuộc nhóm Z"
+        elif ('đều thuộc nhóm' in query_lower or 'đều là thành viên' in query_lower) and 'cùng' not in query_lower:
+            # Extract group name from query
+            group_mentioned = None
+            for entity in context['entities']:
+                if self.kg.get_entity_type(entity['id']) == 'Group':
+                    group_mentioned = entity['id']
+                    break
+            
+            # If no group found in entities, try to extract from query text
+            if not group_mentioned:
+                # Look for group names in query
+                all_groups = self.kg.get_entities_by_type('Group')
+                for group in all_groups:
+                    if group.lower() in query_lower:
+                        group_mentioned = group
+                        break
+            
+            if group_mentioned:
+                # Check all artists in context are members of this group
+                all_in_group = True
+                for entity in context['entities']:
+                    if self.kg.get_entity_type(entity['id']) == 'Artist':
+                        groups = self.kg.get_artist_groups(entity['id'])
+                        if group_mentioned not in groups:
+                            all_in_group = False
+                            break
+                
+                answer = "Có" if all_in_group else "Không"
+                confidence = 0.95
+            else:
+                answer = "Không"
+                confidence = 0.7
+
+        # Pattern 4: "X và Y có cùng nhóm không?" hoặc "X có chung nhóm với Y không?" (same group)
+        elif ('cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower or 'chung nhóm' in query_lower):
+            # Ensure we have at least two entities
+            if len(context['entities']) < 2:
+                extracted = self._extract_entities_for_membership(
+                    query,
+                    expected_labels={'Artist', 'Group'}
+                )
+                for ent in extracted:
+                    if not any(e['id'] == ent for e in context['entities']):
+                        ent_type = self.kg.get_entity_type(ent) or 'Unknown'
+                        context['entities'].append({'id': ent, 'type': ent_type})
+            
+            if len(context['entities']) >= 2:
+                # Thử TẤT CẢ cặp entity (Artist-Artist, Artist-Group, Group-Group)
+                found_match = False
+                for i in range(len(context['entities'])):
+                    if found_match:
+                        break
+                    for j in range(i + 1, len(context['entities'])):
+                        a = context['entities'][i]['id']
+                        b = context['entities'][j]['id']
+                        a_type = self.kg.get_entity_type(a) or context['entities'][i].get('type', 'Unknown')
+                        b_type = self.kg.get_entity_type(b) or context['entities'][j].get('type', 'Unknown')
+                        
+                        # Lấy nhóm của cả hai entity
+                        groups_a = set()
+                        if a_type == 'Artist':
+                            groups_a.update(self.kg.get_artist_groups(a))
+                        elif a_type == 'Group':
+                            groups_a.add(a)  # Group chính nó
+                        
+                        groups_b = set()
+                        if b_type == 'Artist':
+                            groups_b.update(self.kg.get_artist_groups(b))
+                        elif b_type == 'Group':
+                            groups_b.add(b)  # Group chính nó
+                        
+                        # Kiểm tra giao tập nhóm
+                        if groups_a and groups_b and groups_a.intersection(groups_b):
+                            answer = "Có"
+                            confidence = 0.95
+                            found_match = True
+                            break
+                if not found_match:
+                    answer = "Không"
+                    confidence = 0.9
+            else:
+                answer = "Không"
                 confidence = 0.7
                 
         # Ensure we have at least two entities for same-company / same-group checks
@@ -1292,15 +1488,18 @@ class KpopChatbot:
                 labelmates = self.reasoner.get_labelmates(ref_entity)
                 labelmate_set = set(labelmates.answer_entities) if hasattr(labelmates, 'answer_entities') else set()
                 
-                # Also try direct company matching
+                # Also try direct company matching with alias normalization
                 ref_companies = self.kg.get_group_companies(ref_entity)
                 if ref_companies:
                     all_groups = self.kg.get_entities_by_type('Group')
                     for group in all_groups:
                         if group != ref_entity:
                             group_companies = self.kg.get_group_companies(group)
-                            if ref_companies.intersection(group_companies):
-                                labelmate_set.add(group)
+                            for rc in ref_companies:
+                                for gc in group_companies:
+                                    if self._company_matches(rc, gc):
+                                        labelmate_set.add(group)
+                                        break
                 
                 # Find matching choice
                 for labelmate in labelmate_set:
