@@ -265,6 +265,11 @@ class KpopChatbot:
         
         # Bổ sung nhận dạng cho các câu hỏi đa dạng trong dataset đánh giá
         is_genre_question = 'thể loại' in query_lower or 'genre' in query_lower
+        # Câu hỏi về năm hoạt động/phát hành/thành lập
+        is_year_question = (
+            ('năm' in query_lower) and
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower)
+        )
         is_song_in_album_question = (
             ('bài hát' in query_lower and 'album' in query_lower)
             or ('contains' in query_lower and 'released' in query_lower)
@@ -569,12 +574,16 @@ class KpopChatbot:
         # - Facts: từ triples (source, relationship, target) trong graph
         # - Reasoning: từ graph traversal (paths, hops)
         
-        # If reasoning found a direct answer for membership, same group, same company, or song-group queries, use it (more accurate than LLM)
+        # If reasoning found a direct answer for membership, same group, same company, song-group, or year queries, use it (more accurate than LLM)
         # QUAN TRỌNG: Ưu tiên reasoning result cho các câu hỏi factual (tránh LLM hallucinate)
         # Check nếu là song-group question VÀ có reasoning result (kể cả khi confidence thấp)
         use_reasoning_result = False
         if is_song_group_company_question or is_song_group_genre_question or is_song_artist_group_genre_question or is_album_group_genre_question or is_album_artist_occupation_question:
             # Với song-group questions, LUÔN ưu tiên reasoning result nếu có (kể cả khi confidence thấp)
+            if reasoning_result and reasoning_result.answer_text:
+                use_reasoning_result = True
+        elif is_year_question:
+            # Với câu hỏi về năm, LUÔN ưu tiên reasoning result vì LLM thường hallucinate
             if reasoning_result and reasoning_result.answer_text:
                 use_reasoning_result = True
         elif (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
