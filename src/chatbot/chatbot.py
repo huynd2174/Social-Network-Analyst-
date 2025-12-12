@@ -310,6 +310,22 @@ class KpopChatbot:
             ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
         )
         
+        # Câu hỏi về thể loại của nhóm nhạc đã ra mắt album X (Album → Group → Genre)
+        is_album_group_genre_question = (
+            ('album' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
+            ('ra mắt' in query_lower or 'phát hành' in query_lower or 'đã' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
+        
+        # Câu hỏi về nghề nghiệp của ca sĩ đã ra mắt album X (Album → Artist → Occupation)
+        is_album_artist_occupation_question = (
+            ('album' in query_lower) and
+            ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower) and
+            ('ra mắt' in query_lower or 'phát hành' in query_lower or 'đã' in query_lower) and
+            ('nghề nghiệp' in query_lower or 'occupation' in query_lower or 'vai trò' in query_lower)
+        )
+        
         # Xác định label kỳ vọng từ câu hỏi để lọc thực thể đúng loại
         # QUAN TRỌNG: Với same_group question, KHÔNG include Company để tránh extract sai
         expected_labels = set()

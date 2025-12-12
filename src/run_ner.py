@@ -465,6 +465,8 @@ def has_kpop_context(source_nodes, min_keywords=3):
     """
     Kiểm tra entity có trong context K-pop không
     
+    Cải thiện: Sử dụng trọng số cho từ khóa quan trọng
+    
     Args:
         source_nodes: Danh sách node IDs nguồn
         min_keywords: Số từ khóa K-pop tối thiểu (mặc định 3)
@@ -472,12 +474,29 @@ def has_kpop_context(source_nodes, min_keywords=3):
     if isinstance(source_nodes, str):
         source_nodes = [source_nodes]
     
+    # Từ khóa quan trọng có trọng số cao hơn
+    HIGH_WEIGHT_KEYWORDS = {
+        'k-pop', 'kpop', 'k pop', 'idol', 'idols', 'thần tượng',
+        'debut', 'ra mắt', 'comeback', 'trở lại',
+        'nhóm nhạc', 'ca sĩ', 'hàn quốc', 'korea', 'korean',
+        'sm entertainment', 'jyp entertainment', 'yg entertainment', 'hybe',
+    }
+    
     for source in source_nodes:
         text = node_texts.get(source, '')
         if text:
             text_lower = text.lower()
-            kpop_count = sum(1 for kw in KPOP_KEYWORDS if kw.lower() in text_lower)
-            if kpop_count >= min_keywords:
+            # Đếm với trọng số: từ khóa quan trọng = 2 điểm, từ khóa thường = 1 điểm
+            kpop_score = 0
+            for kw in KPOP_KEYWORDS:
+                if kw.lower() in text_lower:
+                    if kw.lower() in HIGH_WEIGHT_KEYWORDS:
+                        kpop_score += 2
+                    else:
+                        kpop_score += 1
+            
+            # Ngưỡng: ít nhất 3 điểm (tương đương 3 từ khóa thường hoặc 1.5 từ khóa quan trọng)
+            if kpop_score >= min_keywords:
                 return True
     return False
 
@@ -535,21 +554,39 @@ def is_related_to_existing_nodes(entity_text, source_nodes, existing_names, min_
     """
     Kiểm tra entity có liên quan đến các node hiện có trong mạng không
     - Xuất hiện cùng với các nghệ sĩ/nhóm nhạc đã có
+    
+    Cải thiện: Kiểm tra tốt hơn với normalize và partial matching
     """
     if isinstance(source_nodes, str):
         source_nodes = [source_nodes]
     
+    # Normalize entity text để so sánh
+    entity_normalized = normalize_for_comparison(entity_text) if 'normalize_for_comparison' in globals() else entity_text.lower()
+    
     for source in source_nodes:
         # source_node chính là một node trong mạng
-        if source.lower() in existing_names:
+        source_normalized = normalize_for_comparison(source) if 'normalize_for_comparison' in globals() else source.lower()
+        if source_normalized in existing_names:
             return True
         
         full_text = node_texts.get(source, '')
         if not full_text:
             continue
         
+        full_text_lower = full_text.lower()
+        
         # Kiểm tra có nhắc đến các node hiện có không
-        mentioned_count = sum(1 for name in existing_names if name in full_text)
+        # Cải thiện: Kiểm tra cả exact match và partial match (tên dài)
+        mentioned_count = 0
+        for name in existing_names:
+            name_lower = name.lower()
+            # Exact match
+            if name_lower in full_text_lower:
+                mentioned_count += 1
+            # Partial match cho tên dài (ít nhất 4 ký tự)
+            elif len(name_lower) >= 4 and name_lower in full_text_lower:
+                mentioned_count += 0.5  # Partial match có trọng số thấp hơn
+        
         if mentioned_count >= min_mentioned:  # Phải nhắc đến ít nhất min_mentioned node hiện có
             return True
     
@@ -2526,6 +2563,32 @@ for ent in merged_rule_entities:
             removed_count_rule[entity_type] += 1
             removed_reason_rule[entity_type]['post_filter_bad_group'] += 1
             continue
+        
+        # Cải thiện: Validation với danh sách nhóm K-pop đã biết
+        # Nếu không có trong danh sách nhóm đã biết và không có trong graph -> cần kiểm tra kỹ hơn
+        entity_normalized = normalize_for_comparison(entity_text)
+        is_known_group = (
+            low in KNOWN_KPOP_GROUPS or
+            entity_normalized in existing_lower and 'Group' in existing_lower.get(entity_normalized, set())
+        )
+        
+        # Nếu không phải nhóm đã biết và không có trong graph -> giảm confidence
+        if not is_known_group:
+            # Kiểm tra xem có phải nhóm thật không bằng cách xem context
+            # Nếu có từ khóa "nhóm nhạc", "group", "band" trong context -> có thể là nhóm thật
+            has_group_context = False
+            for source in sources:
+                full_text = node_texts.get(source, '')
+                if full_text:
+                    full_text_lower = full_text.lower()
+                    group_keywords = ['nhóm nhạc', 'ban nhạc', 'group', 'band', 'idol group']
+                    if any(kw in full_text_lower for kw in group_keywords):
+                        has_group_context = True
+                        break
+            
+            # Nếu không có context về nhóm -> giảm confidence đáng kể
+            if not has_group_context:
+                ent['confidence'] = max(0.5, ent.get('confidence', 0.7) - 0.2)
     
     # Known list (công ty đã biết) -> luôn giữ
     if ent.get('method') == 'known_list':
@@ -2595,15 +2658,43 @@ for ent in merged_rule_entities:
         removed_reason_rule[entity_type]['not_related_to_network'] += 1
         continue
     
-    # Tính confidence dựa trên số nguồn
+    # Cải thiện: Tính confidence dựa trên nhiều yếu tố
     num_sources = len(set(sources))
-    if num_sources >= 5:
-        ent['confidence'] = min(0.95, ent['confidence'] + 0.2)
-    elif num_sources >= 3:
-        ent['confidence'] = min(0.9, ent['confidence'] + 0.15)
-    elif num_sources >= 2:
-        ent['confidence'] = min(0.85, ent['confidence'] + 0.1)
+    base_confidence = ent.get('confidence', 0.7)
     
+    # Boost từ số nguồn
+    if num_sources >= 5:
+        base_confidence = min(0.95, base_confidence + 0.2)
+    elif num_sources >= 3:
+        base_confidence = min(0.9, base_confidence + 0.15)
+    elif num_sources >= 2:
+        base_confidence = min(0.85, base_confidence + 0.1)
+    
+    # Boost từ việc có trong danh sách đã biết
+    entity_normalized = normalize_for_comparison(entity_text)
+    if entity_type == 'Group' and entity_text.lower() in KNOWN_KPOP_GROUPS:
+        base_confidence = min(0.95, base_confidence + 0.1)
+    elif entity_type == 'Company' and entity_text in KNOWN_COMPANIES:
+        base_confidence = min(0.95, base_confidence + 0.1)
+    elif entity_type == 'Artist':
+        # Kiểm tra có trong graph không
+        if entity_normalized in existing_lower and 'Artist' in existing_lower.get(entity_normalized, set()):
+            base_confidence = min(0.9, base_confidence + 0.1)
+    
+    # Boost từ context quality (số từ khóa K-pop)
+    kpop_score = 0
+    for source in sources:
+        text = node_texts.get(source, '')
+        if text:
+            text_lower = text.lower()
+            kpop_score += sum(1 for kw in KPOP_KEYWORDS if kw.lower() in text_lower)
+    
+    if kpop_score >= 5:
+        base_confidence = min(0.95, base_confidence + 0.05)
+    elif kpop_score >= 3:
+        base_confidence = min(0.9, base_confidence + 0.03)
+    
+    ent['confidence'] = base_confidence
     filtered_rule_entities.append(ent)
 
 # =====================================================
@@ -2657,15 +2748,43 @@ if ML_NER_AVAILABLE and merged_ml_entities:
             removed_reason_ml[entity_type]['ml_low_confidence'] += 1
             continue
         
-        # Tính confidence dựa trên số nguồn
+        # Cải thiện: Tính confidence dựa trên nhiều yếu tố (giống rule-based)
         num_sources = len(set(sources))
-        if num_sources >= 5:
-            ent['confidence'] = min(0.95, ent['confidence'] + 0.2)
-        elif num_sources >= 3:
-            ent['confidence'] = min(0.9, ent['confidence'] + 0.15)
-        elif num_sources >= 2:
-            ent['confidence'] = min(0.85, ent['confidence'] + 0.1)
+        base_confidence = ent.get('confidence', 0.65)
         
+        # Boost từ số nguồn
+        if num_sources >= 5:
+            base_confidence = min(0.95, base_confidence + 0.2)
+        elif num_sources >= 3:
+            base_confidence = min(0.9, base_confidence + 0.15)
+        elif num_sources >= 2:
+            base_confidence = min(0.85, base_confidence + 0.1)
+        
+        # Boost từ việc có trong danh sách đã biết
+        entity_normalized = normalize_for_comparison(entity_text)
+        if entity_type == 'Group' and entity_text.lower() in KNOWN_KPOP_GROUPS:
+            base_confidence = min(0.95, base_confidence + 0.1)
+        elif entity_type == 'Company' and entity_text in KNOWN_COMPANIES:
+            base_confidence = min(0.95, base_confidence + 0.1)
+        elif entity_type == 'Artist':
+            # Kiểm tra có trong graph không
+            if entity_normalized in existing_lower and 'Artist' in existing_lower.get(entity_normalized, set()):
+                base_confidence = min(0.9, base_confidence + 0.1)
+        
+        # Boost từ context quality (số từ khóa K-pop)
+        kpop_score = 0
+        for source in sources:
+            text = node_texts.get(source, '')
+            if text:
+                text_lower = text.lower()
+                kpop_score += sum(1 for kw in KPOP_KEYWORDS if kw.lower() in text_lower)
+        
+        if kpop_score >= 5:
+            base_confidence = min(0.95, base_confidence + 0.05)
+        elif kpop_score >= 3:
+            base_confidence = min(0.9, base_confidence + 0.03)
+        
+        ent['confidence'] = base_confidence
         filtered_ml_entities.append(ent)
 
 # =====================================================
@@ -2733,7 +2852,180 @@ filtered_ml_entities = list(final_unique_ml.values())
 if ML_NER_AVAILABLE:
     print(f"  ✓ Còn {len(filtered_ml_entities)} entities (ML-based) sau khi lọc")
 
-# Sắp xếp theo confidence giảm dần
+# =====================================================
+# BƯỚC 5: LỚP LỌC CUỐI CÙNG BẰNG SLM (SMALL LANGUAGE MODEL)
+# =====================================================
+print("\n🤖 Bước 5: Lọc cuối cùng bằng Small Language Model (SLM)...")
+
+# Import SLM nếu có
+SLM_AVAILABLE = False
+slm_validator = None
+try:
+    from chatbot.small_llm import get_llm
+    try:
+        slm_validator = get_llm("qwen2-0.5b")
+        SLM_AVAILABLE = True
+        print("  ✅ SLM đã sẵn sàng để validation")
+    except Exception as e:
+        print(f"  ⚠️  Không thể load SLM: {e}")
+        print("  ⚠️  Bỏ qua lớp lọc SLM, chỉ dùng rule-based filtering")
+        SLM_AVAILABLE = False
+except ImportError:
+    print("  ⚠️  Module small_llm không khả dụng. Bỏ qua lớp lọc SLM.")
+    SLM_AVAILABLE = False
+
+def validate_entity_with_slm(entity_text, entity_type, sources, slm):
+    """
+    Validate entity bằng Small Language Model
+    
+    Args:
+        entity_text: Tên entity
+        entity_type: Loại entity (Artist, Group, Company, Album, Song)
+        sources: Danh sách source nodes
+        slm: SmallLLM instance
+    
+    Returns:
+        Tuple (is_valid, confidence_adjustment, reason)
+    """
+    if not slm:
+        return True, 0.0, "SLM không khả dụng"
+    
+    # Lấy context từ sources
+    context_parts = []
+    for source in sources[:3]:  # Chỉ lấy 3 sources đầu để tránh context quá dài
+        text = node_texts.get(source, '')
+        if text:
+            # Lấy đoạn text xung quanh entity (200 ký tự)
+            entity_lower = entity_text.lower()
+            idx = text.lower().find(entity_lower)
+            if idx != -1:
+                start = max(0, idx - 100)
+                end = min(len(text), idx + len(entity_text) + 100)
+                context_parts.append(text[start:end])
+            else:
+                context_parts.append(text[:200])  # Lấy 200 ký tự đầu
+    
+    context = "\n".join(context_parts[:2])  # Chỉ lấy 2 đoạn context đầu
+    
+    # Tạo prompt validation
+    validation_prompt = f"""Bạn là chuyên gia về K-pop (nhạc Hàn Quốc). Hãy đánh giá xem thực thể sau có hợp lệ không.
+
+THỰC THỂ CẦN KIỂM TRA:
+- Tên: "{entity_text}"
+- Loại: {entity_type}
+- Context: {context[:500]}
+
+YÊU CẦU:
+1. Nếu là {entity_type} trong K-pop (nhạc Hàn Quốc) -> trả lời "VALID"
+2. Nếu KHÔNG phải {entity_type} trong K-pop (ví dụ: nghệ sĩ nước ngoài, chương trình TV, địa danh, câu văn...) -> trả lời "INVALID"
+3. Nếu không chắc chắn -> trả lời "UNCERTAIN"
+
+Chỉ trả lời một từ: VALID, INVALID, hoặc UNCERTAIN."""
+
+    try:
+        response = slm.generate(
+            validation_prompt,
+            context="",
+            max_new_tokens=20,
+            temperature=0.1  # Low temperature để có kết quả nhất quán
+        )
+        
+        response_upper = response.strip().upper()
+        
+        if "VALID" in response_upper:
+            return True, 0.05, "SLM xác nhận hợp lệ"  # Tăng confidence nhẹ
+        elif "INVALID" in response_upper:
+            return False, -0.2, "SLM xác nhận không hợp lệ"  # Giảm confidence đáng kể
+        else:
+            # UNCERTAIN hoặc không rõ ràng
+            return True, -0.05, "SLM không chắc chắn"  # Giảm confidence nhẹ
+    except Exception as e:
+        # Nếu SLM lỗi, giữ nguyên entity (fallback)
+        return True, 0.0, f"SLM error: {str(e)[:50]}"
+
+# Áp dụng SLM validation cho rule-based entities
+if SLM_AVAILABLE and slm_validator:
+    print("  🔍 Đang validate rule-based entities bằng SLM...")
+    slm_validated_rule = []
+    slm_removed_rule = 0
+    slm_adjusted_rule = 0
+    
+    # Chỉ validate các entities có confidence >= 0.7 (để tiết kiệm thời gian)
+    entities_to_validate = [e for e in filtered_rule_entities if e.get('confidence', 0) >= 0.7]
+    print(f"    Validating {len(entities_to_validate)} entities (confidence >= 0.7)...")
+    
+    for i, ent in enumerate(entities_to_validate, 1):
+        if i % 50 == 0:
+            print(f"    Đã validate: {i}/{len(entities_to_validate)}...")
+        
+        is_valid, conf_adj, reason = validate_entity_with_slm(
+            ent['text'],
+            ent['type'],
+            ent.get('sources', [ent.get('source_node', '')]),
+            slm_validator
+        )
+        
+        if is_valid:
+            # Điều chỉnh confidence
+            new_confidence = max(0.0, min(1.0, ent.get('confidence', 0.7) + conf_adj))
+            ent['confidence'] = new_confidence
+            if conf_adj != 0:
+                slm_adjusted_rule += 1
+            slm_validated_rule.append(ent)
+        else:
+            slm_removed_rule += 1
+            if i <= 10:  # In 10 entities đầu bị loại
+                print(f"      ❌ Removed: '{ent['text']}' ({ent['type']}) - {reason}")
+    
+    # Giữ lại các entities có confidence < 0.7 (không validate bằng SLM)
+    low_conf_entities = [e for e in filtered_rule_entities if e.get('confidence', 0) < 0.7]
+    filtered_rule_entities = slm_validated_rule + low_conf_entities
+    
+    print(f"  ✓ SLM validation: Giữ {len(slm_validated_rule)} entities, loại {slm_removed_rule} entities")
+    print(f"  ✓ Điều chỉnh confidence cho {slm_adjusted_rule} entities")
+else:
+    print("  ⚠️  Bỏ qua SLM validation (SLM không khả dụng)")
+
+# Áp dụng SLM validation cho ML-based entities
+if ML_NER_AVAILABLE and SLM_AVAILABLE and slm_validator:
+    print("  🔍 Đang validate ML-based entities bằng SLM...")
+    slm_validated_ml = []
+    slm_removed_ml = 0
+    slm_adjusted_ml = 0
+    
+    # Chỉ validate các entities có confidence >= 0.7
+    entities_to_validate_ml = [e for e in filtered_ml_entities if e.get('confidence', 0) >= 0.7]
+    print(f"    Validating {len(entities_to_validate_ml)} entities (confidence >= 0.7)...")
+    
+    for i, ent in enumerate(entities_to_validate_ml, 1):
+        if i % 50 == 0:
+            print(f"    Đã validate: {i}/{len(entities_to_validate_ml)}...")
+        
+        is_valid, conf_adj, reason = validate_entity_with_slm(
+            ent['text'],
+            ent['type'],
+            ent.get('sources', [ent.get('source_node', '')]),
+            slm_validator
+        )
+        
+        if is_valid:
+            new_confidence = max(0.0, min(1.0, ent.get('confidence', 0.65) + conf_adj))
+            ent['confidence'] = new_confidence
+            if conf_adj != 0:
+                slm_adjusted_ml += 1
+            slm_validated_ml.append(ent)
+        else:
+            slm_removed_ml += 1
+            if i <= 10:
+                print(f"      ❌ Removed: '{ent['text']}' ({ent['type']}) - {reason}")
+    
+    low_conf_entities_ml = [e for e in filtered_ml_entities if e.get('confidence', 0) < 0.7]
+    filtered_ml_entities = slm_validated_ml + low_conf_entities_ml
+    
+    print(f"  ✓ SLM validation: Giữ {len(slm_validated_ml)} entities, loại {slm_removed_ml} entities")
+    print(f"  ✓ Điều chỉnh confidence cho {slm_adjusted_ml} entities")
+
+# Sắp xếp theo confidence giảm dần (sau khi SLM validation)
 filtered_rule_entities.sort(key=lambda x: (-x['confidence'], x['type'], x['text']))
 if ML_NER_AVAILABLE:
     filtered_ml_entities.sort(key=lambda x: (-x['confidence'], x['type'], x['text']))

@@ -485,17 +485,19 @@ class RelationshipExtractor:
             # Loại bỏ các quan hệ có context quá dài (entities quá xa nhau)
             context = rel.get('context', '')
             
-            # Đối với MEMBER_OF từ rule-based, yêu cầu chặt chẽ hơn
-            if rel_type == 'MEMBER_OF' and rel.get('method') == 'rule-based':
-                if len(context) > 200:  # Context quá dài = entities quá xa nhau
-                    continue
+            # Cải thiện: Kiểm tra context với logic tốt hơn
+            if context:
+                context_lower = context.lower()
+                source_lower = source.lower()
+                target_lower = target.lower()
                 
                 # Kiểm tra xem source và target có thực sự xuất hiện trong context không
-                if context:
-                    context_lower = context.lower()
-                    source_lower = source.lower()
-                    target_lower = target.lower()
-                    if source_lower not in context_lower or target_lower not in context_lower:
+                if source_lower not in context_lower or target_lower not in context_lower:
+                    continue
+                
+                # Đối với MEMBER_OF từ rule-based, yêu cầu chặt chẽ hơn
+                if rel_type == 'MEMBER_OF' and rel.get('method') == 'rule-based':
+                    if len(context) > 200:  # Context quá dài = entities quá xa nhau
                         continue
                     
                     # Kiểm tra khoảng cách trong context - CHẶT HƠN cho MEMBER_OF
@@ -505,18 +507,32 @@ class RelationshipExtractor:
                         distance = abs(target_pos - source_pos)
                         if distance > 100:  # MEMBER_OF phải gần nhau hơn (< 100 ký tự)
                             continue
-            else:
-                # Các quan hệ khác: giữ logic cũ
-                if len(context) > 300:
-                    continue
-                
-                # Kiểm tra xem source và target có thực sự xuất hiện trong context không
-                if context:
-                    context_lower = context.lower()
-                    source_lower = source.lower()
-                    target_lower = target.lower()
-                    if source_lower not in context_lower or target_lower not in context_lower:
+                    
+                    # Cải thiện: Kiểm tra có từ khóa quan hệ trong context không
+                    member_keywords = ['thành viên', 'member', 'cựu thành viên', 'former member', 
+                                     'current member', 'past member', 'trưởng nhóm', 'leader']
+                    has_member_keyword = any(kw in context_lower for kw in member_keywords)
+                    if not has_member_keyword:
+                        # Không có từ khóa quan hệ -> giảm confidence
+                        rel['confidence'] = max(0.6, rel.get('confidence', 0.7) - 0.1)
+                else:
+                    # Các quan hệ khác: giữ logic cũ nhưng cải thiện
+                    if len(context) > 300:
                         continue
+                    
+                    # Cải thiện: Kiểm tra có từ khóa quan hệ trong context không (tùy loại)
+                    rel_keywords_map = {
+                        'RELEASED': ['phát hành', 'release', 'ra mắt', 'debut'],
+                        'SINGS': ['hát', 'sing', 'ca khúc', 'bài hát', 'song'],
+                        'MANAGED_BY': ['quản lý', 'manage', 'công ty', 'company', 'entertainment'],
+                        'CONTAINS': ['chứa', 'contain', 'bao gồm', 'include'],
+                    }
+                    rel_keywords = rel_keywords_map.get(rel_type, [])
+                    if rel_keywords:
+                        has_rel_keyword = any(kw in context_lower for kw in rel_keywords)
+                        if not has_rel_keyword:
+                            # Không có từ khóa quan hệ -> giảm confidence
+                            rel['confidence'] = max(0.65, rel.get('confidence', 0.7) - 0.05)
                     
                     # Kiểm tra khoảng cách trong context
                     source_pos = context_lower.find(source_lower)
@@ -2170,6 +2186,122 @@ def main():
     # In top 20 node có nhiều quan hệ nhất
     for node, deg in sorted(node_degree.items(), key=lambda x: -x[1])[:20]:
         print(f"  • {node}: {deg} quan hệ")
+    
+    # =====================================================
+    # BƯỚC CUỐI: LỚP LỌC CUỐI CÙNG BẰNG SLM (SMALL LANGUAGE MODEL)
+    # =====================================================
+    print("\n🤖 Bước cuối: Lọc cuối cùng bằng Small Language Model (SLM)...")
+    
+    # Import SLM nếu có
+    SLM_AVAILABLE = False
+    slm_validator = None
+    try:
+        from chatbot.small_llm import get_llm
+        try:
+            slm_validator = get_llm("qwen2-0.5b")
+            SLM_AVAILABLE = True
+            print("  ✅ SLM đã sẵn sàng để validation")
+        except Exception as e:
+            print(f"  ⚠️  Không thể load SLM: {e}")
+            print("  ⚠️  Bỏ qua lớp lọc SLM, chỉ dùng rule-based filtering")
+            SLM_AVAILABLE = False
+    except ImportError:
+        print("  ⚠️  Module small_llm không khả dụng. Bỏ qua lớp lọc SLM.")
+        SLM_AVAILABLE = False
+    
+    def validate_relationship_with_slm(rel, slm):
+        """
+        Validate relationship bằng Small Language Model
+        
+        Args:
+            rel: Relationship dictionary
+            slm: SmallLLM instance
+        
+        Returns:
+            Tuple (is_valid, confidence_adjustment, reason)
+        """
+        if not slm:
+            return True, 0.0, "SLM không khả dụng"
+        
+        source = rel.get('source', '')
+        target = rel.get('target', '')
+        rel_type = rel.get('type', '')
+        context = rel.get('context', '')[:500]  # Giới hạn context
+        
+        # Tạo prompt validation
+        validation_prompt = f"""Bạn là chuyên gia về K-pop (nhạc Hàn Quốc). Hãy đánh giá xem quan hệ sau có hợp lệ không.
+
+QUAN HỆ CẦN KIỂM TRA:
+- Source: "{source}"
+- Target: "{target}"
+- Loại quan hệ: {rel_type}
+- Context: {context}
+
+YÊU CẦU:
+1. Nếu quan hệ {rel_type} giữa "{source}" và "{target}" là HỢP LỆ trong K-pop -> trả lời "VALID"
+2. Nếu quan hệ KHÔNG hợp lệ (ví dụ: sai loại, không liên quan, không đúng context...) -> trả lời "INVALID"
+3. Nếu không chắc chắn -> trả lời "UNCERTAIN"
+
+Chỉ trả lời một từ: VALID, INVALID, hoặc UNCERTAIN."""
+
+        try:
+            response = slm.generate(
+                validation_prompt,
+                context="",
+                max_new_tokens=20,
+                temperature=0.1  # Low temperature để có kết quả nhất quán
+            )
+            
+            response_upper = response.strip().upper()
+            
+            if "VALID" in response_upper:
+                return True, 0.05, "SLM xác nhận hợp lệ"  # Tăng confidence nhẹ
+            elif "INVALID" in response_upper:
+                return False, -0.2, "SLM xác nhận không hợp lệ"  # Giảm confidence đáng kể
+            else:
+                # UNCERTAIN hoặc không rõ ràng
+                return True, -0.05, "SLM không chắc chắn"  # Giảm confidence nhẹ
+        except Exception as e:
+            # Nếu SLM lỗi, giữ nguyên relationship (fallback)
+            return True, 0.0, f"SLM error: {str(e)[:50]}"
+    
+    # Áp dụng SLM validation
+    if SLM_AVAILABLE and slm_validator:
+        print("  🔍 Đang validate relationships bằng SLM...")
+        slm_validated_rels = []
+        slm_removed_rels = 0
+        slm_adjusted_rels = 0
+        
+        # Chỉ validate các relationships có confidence >= 0.75 (để tiết kiệm thời gian)
+        rels_to_validate = [r for r in unique_relationships if r.get('confidence', 0) >= 0.75]
+        print(f"    Validating {len(rels_to_validate)} relationships (confidence >= 0.75)...")
+        
+        for i, rel in enumerate(rels_to_validate, 1):
+            if i % 50 == 0:
+                print(f"    Đã validate: {i}/{len(rels_to_validate)}...")
+            
+            is_valid, conf_adj, reason = validate_relationship_with_slm(rel, slm_validator)
+            
+            if is_valid:
+                # Điều chỉnh confidence
+                new_confidence = max(0.0, min(1.0, rel.get('confidence', 0.7) + conf_adj))
+                rel['confidence'] = new_confidence
+                if conf_adj != 0:
+                    slm_adjusted_rels += 1
+                slm_validated_rels.append(rel)
+            else:
+                slm_removed_rels += 1
+                if i <= 10:  # In 10 relationships đầu bị loại
+                    print(f"      ❌ Removed: {rel['source']} → {rel['target']} ({rel['type']}) - {reason}")
+        
+        # Giữ lại các relationships có confidence < 0.75 (không validate bằng SLM)
+        low_conf_rels = [r for r in unique_relationships if r.get('confidence', 0) < 0.75]
+        unique_relationships = slm_validated_rels + low_conf_rels
+        
+        print(f"  ✓ SLM validation: Giữ {len(slm_validated_rels)} relationships, loại {slm_removed_rels} relationships")
+        print(f"  ✓ Điều chỉnh confidence cho {slm_adjusted_rels} relationships")
+    else:
+        print("  ⚠️  Bỏ qua SLM validation (SLM không khả dụng)")
     
     # Lưu kết quả
     output = {
