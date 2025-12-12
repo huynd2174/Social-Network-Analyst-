@@ -287,14 +287,31 @@ class KpopChatbot:
             or '(3-hop)' in query_lower
             or ('qua' in query_lower and 'nhóm' in query_lower and 'công ty' in query_lower)
         )
+        # Câu hỏi về công ty/thể loại của nhóm nhạc đã thể hiện ca khúc X
+        is_song_group_company_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
+            ('công ty' in query_lower or 'company' in query_lower or 'label' in query_lower or 'hãng' in query_lower)
+        )
+        is_song_group_genre_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
         
         # Xác định label kỳ vọng từ câu hỏi để lọc thực thể đúng loại
+        # QUAN TRỌNG: Với same_group question, KHÔNG include Company để tránh extract sai
         expected_labels = set()
         if is_same_group_question or is_list_members_question or 'nhóm' in query_lower or 'ban nhạc' in query_lower:
             expected_labels.add('Group')
         if is_membership_question or 'nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower:
             expected_labels.add('Artist')
-        if is_same_company_question or is_company_via_group_question or 'công ty' in query_lower or 'label' in query_lower or 'hãng' in query_lower:
+        # QUAN TRỌNG: Chỉ thêm Company nếu KHÔNG phải same_group question
+        # để tránh extract Company entities cho same_group questions
+        if (is_same_company_question or is_company_via_group_question or 'công ty' in query_lower or 'label' in query_lower or 'hãng' in query_lower) \
+            and not is_same_group_question:
             expected_labels.add('Company')
         if 'bài hát' in query_lower or 'song' in query_lower:
             expected_labels.add('Song')
@@ -342,8 +359,10 @@ class KpopChatbot:
                 is_artist_genre_question or
                 is_same_occupation_question or
                 is_album_song_group_question or
-            is_three_hop_hint or
-            is_song_company_chain_question
+                is_three_hop_hint or
+                is_song_company_chain_question or
+                is_song_group_company_question or
+                is_song_group_genre_question
             )
             
             if is_same_group_question or is_same_company_question or is_list_members_question or is_artist_group_question:
@@ -662,21 +681,33 @@ class KpopChatbot:
         cid_lower = cid.lower()
         
         alias_map = {
-            # Major labels
-            "cube": ["cube entertainment", "cube ent", "company_cube"],
-            "yg entertainment": ["yg", "yg ent", "yg entertainment", "company_yg entertainment"],
-            "jyp entertainment": ["jyp", "jyp ent", "jyp entertainment", "company_jyp entertainment"],
-            "sourcemusic": ["source music", "company_source music"],
-            "source music": ["source music", "company_source music"],
-            "big hit entertainment": ["bighit", "big hit", "big hit entertainment", "hybe", "hybe corporation", "company_hybe", "company_big hit entertainment"],
-            "hybe": ["hybe", "hybe corporation", "bighit", "big hit", "big hit entertainment", "company_hybe", "company_big hit entertainment"],
+            # Big 4
+            "yg entertainment": ["yg", "yg ent", "yg entertainment", "company_yg entertainment", "yg-ent"],
+            "jyp entertainment": ["jyp", "jyp ent", "jyp entertainment", "company_jyp entertainment", "j.y.p"],
+            "sm entertainment": ["sm", "sm ent", "sm entertainment", "company_sm entertainment"],
+            "hybe": ["hybe", "hybe corporation", "big hit", "big hit entertainment", "bighit", "company_hybe", "company_big hit entertainment"],
+            "big hit entertainment": ["big hit", "bighit", "hybe", "hybe corporation", "company_big hit entertainment"],
+
+            # Mid/other
+            "cube entertainment": ["cube", "cube ent", "company_cube", "company_cube entertainment"],
             "woollim entertainment": ["woollim", "woollim ent", "company_woollim entertainment"],
-            "stone music entertainment": ["stone music", "stone", "company_stone music"],
+            "stone music entertainment": ["stone music", "stone", "company_stone music", "company_stone music entertainment"],
             "ist entertainment": ["ist", "play m", "fave", "company_ist entertainment", "company_play m", "company_fave"],
             "core contents media": ["mbk", "mbk entertainment", "core contents media", "company_core contents media", "company_mbk entertainment"],
+            "mbk entertainment": ["mbk", "mbk ent", "mbk entertainment", "company_mbk entertainment", "core contents media"],
+            "source music": ["source music", "company_source music", "source-music"],
+            "pledis entertainment": ["pledis", "pledis ent", "company_pledis entertainment"],
+            "starship entertainment": ["starship", "company_starship entertainment"],
+            "fnc entertainment": ["fnc", "company_fnc entertainment"],
+            "ymc entertainment": ["ymc", "company_ymc", "company_ymc entertainment", "ymc ent"],
             "emi music japan": ["emi", "emi music japan", "company_emi music japan"],
-            "ymc entertainment": ["ymc", "company_ymc", "ymc entertainment"],
-            "loen entertainment": ["loen", "kakao m", "kakao entertainment", "company_loen entertainment"],
+            "loen entertainment": ["loen", "kakao m", "kakao entertainment", "company_loen entertainment", "company_kakao m"],
+            "dsp media": ["dsp", "company_dsp media", "dspmedia"],
+            "ist": ["ist", "company_ist"],
+            "woollim": ["woollim", "company_woollim"],
+            "stone music": ["stone music", "company_stone music"],
+            "yuehua entertainment": ["yuehua", "company_yuehua", "company_yuehua entertainment"],
+            "wm entertainment": ["wm", "company_wm entertainment"],
         }
         
         for norm, aliases in alias_map.items():
@@ -1121,9 +1152,10 @@ class KpopChatbot:
                 answer = "Không"
                 confidence = 0.7
                 
-        # Ensure we have at least two entities for same-company / same-group checks
+        # Ensure we have at least two entities for same-company checks (SAU khi đã xử lý same-group)
+        # QUAN TRỌNG: Chỉ extract Company entities nếu là same-company question, KHÔNG extract cho same-group
         if (('cùng công ty' in query_lower or 'same company' in query_lower or 'thuộc cùng công ty' in query_lower)
-            or ('cùng nhóm' in query_lower or 'same group' in query_lower or 'cùng nhóm nhạc' in query_lower)) \
+            and ('cùng nhóm' not in query_lower and 'same group' not in query_lower and 'cùng nhóm nhạc' not in query_lower)) \
             and len(context['entities']) < 2:
             extracted = self._extract_entities_for_membership(
                 query,
@@ -1484,11 +1516,11 @@ class KpopChatbot:
                             break
             
             if ref_entity:
-                # Get labelmates (groups with same company)
+                # Get labelmates (groups với cùng công ty)
                 labelmates = self.reasoner.get_labelmates(ref_entity)
                 labelmate_set = set(labelmates.answer_entities) if hasattr(labelmates, 'answer_entities') else set()
                 
-                # Also try direct company matching with alias normalization
+                # Bổ sung: dùng alias matching trên công ty
                 ref_companies = self.kg.get_group_companies(ref_entity)
                 if ref_companies:
                     all_groups = self.kg.get_entities_by_type('Group')
@@ -1501,16 +1533,42 @@ class KpopChatbot:
                                         labelmate_set.add(group)
                                         break
                 
-                # Find matching choice
-                for labelmate in labelmate_set:
-                    for i, choice in enumerate(choices):
-                        if labelmate.lower() in choice.lower() or choice.lower() in labelmate.lower():
+                # Thử match trực tiếp với các lựa chọn
+                for i, choice in enumerate(choices):
+                    choice_lower = choice.lower()
+                    # Nếu labelmate_set đã có
+                    for lm in labelmate_set:
+                        if lm.lower() in choice_lower or choice_lower in lm.lower():
                             selected_index = i
                             selected_choice = choices[i]
                             confidence = 0.9
                             break
                     if selected_index is not None:
                         break
+                
+                # Nếu vẫn chưa match, thử so công ty giữa lựa chọn và ref_entity
+                if selected_index is None and ref_companies:
+                    # tìm entity id từ text choice nếu có
+                    all_groups = self.kg.get_entities_by_type('Group')
+                    for i, choice in enumerate(choices):
+                        for g in all_groups:
+                            if g.lower() == choice.lower() or g.lower() in choice_lower or choice_lower in g.lower():
+                                g_companies = self.kg.get_group_companies(g)
+                                matched = False
+                                for rc in ref_companies:
+                                    for gc in g_companies:
+                                        if self._company_matches(rc, gc):
+                                            matched = True
+                                            break
+                                    if matched:
+                                        break
+                                if matched:
+                                    selected_index = i
+                                    selected_choice = choices[i]
+                                    confidence = 0.85
+                                    break
+                        if selected_index is not None:
+                            break
         
         # Fallback: Score-based selection using context and reasoning result
         if selected_index is None:

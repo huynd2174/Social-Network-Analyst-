@@ -222,6 +222,168 @@ class MultiHopReasoner:
                     explanation="Không extract được entities từ query"
                 )
         
+        # 2b. Câu hỏi về công ty của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Company)
+        # Pattern: "công ty của nhóm nhạc đã thể hiện ca khúc X", "công ty nào quản lý nhóm nhạc đã thể hiện ca khúc X"
+        is_song_group_company_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
+            ('công ty' in query_lower or 'company' in query_lower or 'label' in query_lower or 'hãng' in query_lower)
+        )
+        
+        if is_song_group_company_question:
+            # Extract song entity từ query
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+            song_entity = None
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Song':
+                    song_entity = entity
+                    break
+            
+            if song_entity:
+                # Bước 1: Lấy groups thể hiện bài hát này
+                groups = self.kg.get_song_groups(song_entity)
+                if groups:
+                    # Bước 2: Lấy công ty của group đầu tiên (hoặc tất cả)
+                    companies = []
+                    steps = []
+                    steps.append(ReasoningStep(
+                        hop_number=1,
+                        operation='get_groups_from_song',
+                        source_entities=[song_entity],
+                        relationship='SINGS',
+                        target_entities=groups,
+                        explanation=f"Lấy các nhóm nhạc đã thể hiện {song_entity}"
+                    ))
+                    
+                    for group in groups:
+                        group_companies = self.kg.get_group_companies(group)
+                        companies.extend(group_companies)
+                        if group_companies:
+                            steps.append(ReasoningStep(
+                                hop_number=2,
+                                operation='get_company_from_group',
+                                source_entities=[group],
+                                relationship='MANAGED_BY',
+                                target_entities=group_companies,
+                                explanation=f"Lấy công ty quản lý {group}"
+                            ))
+                    
+                    companies = list(set(companies))  # Remove duplicates
+                    if companies:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=companies,
+                            answer_text=f"Công ty quản lý nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join(companies)}",
+                            confidence=0.95,
+                            explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups)} → MANAGED_BY → {', '.join(companies)}"
+                        )
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=[],
+                            answer_text=f"Không tìm thấy công ty quản lý nhóm nhạc đã thể hiện ca khúc {song_entity}",
+                            confidence=0.5,
+                            explanation=f"Tìm thấy nhóm nhạc {', '.join(groups)} đã thể hiện {song_entity} nhưng không có thông tin về công ty"
+                        )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy nhóm nhạc nào đã thể hiện ca khúc {song_entity}",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy nhóm nhạc nào có quan hệ SINGS với {song_entity}"
+                    )
+        
+        # 2c. Câu hỏi về thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Genre)
+        # Pattern: "thể loại của nhóm nhạc đã thể hiện ca khúc X", "genre của nhóm nhạc đã thể hiện ca khúc X"
+        is_song_group_genre_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
+        
+        if is_song_group_genre_question:
+            # Extract song entity từ query
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+            song_entity = None
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Song':
+                    song_entity = entity
+                    break
+            
+            if song_entity:
+                # Bước 1: Lấy groups thể hiện bài hát này
+                groups = self.kg.get_song_groups(song_entity)
+                if groups:
+                    # Bước 2: Lấy thể loại của group đầu tiên (hoặc tất cả)
+                    genres = []
+                    steps = []
+                    steps.append(ReasoningStep(
+                        hop_number=1,
+                        operation='get_groups_from_song',
+                        source_entities=[song_entity],
+                        relationship='SINGS',
+                        target_entities=groups,
+                        explanation=f"Lấy các nhóm nhạc đã thể hiện {song_entity}"
+                    ))
+                    
+                    for group in groups:
+                        # Lấy genres của group (dùng IS_GENRE relationship)
+                        group_genres = []
+                        for _, target, data in self.kg.graph.out_edges(group, data=True):
+                            if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                                group_genres.append(target)
+                        genres.extend(group_genres)
+                        if group_genres:
+                            steps.append(ReasoningStep(
+                                hop_number=2,
+                                operation='get_genre_from_group',
+                                source_entities=[group],
+                                relationship='IS_GENRE',
+                                target_entities=group_genres,
+                                explanation=f"Lấy thể loại của {group}"
+                            ))
+                    
+                    genres = list(set(genres))  # Remove duplicates
+                    if genres:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=genres,
+                            answer_text=f"Thể loại của nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join(genres)}",
+                            confidence=0.95,
+                            explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups)} → IS_GENRE → {', '.join(genres)}"
+                        )
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=[],
+                            answer_text=f"Không tìm thấy thể loại của nhóm nhạc đã thể hiện ca khúc {song_entity}",
+                            confidence=0.5,
+                            explanation=f"Tìm thấy nhóm nhạc {', '.join(groups)} đã thể hiện {song_entity} nhưng không có thông tin về thể loại"
+                        )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy nhóm nhạc nào đã thể hiện ca khúc {song_entity}",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy nhóm nhạc nào có quan hệ SINGS với {song_entity}"
+                    )
+        
         # 3. Câu hỏi 3-hop: Song → Artist → Group → Company hoặc các chuỗi 3-hop khác
         # Pattern: "qua... rồi...", "thông qua... sau đó...", "(3-hop)", "bài hát... công ty..."
         is_three_hop_question = (

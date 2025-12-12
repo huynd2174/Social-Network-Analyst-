@@ -301,6 +301,40 @@ class KpopKnowledgeGraph:
             if data.get('type') == 'SINGS':
                 songs.append(target)
         return list(set(songs))  # Remove duplicates
+    
+    def get_song_groups(self, song_name: str) -> List[str]:
+        """Get all groups that performed a song."""
+        groups = []
+        # Check out_edges: Song → SINGS → Group (if Song is source)
+        for _, target, data in self.graph.out_edges(song_name, data=True):
+            if data.get('type') == 'SINGS':
+                target_type = self.get_entity_type(target)
+                if target_type == 'Group':
+                    groups.append(target)
+        # Check in_edges: Group → SINGS → Song (if Group is source)
+        for source, _, data in self.graph.in_edges(song_name, data=True):
+            if data.get('type') == 'SINGS':
+                source_type = self.get_entity_type(source)
+                if source_type == 'Group':
+                    groups.append(source)
+        return list(set(groups))  # Remove duplicates
+    
+    def get_song_artists(self, song_name: str) -> List[str]:
+        """Get all artists that performed a song."""
+        artists = []
+        # Check out_edges: Song → SINGS → Artist (if Song is source)
+        for _, target, data in self.graph.out_edges(song_name, data=True):
+            if data.get('type') == 'SINGS':
+                target_type = self.get_entity_type(target)
+                if target_type == 'Artist':
+                    artists.append(target)
+        # Check in_edges: Artist → SINGS → Song (if Artist is source)
+        for source, _, data in self.graph.in_edges(song_name, data=True):
+            if data.get('type') == 'SINGS':
+                source_type = self.get_entity_type(source)
+                if source_type == 'Artist':
+                    artists.append(source)
+        return list(set(artists))  # Remove duplicates
         
     def get_group_company(self, group_name: str) -> Optional[str]:
         """Get the company managing a group (returns first one for backward compatibility)."""
