@@ -804,17 +804,17 @@ class EvaluationDatasetGenerator:
                 print("  ⚠️ ChatGPT requested but not available. Using graph-only generation.")
         
         # Generate questions from graph (proportional to target)
-        ratio_2hop = 0.75
-        ratio_3hop = 0.25
-        
-        print("  📝 Generating questions from graph...")
-        all_questions.extend(self.generate_2hop_artist_company_tf(int(graph_count * ratio_2hop * 0.35)))
-        all_questions.extend(self.generate_2hop_same_company_yn(int(graph_count * ratio_2hop * 0.30)))
-        all_questions.extend(self.generate_2hop_labelmates_mc(int(graph_count * ratio_2hop * 0.20)))
-        all_questions.extend(self.generate_2hop_same_group_yn(int(graph_count * ratio_2hop * 0.15)))
-        
-        all_questions.extend(self.generate_3hop_song_company_tf(int(graph_count * ratio_3hop * 0.5)))
-        all_questions.extend(self.generate_3hop_song_company_mc(int(graph_count * ratio_3hop * 0.5)))
+            ratio_2hop = 0.75
+            ratio_3hop = 0.25
+            
+            print("  📝 Generating questions from graph...")
+            all_questions.extend(self.generate_2hop_artist_company_tf(int(graph_count * ratio_2hop * 0.35)))
+            all_questions.extend(self.generate_2hop_same_company_yn(int(graph_count * ratio_2hop * 0.30)))
+            all_questions.extend(self.generate_2hop_labelmates_mc(int(graph_count * ratio_2hop * 0.20)))
+            all_questions.extend(self.generate_2hop_same_group_yn(int(graph_count * ratio_2hop * 0.15)))
+            
+            all_questions.extend(self.generate_3hop_song_company_tf(int(graph_count * ratio_3hop * 0.5)))
+            all_questions.extend(self.generate_3hop_song_company_mc(int(graph_count * ratio_3hop * 0.5)))
         
         # Generate with ChatGPT if requested
         if chatgpt_count > 0:

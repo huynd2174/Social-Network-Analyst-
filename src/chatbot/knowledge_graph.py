@@ -64,18 +64,44 @@ class KpopKnowledgeGraph:
             )
             
         # Add edges
+        # Track edges to handle multiple relationship types between same nodes
+        edge_relations = {}  # (source, target) -> list of relationship types
+        
         for edge in self.edges:
             source = edge.get('source')
             target = edge.get('target')
             rel_type = edge.get('type', 'RELATED')
             
             if source and target and source in self.graph and target in self.graph:
+                edge_key = (source, target)
+                if edge_key not in edge_relations:
+                    edge_relations[edge_key] = []
+                edge_relations[edge_key].append({
+                    'type': rel_type,
+                    'confidence': edge.get('confidence', 1.0),
+                    'method': edge.get('method', 'unknown')
+                })
+        
+        # Add edges with all relationship types
+        for (source, target), relations in edge_relations.items():
+            if len(relations) == 1:
+                # Single relationship type - keep backward compatible format
                 self.graph.add_edge(
-                    source, 
+                    source,
                     target,
-                    type=rel_type,
-                    confidence=edge.get('confidence', 1.0),
-                    method=edge.get('method', 'unknown')
+                    type=relations[0]['type'],
+                    confidence=relations[0]['confidence'],
+                    method=relations[0]['method']
+                )
+            else:
+                # Multiple relationship types - store as list
+                self.graph.add_edge(
+                    source,
+                    target,
+                    type=relations[0]['type'],  # Keep first as primary for backward compatibility
+                    types=[r['type'] for r in relations],  # Store all types
+                    confidence=relations[0]['confidence'],
+                    method=relations[0]['method']
                 )
                 
         print(f"✅ Built graph with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges")
@@ -100,11 +126,80 @@ class KpopKnowledgeGraph:
             return dict(self.graph.nodes[entity_id])
         return None
         
+    def _has_relationship_type(self, edge_data: Dict, rel_type: str) -> bool:
+        """
+        Check if edge has a specific relationship type.
+        Handles both single 'type' and multiple 'types' list.
+        
+        Args:
+            edge_data: Edge data dictionary from graph
+            rel_type: Relationship type to check (e.g., 'SINGS', 'WROTE', 'MEMBER_OF')
+            
+        Returns:
+            True if edge has the relationship type, False otherwise
+        """
+        # Check if 'types' list exists (multiple relationship types)
+        if 'types' in edge_data and isinstance(edge_data['types'], list):
+            return rel_type in edge_data['types']
+        # Fallback to single 'type'
+        return edge_data.get('type') == rel_type
+    
     def get_entity_type(self, entity_id: str) -> Optional[str]:
         """Get entity type by ID."""
         if entity_id in self.graph:
             return self.graph.nodes[entity_id].get('label')
         return None
+    
+    def extract_year_from_infobox(self, entity_id: str, year_type: str = 'activity') -> Optional[str]:
+        """
+        Extract year information from entity infobox.
+        
+        Args:
+            entity_id: Entity ID
+            year_type: Type of year to extract:
+                - 'activity': Năm hoạt động (for groups/artists)
+                - 'release': Phát hành (for songs/albums)
+                - 'founding': Năm thành lập (for companies)
+        
+        Returns:
+            Year string (e.g., "2013–nay", "2021", "2016–2023") or None
+        """
+        entity = self.get_entity(entity_id)
+        if not entity:
+            return None
+        
+        infobox = entity.get('infobox', {})
+        if not infobox:
+            return None
+        
+        # Map year_type to infobox keys
+        key_mapping = {
+            'activity': 'Năm hoạt động',
+            'release': 'Phát hành',
+            'founding': 'Năm thành lập'
+        }
+        
+        key = key_mapping.get(year_type, 'Năm hoạt động')
+        year_str = infobox.get(key)
+        
+        if not year_str:
+            return None
+        
+        # Extract year from various formats:
+        # - "2013–nay" -> "2013–nay"
+        # - "10 tháng 9 năm 2021 (2021-09-10)" -> "2021"
+        # - "2016–2023" -> "2016–2023"
+        import re
+        # Try to extract year from date format like "10 tháng 9 năm 2021"
+        year_match = re.search(r'(\d{4})', year_str)
+        if year_match:
+            # If it's a date format, return just the year
+            if 'tháng' in year_str or 'năm' in year_str:
+                return year_match.group(1)
+            # Otherwise return the full range
+            return year_str
+        
+        return year_str
         
     def get_entities_by_type(self, entity_type: str) -> Set[str]:
         """Get all entities of a specific type."""
@@ -120,40 +215,77 @@ class KpopKnowledgeGraph:
             
         Returns:
             List of (neighbor_id, relationship_type, direction)
+            Note: If edge has multiple relationship types, returns one tuple per type
         """
         neighbors = []
         
         if direction in ['out', 'both']:
             for _, target, data in self.graph.out_edges(entity_id, data=True):
-                neighbors.append((target, data.get('type', 'RELATED'), 'out'))
+                # Get all relationship types (single or multiple)
+                rel_types = data.get('types', [data.get('type', 'RELATED')])
+                if not isinstance(rel_types, list):
+                    rel_types = [rel_types]
+                # Return one tuple per relationship type
+                for rel_type in rel_types:
+                    neighbors.append((target, rel_type, 'out'))
                 
         if direction in ['in', 'both']:
             for source, _, data in self.graph.in_edges(entity_id, data=True):
-                neighbors.append((source, data.get('type', 'RELATED'), 'in'))
+                # Get all relationship types (single or multiple)
+                rel_types = data.get('types', [data.get('type', 'RELATED')])
+                if not isinstance(rel_types, list):
+                    rel_types = [rel_types]
+                # Return one tuple per relationship type
+                for rel_type in rel_types:
+                    neighbors.append((source, rel_type, 'in'))
                 
         return neighbors
         
     def get_relationships(self, entity_id: str) -> List[Dict]:
-        """Get all relationships for an entity."""
+        """
+        Get all relationships for an entity.
+        
+        Returns:
+            List of relationship dicts with 'source', 'target', 'type', 'types', etc.
+            If edge has multiple relationship types, returns one dict per type
+        """
         relationships = []
         
         # Outgoing relationships
         for _, target, data in self.graph.out_edges(entity_id, data=True):
-            relationships.append({
-                'source': entity_id,
-                'target': target,
-                'type': data.get('type', 'RELATED'),
-                'direction': 'outgoing'
-            })
+            # Get all relationship types (single or multiple)
+            rel_types = data.get('types', [data.get('type', 'RELATED')])
+            if not isinstance(rel_types, list):
+                rel_types = [rel_types]
+            # Return one relationship dict per type
+            for rel_type in rel_types:
+                relationships.append({
+                    'source': entity_id,
+                    'target': target,
+                    'type': rel_type,
+                    'types': data.get('types', [rel_type]),  # Include all types
+                    'direction': 'outgoing',
+                    'confidence': data.get('confidence', 1.0),
+                    'method': data.get('method', 'unknown')
+                })
             
         # Incoming relationships
         for source, _, data in self.graph.in_edges(entity_id, data=True):
-            relationships.append({
-                'source': source,
-                'target': entity_id,
-                'type': data.get('type', 'RELATED'),
-                'direction': 'incoming'
-            })
+            # Get all relationship types (single or multiple)
+            rel_types = data.get('types', [data.get('type', 'RELATED')])
+            if not isinstance(rel_types, list):
+                rel_types = [rel_types]
+            # Return one relationship dict per type
+            for rel_type in rel_types:
+                relationships.append({
+                    'source': source,
+                    'target': entity_id,
+                    'type': rel_type,
+                    'types': data.get('types', [rel_type]),  # Include all types
+                    'direction': 'incoming',
+                    'confidence': data.get('confidence', 1.0),
+                    'method': data.get('method', 'unknown')
+                })
             
         return relationships
         
@@ -268,7 +400,7 @@ class KpopKnowledgeGraph:
         # Fallback: Get from MEMBER_OF edges (with strict filtering)
         members = []
         for source, _, data in self.graph.in_edges(group_name, data=True):
-            if data.get('type') == 'MEMBER_OF':
+            if self._has_relationship_type(data, 'MEMBER_OF'):
                 # Only include if source is actually an Artist
                 source_type = self.get_entity_type(source)
                 if source_type == 'Artist':
@@ -285,7 +417,7 @@ class KpopKnowledgeGraph:
         """Get all groups an artist belongs to."""
         groups = []
         for _, target, data in self.graph.out_edges(artist_name, data=True):
-            if data.get('type') == 'MEMBER_OF':
+            if self._has_relationship_type(data, 'MEMBER_OF'):
                 groups.append(target)
         return groups
         
@@ -294,11 +426,11 @@ class KpopKnowledgeGraph:
         songs = []
         # Check in_edges: Song → SINGS → Group
         for source, _, data in self.graph.in_edges(group_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 songs.append(source)
         # Also check out_edges: Group → SINGS → Song (if direction is reversed)
         for _, target, data in self.graph.out_edges(group_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 songs.append(target)
         return list(set(songs))  # Remove duplicates
     
@@ -307,13 +439,13 @@ class KpopKnowledgeGraph:
         groups = []
         # Check out_edges: Song → SINGS → Group (if Song is source)
         for _, target, data in self.graph.out_edges(song_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 target_type = self.get_entity_type(target)
                 if target_type == 'Group':
                     groups.append(target)
         # Check in_edges: Group → SINGS → Song (if Group is source)
         for source, _, data in self.graph.in_edges(song_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 source_type = self.get_entity_type(source)
                 if source_type == 'Group':
                     groups.append(source)
@@ -324,16 +456,50 @@ class KpopKnowledgeGraph:
         artists = []
         # Check out_edges: Song → SINGS → Artist (if Song is source)
         for _, target, data in self.graph.out_edges(song_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 target_type = self.get_entity_type(target)
                 if target_type == 'Artist':
                     artists.append(target)
         # Check in_edges: Artist → SINGS → Song (if Artist is source)
         for source, _, data in self.graph.in_edges(song_name, data=True):
-            if data.get('type') == 'SINGS':
+            if self._has_relationship_type(data, 'SINGS'):
                 source_type = self.get_entity_type(source)
                 if source_type == 'Artist':
                     artists.append(source)
+        return list(set(artists))  # Remove duplicates
+    
+    def get_album_groups(self, album_name: str) -> List[str]:
+        """Get all groups that released an album."""
+        groups = []
+        # Check in_edges: Group → RELEASED → Album (if Group is source)
+        for source, _, data in self.graph.in_edges(album_name, data=True):
+            if self._has_relationship_type(data, 'RELEASED'):
+                source_type = self.get_entity_type(source)
+                if source_type == 'Group':
+                    groups.append(source)
+        # Check out_edges: Album → RELEASED → Group (if Album is source - less common)
+        for _, target, data in self.graph.out_edges(album_name, data=True):
+            if self._has_relationship_type(data, 'RELEASED'):
+                target_type = self.get_entity_type(target)
+                if target_type == 'Group':
+                    groups.append(target)
+        return list(set(groups))  # Remove duplicates
+    
+    def get_album_artists(self, album_name: str) -> List[str]:
+        """Get all artists that released an album."""
+        artists = []
+        # Check in_edges: Artist → RELEASED → Album (if Artist is source)
+        for source, _, data in self.graph.in_edges(album_name, data=True):
+            if self._has_relationship_type(data, 'RELEASED'):
+                source_type = self.get_entity_type(source)
+                if source_type == 'Artist':
+                    artists.append(source)
+        # Check out_edges: Album → RELEASED → Artist (if Album is source - less common)
+        for _, target, data in self.graph.out_edges(album_name, data=True):
+            if self._has_relationship_type(data, 'RELEASED'):
+                target_type = self.get_entity_type(target)
+                if target_type == 'Artist':
+                    artists.append(target)
         return list(set(artists))  # Remove duplicates
         
     def get_group_company(self, group_name: str) -> Optional[str]:
@@ -345,7 +511,7 @@ class KpopKnowledgeGraph:
         """Get ALL companies managing a group (a group can have multiple companies)."""
         companies = []
         for _, target, data in self.graph.out_edges(group_name, data=True):
-            if data.get('type') == 'MANAGED_BY':
+            if self._has_relationship_type(data, 'MANAGED_BY'):
                 companies.append(target)
         return companies
     
@@ -353,7 +519,7 @@ class KpopKnowledgeGraph:
         """Get ALL companies managing an artist directly (Artist → Company)."""
         companies = []
         for _, target, data in self.graph.out_edges(artist_name, data=True):
-            if data.get('type') == 'MANAGED_BY':
+            if self._has_relationship_type(data, 'MANAGED_BY'):
                 # Check if target is a Company
                 if self.get_entity_type(target) == 'Company':
                     companies.append(target)
@@ -363,7 +529,7 @@ class KpopKnowledgeGraph:
         """Get all groups under a company."""
         groups = []
         for source, _, data in self.graph.in_edges(company_name, data=True):
-            if data.get('type') == 'MANAGED_BY':
+            if self._has_relationship_type(data, 'MANAGED_BY'):
                 if self.get_entity_type(source) == 'Group':
                     groups.append(source)
         return groups

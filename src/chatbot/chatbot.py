@@ -301,6 +301,15 @@ class KpopChatbot:
             ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
         )
         
+        # Câu hỏi 3-hop: Song → Artist → Group → Genre
+        is_song_artist_group_genre_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+            ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'có' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
+        
         # Xác định label kỳ vọng từ câu hỏi để lọc thực thể đúng loại
         # QUAN TRỌNG: Với same_group question, KHÔNG include Company để tránh extract sai
         expected_labels = set()
@@ -362,7 +371,10 @@ class KpopChatbot:
                 is_three_hop_hint or
                 is_song_company_chain_question or
                 is_song_group_company_question or
-                is_song_group_genre_question
+                is_song_group_genre_question or
+                is_song_artist_group_genre_question or
+                is_album_group_genre_question or
+                is_album_artist_occupation_question
             )
             
             if is_same_group_question or is_same_company_question or is_list_members_question or is_artist_group_question:
@@ -541,9 +553,18 @@ class KpopChatbot:
         # - Facts: từ triples (source, relationship, target) trong graph
         # - Reasoning: từ graph traversal (paths, hops)
         
-        # If reasoning found a direct answer for membership, same group, or same company, use it (more accurate than LLM)
+        # If reasoning found a direct answer for membership, same group, same company, or song-group queries, use it (more accurate than LLM)
         # QUAN TRỌNG: Ưu tiên reasoning result cho các câu hỏi factual (tránh LLM hallucinate)
-        if (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
+        # Check nếu là song-group question VÀ có reasoning result (kể cả khi confidence thấp)
+        use_reasoning_result = False
+        if is_song_group_company_question or is_song_group_genre_question or is_song_artist_group_genre_question or is_album_group_genre_question or is_album_artist_occupation_question:
+            # Với song-group questions, LUÔN ưu tiên reasoning result nếu có (kể cả khi confidence thấp)
+            if reasoning_result and reasoning_result.answer_text:
+                use_reasoning_result = True
+        elif (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
+            use_reasoning_result = True
+        
+        if use_reasoning_result:
             # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
             # Reasoning is more accurate than LLM for factual checks
             # ✅ QUAN TRỌNG: LUÔN dùng reasoning result trực tiếp, KHÔNG qua LLM để tránh hallucination
@@ -552,7 +573,7 @@ class KpopChatbot:
                 entities_str = ", ".join(reasoning_result.answer_entities[:10])
                 if entities_str and entities_str not in response:
                     response += f"\n\nDanh sách: {entities_str}"
-            # ✅ Bỏ qua LLM generation cho same_group/same_company questions để tránh trả lời sai
+            # ✅ Bỏ qua LLM generation cho same_group/same_company/song-group questions để tránh trả lời sai
         elif self.llm and use_llm:
             # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (đúng yêu cầu)
             history = session.get_history(max_turns=3)

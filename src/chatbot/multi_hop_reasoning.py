@@ -156,74 +156,188 @@ class MultiHopReasoner:
         # MULTI-HOP QUESTIONS (ƯU TIÊN CAO NHẤT)
         # ============================================
         
-        # 1. Câu hỏi so sánh công ty (2-hop): "BTS và SEVENTEEN có cùng công ty không"
-        # QUAN TRỌNG: Check same_company TRƯỚC tất cả để tránh conflict
-        if any(kw in query_lower for kw in ['cùng công ty', 'same company', 'cùng hãng', 'cùng label', 'cùng hãng đĩa', 'cùng công ty quản lý']):
-            # QUAN TRỌNG: Phải có đủ 2 entities để so sánh
-            # Dùng _extract_entities_robust để đảm bảo extract đủ 2 entities với LLM fallback
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
-            
-            if len(all_entities) >= 2:
-                # Có đủ 2 entities → so sánh
-                return self.check_same_company(all_entities[0], all_entities[1])
-            elif len(all_entities) == 1:
-                # Chỉ có 1 entity → không đủ để so sánh, trả về lỗi rõ ràng
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ/nhóm nhạc.",
-                    confidence=0.0,
-                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh công ty"
-                )
-            else:
-                # Không tìm được entity nào
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text="Không tìm thấy thông tin về các nghệ sĩ/nhóm nhạc trong câu hỏi. Vui lòng kiểm tra lại tên.",
-                    confidence=0.0,
-                    explanation="Không extract được entities từ query"
-                )
+        # -1. Câu hỏi về năm hoạt động (1-hop, 2-hop, 3-hop)
+        # Pattern: "năm hoạt động của X", "năm phát hành của X"
+        is_year_question = (
+            ('năm' in query_lower) and
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower)
+        )
         
-        # 2. Câu hỏi so sánh nhóm nhạc (2-hop): "Lisa và Jennie có cùng nhóm nhạc không"
-        if any(kw in query_lower for kw in [
-            'cùng nhóm', 'cùng nhóm nhạc', 'cùng một nhóm', 'cùng một nhóm nhạc',
-            'same group', 'cùng ban nhạc', 'chung nhóm', 'chung nhóm nhạc'
-        ]):
-            # Extract entities với LLM fallback
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+        if is_year_question:
+            # Determine year type
+            year_type = 'activity'  # default
+            if 'phát hành' in query_lower:
+                year_type = 'release'
+            elif 'thành lập' in query_lower:
+                year_type = 'founding'
             
-            if len(all_entities) >= 2:
-                return self.check_same_group(all_entities[0], all_entities[1])
-            elif len(all_entities) == 1:
-                # Chỉ có 1 entity → không đủ để so sánh
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
-                    confidence=0.0,
-                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh cùng nhóm"
-                )
+            # 3-hop: năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện ca khúc X (Song → Artist → Group → Year)
+            is_song_artist_group_year_question = (
+                ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+                ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower) and
+                ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+                ('thể hiện' in query_lower or 'trình bày' in query_lower or 'có' in query_lower)
+            )
+            
+            if is_song_artist_group_year_question:
+                # Extract song entity
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                song_entity = None
+                for entity in all_entities:
+                    if self.kg.get_entity_type(entity) == 'Song':
+                        song_entity = entity
+                        break
+                
+                if song_entity:
+                    # Step 1: Get artists
+                    artists = self.kg.get_song_artists(song_entity)
+                    if artists:
+                        steps = []
+                        steps.append(ReasoningStep(
+                            hop_number=1,
+                            operation='get_artists_from_song',
+                            source_entities=[song_entity],
+                            relationship='SINGS',
+                            target_entities=artists,
+                            explanation=f"Lấy các ca sĩ đã thể hiện {song_entity}"
+                        ))
+                        
+                        # Step 2: Get groups
+                        groups = []
+                        for artist in artists:
+                            artist_groups = self.kg.get_artist_groups(artist)
+                            groups.extend(artist_groups)
+                            if artist_groups:
+                                steps.append(ReasoningStep(
+                                    hop_number=2,
+                                    operation='get_groups_from_artist',
+                                    source_entities=[artist],
+                                    relationship='MEMBER_OF',
+                                    target_entities=artist_groups,
+                                    explanation=f"Lấy các nhóm nhạc của {artist}"
+                                ))
+                        
+                        groups = list(set(groups))
+                        if groups:
+                            # Step 3: Get year from groups
+                            years = []
+                            for group in groups:
+                                year = self.kg.extract_year_from_infobox(group, year_type)
+                                if year:
+                                    years.append((group, year))
+                            
+                            if years:
+                                # Format answer
+                                year_info = [f"{group}: {year}" for group, year in years]
+                                return ReasoningResult(
+                                    query=query,
+                                    reasoning_type=ReasoningType.CHAIN,
+                                    steps=steps,
+                                    answer_entities=[group for group, _ in years],
+                                    answer_text=f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_entity} là: {', '.join([year for _, year in years])}",
+                                    confidence=0.95,
+                                    explanation=f"3-hop: {song_entity} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → Year"
+                                )
+            
+            # 2-hop: năm hoạt động của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Year)
+            is_song_group_year_question = (
+                ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+                ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+                ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
+                not ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower)  # Not 3-hop
+            )
+            
+            if is_song_group_year_question:
+                # Extract song entity
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                song_entity = None
+                for entity in all_entities:
+                    if self.kg.get_entity_type(entity) == 'Song':
+                        song_entity = entity
+                        break
+                
+                if song_entity:
+                    # Step 1: Get groups
+                    groups = self.kg.get_song_groups(song_entity)
+                    if groups:
+                        steps = []
+                        steps.append(ReasoningStep(
+                            hop_number=1,
+                            operation='get_groups_from_song',
+                            source_entities=[song_entity],
+                            relationship='SINGS',
+                            target_entities=groups,
+                            explanation=f"Lấy các nhóm nhạc đã thể hiện {song_entity}"
+                        ))
+                        
+                        # Step 2: Get year from groups
+                        years = []
+                        for group in groups:
+                            year = self.kg.extract_year_from_infobox(group, year_type)
+                            if year:
+                                years.append((group, year))
+                        
+                        if years:
+                            return ReasoningResult(
+                                query=query,
+                                reasoning_type=ReasoningType.CHAIN,
+                                steps=steps,
+                                answer_entities=[group for group, _ in years],
+                                answer_text=f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join([year for _, year in years])}",
+                                confidence=0.95,
+                                explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups[:3])} → Year"
+                            )
+            
+            # 1-hop: năm hoạt động/phát hành của X (direct)
+            # Determine expected types based on year_type
+            if year_type == 'release':
+                # For release year, expect Song or Album
+                expected_types = ['Song', 'Album']
+            elif year_type == 'activity':
+                # For activity year, expect Group or Artist
+                expected_types = ['Group', 'Artist']
+            elif year_type == 'founding':
+                # For founding year, expect Company
+                expected_types = ['Company']
             else:
-                # Không tìm được entity nào
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
-                    confidence=0.0,
-                    explanation="Không extract được entities từ query"
-                )
+                expected_types = ['Group', 'Artist', 'Song', 'Album', 'Company']
+            
+            # Extract entity
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=expected_types)
+            if all_entities:
+                entity = all_entities[0]
+                year = self.kg.extract_year_from_infobox(entity, year_type)
+                if year:
+                    # Format answer text based on year_type
+                    if year_type == 'release':
+                        answer_text = f"Năm phát hành của {entity} là: {year}"
+                    elif year_type == 'activity':
+                        answer_text = f"Năm hoạt động của {entity} là: {year}"
+                    elif year_type == 'founding':
+                        answer_text = f"Năm thành lập của {entity} là: {year}"
+                    else:
+                        answer_text = f"Năm của {entity} là: {year}"
+                    
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[ReasoningStep(
+                            hop_number=1,
+                            operation='get_year_from_entity',
+                            source_entities=[entity],
+                            relationship='INFOBOX',
+                            target_entities=[entity],
+                            explanation=f"Lấy năm từ thông tin của {entity}"
+                        )],
+                        answer_entities=[entity],
+                        answer_text=answer_text,
+                        confidence=0.95,
+                        explanation=f"1-hop: {entity} → Year ({year_type}) from infobox"
+                    )
         
-        # 2b. Câu hỏi về công ty của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Company)
-        # Pattern: "công ty của nhóm nhạc đã thể hiện ca khúc X", "công ty nào quản lý nhóm nhạc đã thể hiện ca khúc X"
+        # 0. Câu hỏi về công ty/thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Company/Genre)
+        # QUAN TRỌNG: Check song-group questions TRƯỚC same_company để tránh conflict
+        # Pattern: "công ty của nhóm nhạc đã thể hiện ca khúc X"
         is_song_group_company_question = (
             ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
             ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
@@ -300,14 +414,214 @@ class MultiHopReasoner:
                         confidence=0.3,
                         explanation=f"Không tìm thấy nhóm nhạc nào có quan hệ SINGS với {song_entity}"
                     )
+            else:
+                # Không tìm thấy song entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về bài hát trong câu hỏi. Vui lòng cung cấp tên bài hát cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được song entity từ query: {query}"
+                )
         
-        # 2c. Câu hỏi về thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Genre)
+        # 1. Câu hỏi so sánh công ty (2-hop): "BTS và SEVENTEEN có cùng công ty không"
+        # QUAN TRỌNG: Check same_company SAU song-group questions để tránh conflict
+        if any(kw in query_lower for kw in ['cùng công ty', 'same company', 'cùng hãng', 'cùng label', 'cùng hãng đĩa', 'cùng công ty quản lý']):
+            # QUAN TRỌNG: Phải có đủ 2 entities để so sánh
+            # Dùng _extract_entities_robust để đảm bảo extract đủ 2 entities với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                # Có đủ 2 entities → so sánh
+                return self.check_same_company(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                # Chỉ có 1 entity → không đủ để so sánh, trả về lỗi rõ ràng
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ/nhóm nhạc.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh công ty"
+                )
+            else:
+                # Không tìm được entity nào
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ/nhóm nhạc trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2. Câu hỏi so sánh nhóm nhạc (2-hop): "Lisa và Jennie có cùng nhóm nhạc không"
+        if any(kw in query_lower for kw in [
+            'cùng nhóm', 'cùng nhóm nhạc', 'cùng một nhóm', 'cùng một nhóm nhạc',
+            'same group', 'cùng ban nhạc', 'chung nhóm', 'chung nhóm nhạc'
+        ]):
+            # Extract entities với LLM fallback
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_group(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                # Chỉ có 1 entity → không đủ để so sánh
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh cùng nhóm"
+                )
+            else:
+                # Không tìm được entity nào
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2b. Câu hỏi về thể loại của nhóm nhạc có ca sĩ thể hiện bài hát X (Song → Artist → Group → Genre) - 3-hop
+        # Pattern: "thể loại của nhóm nhạc có ca sĩ thể hiện bài hát X"
+        is_song_artist_group_genre_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
+            ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'có' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
+        
+        if is_song_artist_group_genre_question:
+            # Extract song entity từ query
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+            song_entity = None
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Song':
+                    song_entity = entity
+                    break
+            
+            if song_entity:
+                # Bước 1: Lấy artists thể hiện bài hát này (Song → Artist)
+                artists = self.kg.get_song_artists(song_entity)
+                if artists:
+                    steps = []
+                    steps.append(ReasoningStep(
+                        hop_number=1,
+                        operation='get_artists_from_song',
+                        source_entities=[song_entity],
+                        relationship='SINGS',
+                        target_entities=artists,
+                        explanation=f"Lấy các ca sĩ đã thể hiện {song_entity}"
+                    ))
+                    
+                    # Bước 2: Lấy groups của các artists (Artist → Group)
+                    groups = []
+                    for artist in artists:
+                        artist_groups = self.kg.get_artist_groups(artist)
+                        groups.extend(artist_groups)
+                        if artist_groups:
+                            steps.append(ReasoningStep(
+                                hop_number=2,
+                                operation='get_groups_from_artist',
+                                source_entities=[artist],
+                                relationship='MEMBER_OF',
+                                target_entities=artist_groups,
+                                explanation=f"Lấy các nhóm nhạc của {artist}"
+                            ))
+                    
+                    groups = list(set(groups))  # Remove duplicates
+                    if groups:
+                        # Bước 3: Lấy thể loại của các groups (Group → Genre)
+                        genres = []
+                        for group in groups:
+                            group_genres = []
+                            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                                if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                                    group_genres.append(target)
+                            genres.extend(group_genres)
+                            if group_genres:
+                                steps.append(ReasoningStep(
+                                    hop_number=3,
+                                    operation='get_genre_from_group',
+                                    source_entities=[group],
+                                    relationship='IS_GENRE',
+                                    target_entities=group_genres,
+                                    explanation=f"Lấy thể loại của {group}"
+                                ))
+                        
+                        genres = list(set(genres))  # Remove duplicates
+                        if genres:
+                            return ReasoningResult(
+                                query=query,
+                                reasoning_type=ReasoningType.CHAIN,
+                                steps=steps,
+                                answer_entities=genres,
+                                answer_text=f"Thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity} là: {', '.join(genres)}",
+                                confidence=0.95,
+                                explanation=f"3-hop: {song_entity} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → IS_GENRE → {', '.join(genres)}"
+                            )
+                        else:
+                            return ReasoningResult(
+                                query=query,
+                                reasoning_type=ReasoningType.CHAIN,
+                                steps=steps,
+                                answer_entities=[],
+                                answer_text=f"Không tìm thấy thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity}",
+                                confidence=0.5,
+                                explanation=f"Tìm thấy nhóm nhạc {', '.join(groups[:3])} nhưng không có thông tin về thể loại"
+                            )
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=[],
+                            answer_text=f"Không tìm thấy nhóm nhạc nào của ca sĩ đã thể hiện bài hát {song_entity}",
+                            confidence=0.4,
+                            explanation=f"Tìm thấy ca sĩ {', '.join(artists[:3])} nhưng không tìm thấy nhóm nhạc"
+                        )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy ca sĩ nào đã thể hiện bài hát {song_entity}",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy ca sĩ nào có quan hệ SINGS với {song_entity}"
+                    )
+            else:
+                # Không tìm thấy song entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về bài hát trong câu hỏi. Vui lòng cung cấp tên bài hát cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được song entity từ query: {query}"
+                )
+        
+        # 2c. Câu hỏi về thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Genre) - 2-hop
         # Pattern: "thể loại của nhóm nhạc đã thể hiện ca khúc X", "genre của nhóm nhạc đã thể hiện ca khúc X"
+        # QUAN TRỌNG: Check sau song_artist_group_genre_question để tránh conflict
         is_song_group_genre_question = (
             ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
             ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
             ('thể hiện' in query_lower or 'trình bày' in query_lower or 'đã' in query_lower) and
-            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower) and
+            not ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower)  # Không phải song-artist-group-genre
         )
         
         if is_song_group_genre_question:
@@ -383,6 +697,205 @@ class MultiHopReasoner:
                         confidence=0.3,
                         explanation=f"Không tìm thấy nhóm nhạc nào có quan hệ SINGS với {song_entity}"
                     )
+            else:
+                # Không tìm thấy song entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về bài hát trong câu hỏi. Vui lòng cung cấp tên bài hát cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được song entity từ query: {query}"
+                )
+        
+        # 2d. Câu hỏi về thể loại của nhóm nhạc đã ra mắt album X (Album → Group → Genre)
+        # Pattern: "thể loại của nhóm nhạc đã ra mắt album X", "genre của nhóm nhạc đã ra mắt album X"
+        is_album_group_genre_question = (
+            ('album' in query_lower) and
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower or 'group' in query_lower) and
+            ('ra mắt' in query_lower or 'phát hành' in query_lower or 'đã' in query_lower) and
+            ('thể loại' in query_lower or 'genre' in query_lower or 'dòng nhạc' in query_lower)
+        )
+        
+        if is_album_group_genre_question:
+            # Extract album entity từ query
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Album'])
+            album_entity = None
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Album':
+                    album_entity = entity
+                    break
+            
+            if album_entity:
+                # Bước 1: Lấy groups ra mắt album này
+                groups = self.kg.get_album_groups(album_entity)
+                if groups:
+                    # Bước 2: Lấy thể loại của group đầu tiên (hoặc tất cả)
+                    genres = []
+                    steps = []
+                    steps.append(ReasoningStep(
+                        hop_number=1,
+                        operation='get_groups_from_album',
+                        source_entities=[album_entity],
+                        relationship='RELEASED',
+                        target_entities=groups,
+                        explanation=f"Lấy các nhóm nhạc đã ra mắt {album_entity}"
+                    ))
+                    
+                    for group in groups:
+                        # Lấy genres của group (dùng IS_GENRE relationship)
+                        group_genres = []
+                        for _, target, data in self.kg.graph.out_edges(group, data=True):
+                            if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                                group_genres.append(target)
+                        genres.extend(group_genres)
+                        if group_genres:
+                            steps.append(ReasoningStep(
+                                hop_number=2,
+                                operation='get_genre_from_group',
+                                source_entities=[group],
+                                relationship='IS_GENRE',
+                                target_entities=group_genres,
+                                explanation=f"Lấy thể loại của {group}"
+                            ))
+                    
+                    genres = list(set(genres))  # Remove duplicates
+                    if genres:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=genres,
+                            answer_text=f"Thể loại của nhóm nhạc đã ra mắt album {album_entity} là: {', '.join(genres)}",
+                            confidence=0.95,
+                            explanation=f"2-hop: {album_entity} → RELEASED → {', '.join(groups)} → IS_GENRE → {', '.join(genres)}"
+                        )
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=[],
+                            answer_text=f"Không tìm thấy thể loại của nhóm nhạc đã ra mắt album {album_entity}",
+                            confidence=0.5,
+                            explanation=f"Tìm thấy nhóm nhạc {', '.join(groups)} đã ra mắt {album_entity} nhưng không có thông tin về thể loại"
+                        )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy nhóm nhạc nào đã ra mắt album {album_entity}",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy nhóm nhạc nào có quan hệ RELEASED với {album_entity}"
+                    )
+            else:
+                # Không tìm thấy album entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về album trong câu hỏi. Vui lòng cung cấp tên album cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được album entity từ query: {query}"
+                )
+        
+        # 2e. Câu hỏi về nghề nghiệp của ca sĩ đã ra mắt album X (Album → Artist → Occupation)
+        # Pattern: "Nghề nghiệp khác của ca sĩ đã ra mắt album X", "occupation của ca sĩ đã ra mắt album X"
+        is_album_artist_occupation_question = (
+            ('album' in query_lower) and
+            ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower) and
+            ('ra mắt' in query_lower or 'phát hành' in query_lower or 'đã' in query_lower) and
+            ('nghề nghiệp' in query_lower or 'occupation' in query_lower or 'vai trò' in query_lower)
+        )
+        
+        if is_album_artist_occupation_question:
+            # Extract album entity từ query
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Album'])
+            album_entity = None
+            for entity in all_entities:
+                if self.kg.get_entity_type(entity) == 'Album':
+                    album_entity = entity
+                    break
+            
+            if album_entity:
+                # Bước 1: Lấy artists ra mắt album này
+                artists = self.kg.get_album_artists(album_entity)
+                if artists:
+                    # Bước 2: Lấy nghề nghiệp (occupation) của artist đầu tiên (hoặc tất cả)
+                    occupations = []
+                    steps = []
+                    steps.append(ReasoningStep(
+                        hop_number=1,
+                        operation='get_artists_from_album',
+                        source_entities=[album_entity],
+                        relationship='RELEASED',
+                        target_entities=artists,
+                        explanation=f"Lấy các ca sĩ đã ra mắt {album_entity}"
+                    ))
+                    
+                    for artist in artists:
+                        # Lấy occupations của artist (dùng HAS_OCCUPATION relationship)
+                        artist_occupations = []
+                        for _, target, data in self.kg.graph.out_edges(artist, data=True):
+                            if data.get('type') == 'HAS_OCCUPATION' and self.kg.get_entity_type(target) == 'Occupation':
+                                artist_occupations.append(target)
+                        occupations.extend(artist_occupations)
+                        if artist_occupations:
+                            steps.append(ReasoningStep(
+                                hop_number=2,
+                                operation='get_occupation_from_artist',
+                                source_entities=[artist],
+                                relationship='HAS_OCCUPATION',
+                                target_entities=artist_occupations,
+                                explanation=f"Lấy nghề nghiệp của {artist}"
+                            ))
+                    
+                    occupations = list(set(occupations))  # Remove duplicates
+                    if occupations:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=occupations,
+                            answer_text=f"Nghề nghiệp của ca sĩ đã ra mắt album {album_entity} là: {', '.join(occupations)}",
+                            confidence=0.95,
+                            explanation=f"2-hop: {album_entity} → RELEASED → {', '.join(artists)} → HAS_OCCUPATION → {', '.join(occupations)}"
+                        )
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.CHAIN,
+                            steps=steps,
+                            answer_entities=[],
+                            answer_text=f"Không tìm thấy nghề nghiệp của ca sĩ đã ra mắt album {album_entity}",
+                            confidence=0.5,
+                            explanation=f"Tìm thấy ca sĩ {', '.join(artists)} đã ra mắt {album_entity} nhưng không có thông tin về nghề nghiệp"
+                        )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy ca sĩ nào đã ra mắt album {album_entity}",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy ca sĩ nào có quan hệ RELEASED với {album_entity}"
+                    )
+            else:
+                # Không tìm thấy album entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về album trong câu hỏi. Vui lòng cung cấp tên album cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được album entity từ query: {query}"
+                )
         
         # 3. Câu hỏi 3-hop: Song → Artist → Group → Company hoặc các chuỗi 3-hop khác
         # Pattern: "qua... rồi...", "thông qua... sau đó...", "(3-hop)", "bài hát... công ty..."
@@ -705,8 +1218,18 @@ class MultiHopReasoner:
                     return self.get_album_songs(entity)
                     
         # ============================================
-        # FALLBACK - reasoning type detection
+        # FALLBACK - LLM-based understanding khi không có pattern khớp
         # ============================================
+        # Nếu không có pattern nào khớp, dùng LLM để hiểu query và đề xuất reasoning path
+        if self.graph_rag and self.graph_rag.llm_for_understanding:
+            # Sử dụng LLM để hiểu query: intent, entities, relations, multi-hop depth
+            llm_understanding = self._understand_query_with_llm_for_reasoning(query, start_entities)
+            
+            if llm_understanding:
+                # LLM đã hiểu được query, thực hiện reasoning dựa trên thông tin từ LLM
+                return self._execute_reasoning_from_llm_understanding(query, llm_understanding, max_hops)
+        
+        # Fallback tiếp: pattern-based reasoning type detection (nếu LLM không available)
         reasoning_type = self._detect_reasoning_type(query)
         
         # Execute appropriate reasoning strategy
@@ -719,7 +1242,19 @@ class MultiHopReasoner:
         elif reasoning_type == ReasoningType.INTERSECTION:
             return self._intersection_reasoning(query, start_entities)
         else:
-            return self._chain_reasoning(query, start_entities, max_hops)
+            # Final fallback: chain reasoning với entities hiện có
+            if start_entities:
+                return self._chain_reasoning(query, start_entities, max_hops)
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không thể hiểu câu hỏi và không tìm thấy entities để suy luận. Vui lòng cung cấp thêm thông tin.",
+                    confidence=0.0,
+                    explanation="No pattern matched and no entities found"
+                )
             
     def _detect_reasoning_type(self, query: str) -> ReasoningType:
         """Detect the type of reasoning needed for a query."""
@@ -737,6 +1272,227 @@ class MultiHopReasoner:
             
         # Default to chain reasoning
         return ReasoningType.CHAIN
+    
+    def _understand_query_with_llm_for_reasoning(self, query: str, start_entities: List[str]) -> Optional[Dict]:
+        """
+        Sử dụng LLM để hiểu query và đề xuất reasoning strategy khi không có pattern khớp.
+        
+        Args:
+            query: User query
+            start_entities: Entities đã có sẵn
+            
+        Returns:
+            Dict chứa thông tin từ LLM understanding: {
+                'intent': str,
+                'entities': List[str],
+                'relations': List[str],
+                'multi_hop_depth': int,
+                'target_type': Optional[str],
+                'target_relationship': Optional[str]
+            }
+        """
+        if not self.graph_rag or not self.graph_rag.llm_for_understanding:
+            return None
+        
+        try:
+            # Sử dụng method có sẵn từ GraphRAG để extract entities và metadata
+            llm_entities = self.graph_rag._extract_entities_with_llm(query)
+            
+            if not llm_entities:
+                return None
+            
+            # Extract metadata từ LLM entities (đã được thêm vào trong _extract_entities_with_llm)
+            # Lấy từ entity đầu tiên (thường tất cả đều có cùng metadata)
+            first_entity = llm_entities[0] if llm_entities else {}
+            intent = first_entity.get('intent', 'multi_hop')
+            relations = first_entity.get('relations', [])
+            multi_hop_depth = first_entity.get('multi_hop_depth', 2)
+            
+            # Collect all entity IDs from LLM
+            llm_entity_ids = []
+            for llm_e in llm_entities:
+                entity_id = llm_e.get('text', '')
+                if entity_id:
+                    # Validate entity exists in KG
+                    entity_data = self.kg.get_entity(entity_id)
+                    if entity_data:
+                        llm_entity_ids.append(entity_id)
+            
+            # Combine với start_entities
+            all_entities = list(set(start_entities + llm_entity_ids))
+            
+            # Detect target type và relationship từ query
+            target_type = self._detect_target_type_from_intent(intent, query.lower())
+            target_relationship = relations[0] if relations else None
+            
+            return {
+                'intent': intent,
+                'entities': all_entities,
+                'relations': relations,
+                'multi_hop_depth': min(multi_hop_depth, 3),  # Limit to max 3 hops
+                'target_type': target_type,
+                'target_relationship': target_relationship
+            }
+        except Exception as e:
+            # Nếu LLM fail, return None để fallback về pattern-based
+            return None
+    
+    def _detect_target_type_from_intent(self, intent: str, query_lower: str) -> Optional[str]:
+        """Detect target entity type từ intent và query."""
+        # Map intent và keywords to entity types
+        if 'company' in intent or 'công ty' in query_lower or 'hãng' in query_lower:
+            return 'Company'
+        elif 'group' in intent or 'nhóm' in query_lower:
+            return 'Group'
+        elif 'artist' in intent or 'nghệ sĩ' in query_lower or 'ca sĩ' in query_lower:
+            return 'Artist'
+        elif 'song' in intent or 'bài hát' in query_lower or 'ca khúc' in query_lower:
+            return 'Song'
+        elif 'album' in intent:
+            return 'Album'
+        elif 'genre' in intent or 'thể loại' in query_lower:
+            return 'Genre'
+        elif 'occupation' in intent or 'nghề nghiệp' in query_lower:
+            return 'Occupation'
+        return None
+    
+    def _execute_reasoning_from_llm_understanding(
+        self,
+        query: str,
+        llm_understanding: Dict,
+        max_hops: int
+    ) -> ReasoningResult:
+        """
+        Thực hiện reasoning dựa trên thông tin từ LLM understanding.
+        
+        Args:
+            query: Original query
+            llm_understanding: Dict từ _understand_query_with_llm_for_reasoning
+            max_hops: Maximum hops
+            
+        Returns:
+            ReasoningResult
+        """
+        entities = llm_understanding.get('entities', [])
+        intent = llm_understanding.get('intent', 'multi_hop')
+        multi_hop_depth = llm_understanding.get('multi_hop_depth', 2)
+        target_type = llm_understanding.get('target_type')
+        target_relationship = llm_understanding.get('target_relationship')
+        
+        if not entities:
+            return ReasoningResult(
+                query=query,
+                reasoning_type=ReasoningType.CHAIN,
+                steps=[],
+                answer_entities=[],
+                answer_text="Không thể trích xuất entities từ câu hỏi.",
+                confidence=0.0,
+                explanation="No entities extracted by LLM"
+            )
+        
+        # Điều chỉnh max_hops dựa trên LLM understanding
+        effective_max_hops = min(multi_hop_depth, max_hops)
+        
+        # Xác định reasoning type từ intent
+        if 'comparison' in intent or 'same' in intent:
+            if len(entities) >= 2:
+                return self._comparison_reasoning(query, entities)
+            else:
+                # Fallback to chain reasoning
+                return self._chain_reasoning_with_targets(query, entities, effective_max_hops, target_type, target_relationship)
+        elif 'intersection' in intent or 'common' in intent:
+            if len(entities) >= 2:
+                return self._intersection_reasoning(query, entities)
+            else:
+                return self._chain_reasoning_with_targets(query, entities, effective_max_hops, target_type, target_relationship)
+        elif 'aggregation' in intent or 'list' in intent:
+            return self._aggregation_reasoning(query, entities, effective_max_hops)
+        else:
+            # Default: chain reasoning với target hints từ LLM
+            return self._chain_reasoning_with_targets(query, entities, effective_max_hops, target_type, target_relationship)
+    
+    def _chain_reasoning_with_targets(
+        self,
+        query: str,
+        start_entities: List[str],
+        max_hops: int,
+        target_type: Optional[str] = None,
+        target_relationship: Optional[str] = None
+    ) -> ReasoningResult:
+        """
+        Chain reasoning với target type và relationship hints từ LLM.
+        Tương tự _chain_reasoning nhưng có thêm hints để filter chính xác hơn.
+        """
+        if not start_entities:
+            return ReasoningResult(
+                query=query,
+                reasoning_type=ReasoningType.CHAIN,
+                steps=[],
+                answer_entities=[],
+                answer_text="Không tìm thấy entities để bắt đầu suy luận",
+                confidence=0.0,
+                explanation="No starting entities"
+            )
+        
+        steps = []
+        current_entities = start_entities
+        visited = set(start_entities)
+        
+        for hop in range(max_hops):
+            next_entities = set()
+            relationship_types = set()
+            
+            for entity in current_entities[:10]:  # Limit for performance
+                neighbors = self.kg.get_neighbors(entity)
+                
+                for neighbor, rel_type, direction in neighbors:
+                    if neighbor in visited:
+                        continue
+                    
+                    # Filter by target relationship nếu có
+                    if target_relationship and rel_type != target_relationship:
+                        continue
+                    
+                    # Filter by target type nếu có
+                    if target_type:
+                        neighbor_type = self.kg.get_entity_type(neighbor)
+                        if neighbor_type != target_type:
+                            continue
+                    
+                    next_entities.add(neighbor)
+                    visited.add(neighbor)
+                    relationship_types.add(rel_type)
+            
+            if not next_entities:
+                break
+            
+            reasoning_step = ReasoningStep(
+                hop_number=hop + 1,
+                operation='traverse',
+                source_entities=list(current_entities),
+                relationship=', '.join(sorted(relationship_types)) if relationship_types else 'various',
+                target_entities=list(next_entities)[:20],
+                explanation=f"Hop {hop + 1}: Từ {len(current_entities)} entities, tìm thấy {len(next_entities)} entities liên quan"
+            )
+            steps.append(reasoning_step)
+            current_entities = list(next_entities)
+        
+        # Nếu có target type, ưu tiên entities có type đó
+        final_entities = list(current_entities)
+        if target_type:
+            filtered = [e for e in final_entities if self.kg.get_entity_type(e) == target_type]
+            if filtered:
+                final_entities = filtered
+        
+        return ReasoningResult(
+            query=query,
+            reasoning_type=ReasoningType.CHAIN,
+            steps=steps,
+            answer_entities=final_entities[:20],
+            answer_text=f"Tìm thấy {len(final_entities)} entities liên quan: {', '.join(final_entities[:10])}{'...' if len(final_entities) > 10 else ''}",
+            confidence=0.8 if final_entities else 0.3,
+            explanation=f"LLM-guided reasoning: {len(steps)} hops, target: {target_type or 'any'}, relationship: {target_relationship or 'any'}"
+        )
         
     def _chain_reasoning(
         self,
@@ -1383,7 +2139,7 @@ class MultiHopReasoner:
             normalized_seen.add(normalized)
         
         # 2. Rule-based extraction từ query
-        extracted = self._extract_entities_from_query(query)
+        extracted = self._extract_entities_from_query(query, expected_types)
         # QUAN TRỌNG: Sắp xếp extracted entities theo độ dài tên (dài trước) để ưu tiên full names
         # Ví dụ: "Yoo Jeong-yeon" sẽ được thêm trước "Yoo"
         extracted_sorted = sorted(extracted, key=lambda x: len(self._normalize_entity_name(x)), reverse=True)
@@ -1436,10 +2192,14 @@ class MultiHopReasoner:
         
         return all_entities
     
-    def _extract_entities_from_query(self, query: str) -> List[str]:
+    def _extract_entities_from_query(self, query: str, expected_types: Optional[List[str]] = None) -> List[str]:
         """
         Extract entity names from query (case-insensitive).
-        Tìm tất cả artists/groups có thể có trong query.
+        Tìm tất cả artists/groups/songs có thể có trong query.
+        
+        Args:
+            query: Query string
+            expected_types: Loại entities mong đợi (None = tất cả)
         """
         entities = []
         query_lower = query.lower()
@@ -1449,6 +2209,25 @@ class MultiHopReasoner:
                       if data.get('label') == 'Artist']
         all_groups = [node for node, data in self.kg.graph.nodes(data=True) 
                      if data.get('label') == 'Group']
+        
+        # Thêm songs, albums, genres, companies nếu cần
+        all_songs = []
+        all_albums = []
+        all_genres = []
+        all_companies = []
+        
+        if not expected_types or 'Song' in expected_types:
+            all_songs = [node for node, data in self.kg.graph.nodes(data=True) 
+                        if data.get('label') == 'Song']
+        if not expected_types or 'Album' in expected_types:
+            all_albums = [node for node, data in self.kg.graph.nodes(data=True) 
+                         if data.get('label') == 'Album']
+        if not expected_types or 'Genre' in expected_types:
+            all_genres = [node for node, data in self.kg.graph.nodes(data=True) 
+                         if data.get('label') == 'Genre']
+        if not expected_types or 'Company' in expected_types:
+            all_companies = [node for node, data in self.kg.graph.nodes(data=True) 
+                            if data.get('label') == 'Company']
         
         # Tìm tất cả artists trong query (case-insensitive)
         # QUAN TRỌNG: Xử lý node có đuôi như "Lisa (ca sĩ)"
@@ -1780,6 +2559,248 @@ class MultiHopReasoner:
                     entities.append(group)
                     normalized_seen.add(base_name)
         
+        # Tìm songs nếu cần (khi expected_types có 'Song') - Áp dụng logic tương tự như artists
+        if all_songs and (not expected_types or 'Song' in expected_types):
+            # Sắp xếp songs theo độ dài tên (dài trước) để ưu tiên match tên đầy đủ
+            all_songs_sorted = sorted(all_songs, key=lambda x: len(self._normalize_entity_name(x)), reverse=True)
+            
+            for song in all_songs_sorted:
+                song_lower = song.lower()
+                # Extract base name (không có đuôi)
+                base_name = self._normalize_entity_name(song)
+                base_name_lower = base_name.lower()
+                
+                # Check duplicate bằng normalized name TRƯỚC khi match
+                if base_name_lower in normalized_seen:
+                    continue  # Đã có entity với cùng normalized name
+                
+                # Định nghĩa base_name_word_count
+                base_name_word_count = len(base_name_lower.split())
+                
+                # Tạo variants để match với nhiều format
+                song_variants = [
+                    base_name_lower,  # Original
+                    base_name_lower.replace('-', ' '),  # "kill-this-love" → "kill this love"
+                    base_name_lower.replace('-', ''),    # "kill-this-love" → "killthislove"
+                    base_name_lower.replace(' ', ''),    # "kill this love" → "killthislove"
+                    base_name_lower.replace(' ', '-'),   # "kill this love" → "kill-this-love"
+                ]
+                song_variants = list(dict.fromkeys(song_variants))
+                
+                # Method 2: Check n-gram matching (2-4 words) để bắt tên phức tạp như "Kill This Love"
+                # Ưu tiên match đầy đủ tên TRƯỚC khi match single word
+                matched_in_ngram = False
+                for ngram in query_ngrams:
+                    if len(ngram) < 3:
+                        continue
+                    # Nếu base_name có nhiều từ, chỉ match với n-gram có ít nhất 2 từ
+                    if base_name_word_count >= 2:
+                        ngram_word_count = len(ngram.split())
+                        if ngram_word_count < 2:
+                            continue  # Skip single word n-grams cho multi-word names
+                    for variant in song_variants:
+                        # Exact match (ưu tiên cao nhất)
+                        if variant == ngram:
+                            if base_name_lower not in normalized_seen:
+                                entities.append(song)
+                                normalized_seen.add(base_name_lower)
+                                matched_in_ngram = True
+                                break
+                        # Xử lý tên có dash trước khi check substring
+                        elif '-' in variant or '-' in ngram:
+                            # Normalize cả 2 về cùng format (space) để so sánh
+                            variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
+                            ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
+                            # Exact match sau khi normalize
+                            if variant_normalized == ngram_normalized:
+                                if base_name_lower not in normalized_seen:
+                                    entities.append(song)
+                                    normalized_seen.add(base_name_lower)
+                                    matched_in_ngram = True
+                                    break
+                            # So sánh parts: nếu có ít nhất 2 parts giống nhau → match
+                            variant_parts = set(variant_normalized.split())
+                            ngram_parts = set(ngram_normalized.split())
+                            if len(variant_parts.intersection(ngram_parts)) >= 2:
+                                if base_name_lower not in normalized_seen:
+                                    entities.append(song)
+                                    normalized_seen.add(base_name_lower)
+                                    matched_in_ngram = True
+                                    break
+                        # Substring match (variant trong ngram hoặc ngược lại) - chỉ khi không có dash
+                        elif variant in ngram or ngram in variant:
+                            # Chỉ match nếu cả 2 đều có ít nhất 2 từ (ưu tiên match đầy đủ tên)
+                            variant_words = variant.split()
+                            ngram_words = ngram.split()
+                            if len(variant_words) >= 2 and len(ngram_words) >= 2:
+                                # Check xem có ít nhất 2 từ trùng nhau không
+                                variant_set = set(variant_words)
+                                ngram_set = set(ngram_words)
+                                if len(variant_set.intersection(ngram_set)) >= 2:
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(song)
+                                        normalized_seen.add(base_name_lower)
+                                        matched_in_ngram = True
+                                        break
+                # Nếu đã match trong n-gram, skip các method khác
+                if matched_in_ngram:
+                    continue
+                
+                if base_name_lower in normalized_seen:
+                    continue
+                
+                # Method 3: Check substring match (cho tên phức tạp)
+                if len(base_name_lower) >= 4:
+                    for variant in song_variants:
+                        if len(variant) >= 4 and variant in query_lower:
+                            # Verify: phải có ít nhất 2 từ trong variant xuất hiện trong query
+                            variant_words = variant.split()
+                            if len(variant_words) >= 2:
+                                matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
+                                if matched_words >= 2:
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(song)
+                                        normalized_seen.add(base_name_lower)
+                                        break
+                            elif len(variant_words) == 1 and variant in query_lower:
+                                if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(song)
+                                        normalized_seen.add(base_name_lower)
+                                        break
+                    if base_name_lower in normalized_seen:
+                        continue
+                
+                # Method 4: Check nếu tất cả các từ trong song name đều có trong query
+                song_words = set(base_name_lower.split())
+                query_words_set = set(query_words_list)
+                if song_words.issubset(query_words_set) and len(song_words) >= 2:
+                    if base_name_lower not in normalized_seen:
+                        entities.append(song)
+                        normalized_seen.add(base_name_lower)
+                        continue
+        
+        # Tìm albums nếu cần (khi expected_types có 'Album') - Áp dụng logic tương tự như songs
+        if all_albums and (not expected_types or 'Album' in expected_types):
+            # Sắp xếp albums theo độ dài tên (dài trước) để ưu tiên match tên đầy đủ
+            all_albums_sorted = sorted(all_albums, key=lambda x: len(self._normalize_entity_name(x)), reverse=True)
+            
+            for album in all_albums_sorted:
+                album_lower = album.lower()
+                # Extract base name (không có đuôi)
+                base_name = self._normalize_entity_name(album)
+                base_name_lower = base_name.lower()
+                
+                # Check duplicate bằng normalized name TRƯỚC khi match
+                if base_name_lower in normalized_seen:
+                    continue  # Đã có entity với cùng normalized name
+                
+                # Định nghĩa base_name_word_count
+                base_name_word_count = len(base_name_lower.split())
+                
+                # Tạo variants để match với nhiều format
+                album_variants = [
+                    base_name_lower,  # Original
+                    base_name_lower.replace('-', ' '),  # "born-pink" → "born pink"
+                    base_name_lower.replace('-', ''),    # "born-pink" → "bornpink"
+                    base_name_lower.replace(' ', ''),    # "born pink" → "bornpink"
+                    base_name_lower.replace(' ', '-'),   # "born pink" → "born-pink"
+                ]
+                album_variants = list(dict.fromkeys(album_variants))
+                
+                # Method 2: Check n-gram matching (2-4 words) để bắt tên phức tạp như "Born Pink", "A Flower Bookmark"
+                # Ưu tiên match đầy đủ tên TRƯỚC khi match single word
+                matched_in_ngram = False
+                for ngram in query_ngrams:
+                    if len(ngram) < 3:
+                        continue
+                    # Nếu base_name có nhiều từ, chỉ match với n-gram có ít nhất 2 từ
+                    if base_name_word_count >= 2:
+                        ngram_word_count = len(ngram.split())
+                        if ngram_word_count < 2:
+                            continue  # Skip single word n-grams cho multi-word names
+                    for variant in album_variants:
+                        # Exact match (ưu tiên cao nhất)
+                        if variant == ngram:
+                            if base_name_lower not in normalized_seen:
+                                entities.append(album)
+                                normalized_seen.add(base_name_lower)
+                                matched_in_ngram = True
+                                break
+                        # Xử lý tên có dash trước khi check substring
+                        elif '-' in variant or '-' in ngram:
+                            # Normalize cả 2 về cùng format (space) để so sánh
+                            variant_normalized = variant.replace('-', ' ').replace('  ', ' ').strip()
+                            ngram_normalized = ngram.replace('-', ' ').replace('  ', ' ').strip()
+                            # Exact match sau khi normalize
+                            if variant_normalized == ngram_normalized:
+                                if base_name_lower not in normalized_seen:
+                                    entities.append(album)
+                                    normalized_seen.add(base_name_lower)
+                                    matched_in_ngram = True
+                                    break
+                            # So sánh parts: nếu có ít nhất 2 parts giống nhau → match
+                            variant_parts = set(variant_normalized.split())
+                            ngram_parts = set(ngram_normalized.split())
+                            if len(variant_parts.intersection(ngram_parts)) >= 2:
+                                if base_name_lower not in normalized_seen:
+                                    entities.append(album)
+                                    normalized_seen.add(base_name_lower)
+                                    matched_in_ngram = True
+                                    break
+                        # Substring match (variant trong ngram hoặc ngược lại) - chỉ khi không có dash
+                        elif variant in ngram or ngram in variant:
+                            # Chỉ match nếu cả 2 đều có ít nhất 2 từ (ưu tiên match đầy đủ tên)
+                            variant_words = variant.split()
+                            ngram_words = ngram.split()
+                            if len(variant_words) >= 2 and len(ngram_words) >= 2:
+                                # Check xem có ít nhất 2 từ trùng nhau không
+                                variant_set = set(variant_words)
+                                ngram_set = set(ngram_words)
+                                if len(variant_set.intersection(ngram_set)) >= 2:
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(album)
+                                        normalized_seen.add(base_name_lower)
+                                        matched_in_ngram = True
+                                        break
+                # Nếu đã match trong n-gram, skip các method khác
+                if matched_in_ngram:
+                    continue
+                
+                if base_name_lower in normalized_seen:
+                    continue
+                
+                # Method 3: Check substring match (cho tên phức tạp)
+                if len(base_name_lower) >= 4:
+                    for variant in album_variants:
+                        if len(variant) >= 4 and variant in query_lower:
+                            # Verify: phải có ít nhất 2 từ trong variant xuất hiện trong query
+                            variant_words = variant.split()
+                            if len(variant_words) >= 2:
+                                matched_words = sum(1 for w in variant_words if len(w) >= 3 and w in query_lower)
+                                if matched_words >= 2:
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(album)
+                                        normalized_seen.add(base_name_lower)
+                                        break
+                            elif len(variant_words) == 1 and variant in query_lower:
+                                if variant in query_words_list or any(variant in w for w in query_words_list if len(w) >= len(variant)):
+                                    if base_name_lower not in normalized_seen:
+                                        entities.append(album)
+                                        normalized_seen.add(base_name_lower)
+                                        break
+                    if base_name_lower in normalized_seen:
+                        continue
+                
+                # Method 4: Check nếu tất cả các từ trong album name đều có trong query
+                album_words = set(base_name_lower.split())
+                query_words_set = set(query_words_list)
+                if album_words.issubset(query_words_set) and len(album_words) >= 2:
+                    if base_name_lower not in normalized_seen:
+                        entities.append(album)
+                        normalized_seen.add(base_name_lower)
+                        continue
+        
         # Nếu chưa đủ, try fuzzy match với từng word (bao gồm base name)
         if len(entities) < 2:
             words = query_lower.split()
@@ -1795,17 +2816,23 @@ class MultiHopReasoner:
                     if base_name in normalized_seen:
                         continue
                     
+                    # Filter theo expected_types nếu có
+                    if expected_types:
+                        node_data = self.kg.get_entity(node)
+                        if not node_data or node_data.get('label') not in expected_types:
+                            continue
+                    
                     # Exact match với full name hoặc base name
                     if node_lower == word or base_name == word:
                         node_data = self.kg.get_entity(node)
-                        if node_data and node_data.get('label') in ['Artist', 'Group']:
+                        if node_data and (not expected_types or node_data.get('label') in expected_types):
                             entities.append(node)
                             normalized_seen.add(base_name)
                         break
                     # Partial match
                     elif (word in base_name and len(word) >= 3) or (base_name in word and len(base_name) >= 3):
                         node_data = self.kg.get_entity(node)
-                        if node_data and node_data.get('label') in ['Artist', 'Group']:
+                        if node_data and (not expected_types or node_data.get('label') in expected_types):
                             entities.append(node)
                             normalized_seen.add(base_name)
                         break

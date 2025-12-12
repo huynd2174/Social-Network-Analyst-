@@ -226,20 +226,34 @@ Output:
 
 ## Multi-hop Reasoning
 
-### Các loại suy luận
+Multi-hop nghĩa là phải đi qua ≥2 cạnh nối tiếp trên đồ thị để trả lời, không phải đếm số thực thể trong câu hỏi. “Lisa và Jisoo có cùng nhóm không?” chỉ là hai fact song song (mỗi fact 1-hop), còn “Lisa thuộc công ty nào?” là 2-hop: Lisa → MEMBER_OF → BLACKPINK → MANAGED_BY → YG.
 
+### Phân loại nhanh
 | Loại | Mô tả | Ví dụ |
 |------|-------|-------|
 | **1-hop** | Quan hệ trực tiếp | "BTS có bao nhiêu thành viên?" |
-| **2-hop** | 1 thực thể trung gian | "Jungkook thuộc công ty nào?" |
-| **3-hop** | 2 thực thể trung gian | "Jungkook và Jennie có cùng công ty không?" |
+| **2-hop** | 1 nút trung gian | "Jungkook thuộc công ty nào?" |
+| **3-hop** | 2 nút trung gian | "Album nào thuộc nhóm có thành viên là Lisa?" |
 
-### Chiến lược suy luận
+### Pipeline
+1) **Intent Detection**: pattern-based; nếu chưa rõ thì nhờ LLM hỗ trợ rồi validate lại. Intent quyết định luồng (so sánh vs chain Artist→Group→Company, …).  
+2) **GraphRAG**: lấy subgraph liên quan (entity search + BFS 1–2 hop); chỉ cung cấp dữ liệu, không suy luận.  
+3) **MultiHopReasoner**: suy luận thuần đồ thị (NetworkX), không dùng LLM để suy luận.
 
-1. **Chain Reasoning**: A → B → C
-2. **Aggregation**: A → {B1, B2, ...} → count/list
-3. **Comparison**: So sánh A và B
-4. **Intersection**: Tìm điểm chung
+### Chiến lược chính
+- **Shortest-path ưu tiên**: `path(u,v) = argmin_{p∈P(u,v)} |p|` (dùng `nx.shortest_path`, `nx.all_simple_paths` với giới hạn hop).  
+- **Chain reasoning domain-aware**: hàm chuyên dụng (vd. `get_artist_groups`, `get_group_companies`, `get_album_songs`) sinh truy vấn trung gian, ưu tiên đường trực tiếp, tránh vòng.  
+- **Comparison/Intersection**: câu so sánh chạy chain cho từng thực thể, lấy giao/hiệu (vd. cùng công ty, cùng nhóm).  
+- **3-hop+**: kết hợp BFS pathfinding (tìm đường ngắn nhất trong subgraph) + chain mẫu domain. Ví dụ “Album nào thuộc nhóm có thành viên là Lisa?”: từ Lisa → Group, từ Group → Album/Bài hát liên quan, gom kết quả.
+
+### Chấm điểm & lọc
+- Mỗi path có score từ: confidence edge (từ RE), số lần xuất hiện (cross-doc), độ dài (ngắn ưu tiên), nguồn bằng chứng.  
+- Chọn đường score cao nhất hoặc hợp nhất nếu nhiều đường đủ ngưỡng; nếu không có đường đạt ngưỡng → trả “không chắc” kèm confidence.  
+- Lọc blacklist/duplicate và giới hạn kích thước trả về để tránh quá tải.
+
+### Giải thích & kiểm chứng
+- Reasoner chuyển path thành lời giải thích tự nhiên, đính kèm triples/đoạn hỗ trợ.  
+- Mọi thực thể/quan hệ phải tồn tại trong KG và vượt threshold; kết quả từ semantic/LLM fallback đều phải cross-check KG để tránh hallucination.
 
 ### Ví dụ
 
