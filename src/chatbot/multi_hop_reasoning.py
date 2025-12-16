@@ -1891,12 +1891,25 @@ class MultiHopReasoner:
         )
         steps.append(step)
         
+        # Helper function để clean company name (loại bỏ prefix "Company_")
+        def _clean_company_name(name):
+            if not name:
+                return "không rõ"
+            # Loại bỏ prefix "Company_" nếu có
+            if name.startswith("Company_"):
+                return name[8:]  # Bỏ "Company_"
+            return name
+        
+        # Clean company names cho output tự nhiên
+        company1_clean = _clean_company_name(company1)
+        company2_clean = _clean_company_name(company2)
+        
         # Generate answer
-        if 'cùng công ty' in query.lower() or 'same company' in query.lower():
+        if 'cùng công ty' in query.lower() or 'same company' in query.lower() or 'cùng hãng' in query.lower():
             if same_company:
-                answer_text = f"Có, {entity1} và {entity2} cùng thuộc công ty {company1}"
+                answer_text = f"Có, {entity1} và {entity2} cùng thuộc công ty {company1_clean}"
             else:
-                answer_text = f"Không, {entity1} thuộc {company1}, còn {entity2} thuộc {company2}"
+                answer_text = f"Không, {entity1} ({company1_clean}) và {entity2} ({company2_clean}) khác công ty"
         else:
             answer_text = f"{entity1} và {entity2} có {len(common_targets)} điểm chung"
             
@@ -3134,10 +3147,23 @@ class MultiHopReasoner:
         # Compare
         common_companies = set(companies1).intersection(set(companies2))
         
+        # Helper function để clean company name (loại bỏ prefix "Company_")
+        def _clean_company_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Company_"):
+                return name[8:]
+            return name
+        
+        # Clean company names cho output tự nhiên
+        companies1_clean = [_clean_company_name(c) for c in companies1]
+        companies2_clean = [_clean_company_name(c) for c in companies2]
+        common_clean = [_clean_company_name(c) for c in common_companies]
+        
         if common_companies:
-            answer_text = f"Có, {entity1} và {entity2} cùng thuộc công ty: {', '.join(common_companies)}"
+            answer_text = f"Có, {entity1} và {entity2} cùng thuộc công ty: {', '.join(common_clean)}"
         else:
-            answer_text = f"Không, {entity1} ({', '.join(companies1) if companies1 else 'không rõ'}) và {entity2} ({', '.join(companies2) if companies2 else 'không rõ'}) khác công ty"
+            answer_text = f"Không, {entity1} ({', '.join(companies1_clean) if companies1_clean else 'không rõ'}) và {entity2} ({', '.join(companies2_clean) if companies2_clean else 'không rõ'}) khác công ty"
             
         return ReasoningResult(
             query=f"{entity1} và {entity2} có cùng công ty không?",

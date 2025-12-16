@@ -174,25 +174,232 @@ So sánh giữa PageRank và các chỉ số centrality khác cho thấy có s�
 
 ### 3.3. Phát hiện cộng đồng (0.5 điểm)
 
-Phát hiện cộng đồng là quá trình xác định các nhóm node có mật độ kết nối cao với nhau và mật độ kết nối thấp với các node bên ngoài nhóm. Trong ngữ cảnh của đồ thị tri thức K-pop, phát hiện cộng đồng giúp khám phá các nhóm nghệ sĩ, nhóm nhạc, hoặc thực thể khác có mối quan hệ chặt chẽ với nhau, tạo thành các cụm tự nhiên trong mạng. Hệ thống sử dụng thuật toán Louvain nếu có sẵn trong NetworkX, hoặc thuật toán Greedy Modularity làm phương án dự phòng nếu Louvain không khả dụng.
+Phát hiện cộng đồng (Community Detection) là quá trình xác định các nhóm node có mật độ kết nối cao với nhau và mật độ kết nối thấp với các node bên ngoài nhóm. Trong ngữ cảnh của đồ thị tri thức K-pop, phát hiện cộng đồng giúp khám phá các nhóm nghệ sĩ, nhóm nhạc, hoặc thực thể khác có mối quan hệ chặt chẽ với nhau, tạo thành các cụm tự nhiên trong mạng. Hệ thống triển khai phân tích cộng đồng theo hai tầng: (1) phát hiện cộng đồng bằng thuật toán và (2) phân tích ngữ nghĩa cộng đồng để hiểu ý nghĩa thực tế của các cộng đồng được phát hiện.
 
-Thuật toán Louvain là một thuật toán heuristic nhanh và hiệu quả để phát hiện cộng đồng bằng cách tối ưu modularity. Modularity là một chỉ số đo lường chất lượng phân chia cộng đồng, được định nghĩa bằng công thức Q = (1/2m) * Σ[Aij - (ki*kj/2m)] * δ(ci, cj), trong đó m là tổng số cạnh trong đồ thị, Aij là ma trận kề (1 nếu có cạnh giữa node i và j, 0 nếu không), ki và kj là bậc của node i và j, và δ(ci, cj) là hàm Kronecker delta (1 nếu node i và j thuộc cùng cộng đồng, 0 nếu không). Giá trị modularity lớn hơn 0.3 được coi là chỉ báo của cấu trúc cộng đồng rõ ràng, trong khi giá trị lớn hơn 0.5 cho thấy cấu trúc cộng đồng rất mạnh.
+#### 3.3.1. Thuật toán phát hiện cộng đồng
 
-Thuật toán Louvain hoạt động theo hai giai đoạn. Giai đoạn đầu tiên là tối ưu cục bộ: mỗi node được gán vào cộng đồng mà tăng modularity nhiều nhất, lặp lại quá trình này cho đến khi không còn cải thiện nào. Giai đoạn thứ hai là hợp nhất: các node trong cùng cộng đồng được hợp nhất thành một siêu node, tạo ra một đồ thị mới với các cộng đồng như các node. Hai giai đoạn này được lặp lại cho đến khi modularity không còn cải thiện. Thuật toán Greedy Modularity hoạt động tương tự nhưng sử dụng một chiến lược tham lam khác, hợp nhất các cộng đồng theo cách tăng modularity nhiều nhất tại mỗi bước.
+Hệ thống sử dụng thuật toán **Louvain** làm phương pháp chính vì tính hiệu quả và chất lượng kết quả vượt trội. Ngoài ra, hệ thống cũng so sánh với các thuật toán khác để đánh giá và xác nhận kết quả:
 
-Kết quả phát hiện cộng đồng cho thấy hệ thống đã phát hiện được 1,899 cộng đồng với modularity là 0.612882809, một giá trị rất cao so với ngưỡng 0.3 và gần với ngưỡng 0.5, cho thấy cấu trúc cộng đồng rất rõ ràng và mạnh mẽ trong mạng K-pop. Giá trị modularity cao này phản ánh thực tế rằng mạng K-pop có cấu trúc phân cấp rõ ràng, với các nhóm nghệ sĩ, nhóm nhạc, và các thực thể khác tạo thành các cụm tự nhiên với mật độ kết nối cao bên trong và mật độ kết nối thấp giữa các cụm.
+| Thuật toán | Số cộng đồng | Modularity | Coverage |
+|------------|--------------|------------|----------|
+| **Louvain** | 177 | **0.5479** | 65.05% |
+| Greedy Modularity | 177 | 0.5307 | 68.13% |
+| Label Propagation | 244 | 0.2655 | 90.96% |
+| Asynchronous LPA | 253 | 0.3297 | 87.19% |
+| K-Clique (k=3) | 114 | - | - |
 
-Cộng đồng lớn nhất có 376 nodes, chiếm khoảng 8.6% tổng số node trong mạng. Đây là một tỷ lệ đáng kể, cho thấy có một cộng đồng lớn và có ảnh hưởng trong mạng K-pop. Số lượng cộng đồng lớn (1,899) phản ánh tính đa dạng cao của mạng K-pop, với nhiều nhóm và cộng đồng nhỏ khác nhau, mỗi cộng đồng có đặc điểm và mối quan hệ riêng.
+**Thuật toán Louvain** được chọn vì đạt Modularity cao nhất (0.5479), một giá trị vượt ngưỡng 0.5 cho thấy cấu trúc cộng đồng **RẤT MẠNH**. Modularity là chỉ số đo lường chất lượng phân chia cộng đồng, được định nghĩa bằng công thức:
 
-Hệ thống phân tích chi tiết các cộng đồng được phát hiện, bao gồm thống kê kích thước (nhỏ nhất, lớn nhất, trung bình, trung vị), phân bố loại thực thể trong mỗi cộng đồng, và xác định loại thực thể chủ đạo (dominant label). Kết quả cho thấy có nhiều loại cộng đồng khác nhau: một số cộng đồng chủ yếu chứa nghệ sĩ (artist-dominated communities), một số chủ yếu chứa nhóm nhạc (group-dominated communities), và một số là hỗn hợp (mixed communities) chứa nhiều loại thực thể khác nhau.
+```
+Q = (1/2m) × Σ[Aij - (ki×kj/2m)] × δ(ci, cj)
+```
 
-Các cộng đồng được phát hiện có thể được giải thích theo nhiều cách khác nhau dựa trên cấu trúc và thành phần của chúng. Một số cộng đồng có thể đại diện cho một nhóm nhạc và tất cả các thành viên, bài hát, album liên quan của nhóm đó. Các cộng đồng này thường có cấu trúc tập trung, với nhóm nhạc ở trung tâm và các thành viên, bài hát, album xung quanh. Các cộng đồng khác có thể đại diện cho các nghệ sĩ cùng công ty giải trí, như SM Entertainment, YG Entertainment, JYP Entertainment, hoặc HYBE. Các cộng đồng này thường bao gồm nhiều nhóm nhạc và nghệ sĩ thuộc cùng một công ty, được kết nối thông qua quan hệ MANAGED_BY.
+Trong đó: m là tổng số cạnh, Aij là ma trận kề, ki và kj là bậc của node i và j, và δ(ci, cj) là hàm Kronecker delta (1 nếu node i và j thuộc cùng cộng đồng).
 
-Một số cộng đồng có thể đại diện cho các nghệ sĩ cùng thể loại nhạc, như Hip-hop, Ballad, hoặc Dance-pop. Các cộng đồng này được hình thành thông qua quan hệ IS_GENRE, nơi nhiều nghệ sĩ và nhóm nhạc chia sẻ cùng một thể loại. Cuối cùng, một số cộng đồng có thể đại diện cho các nghệ sĩ có collaboration hoặc mối quan hệ hợp tác chặt chẽ, được kết nối thông qua các bài hát chung, album chung, hoặc các hoạt động hợp tác khác.
+Thuật toán Louvain hoạt động theo hai giai đoạn lặp:
+- **Giai đoạn 1 (Tối ưu cục bộ)**: Mỗi node được gán vào cộng đồng tăng modularity nhiều nhất
+- **Giai đoạn 2 (Hợp nhất)**: Các node cùng cộng đồng được hợp nhất thành siêu node
 
-Hệ thống cũng phân tích các cộng đồng đặc biệt, bao gồm các cộng đồng có kích thước lớn bất thường, các cộng đồng có tính đồng nhất cao (tất cả node thuộc cùng một loại), và các cộng đồng có tính đa dạng cao (chứa nhiều loại thực thể khác nhau). Phân tích này giúp hiểu rõ hơn về cấu trúc và động lực của mạng K-pop.
+#### 3.3.2. Kết quả phát hiện cộng đồng
 
-Ứng dụng của phát hiện cộng đồng trong hệ thống này là đa dạng và sâu sắc. Thứ nhất, nó giúp phân tích mối quan hệ giữa các nghệ sĩ và nhóm nhạc một cách có hệ thống, cho phép hiểu rõ hơn về cấu trúc xã hội và tổ chức của ngành K-pop. Thứ hai, nó có thể được sử dụng để gợi ý các nghệ sĩ tương tự dựa trên việc họ thuộc cùng cộng đồng, một tính năng hữu ích cho các hệ thống đề xuất và tìm kiếm. Thứ ba, nó giúp phân tích xu hướng và phong cách âm nhạc bằng cách xem xét các đặc điểm chung của các nghệ sĩ trong cùng cộng đồng, có thể được sử dụng để dự đoán xu hướng mới hoặc phân tích sự phát triển của các phong cách âm nhạc. Thứ tư, nó có thể được sử dụng để phân tích cạnh tranh và hợp tác trong ngành K-pop, bằng cách xem xét các cộng đồng được hình thành bởi các công ty giải trí hoặc các nhóm nhạc cùng thế hệ.
+Kết quả phân tích cho thấy mạng K-pop có cấu trúc cộng đồng rõ ràng:
+
+| Metric | Giá trị | Ý nghĩa |
+|--------|---------|---------|
+| Tổng số cộng đồng | 177 | Đa dạng, nhiều nhóm nhỏ |
+| Modularity | 0.5479 | Cấu trúc cộng đồng MẠNH |
+| Cộng đồng lớn nhất | 198 nodes (11.7%) | Có cộng đồng trung tâm lớn |
+| Cộng đồng nhỏ nhất | 1 node | Tồn tại các node cô lập |
+| Kích thước trung bình | 9.6 nodes | Cộng đồng có quy mô vừa phải |
+| Internal Density | 0.0322 | Mật độ liên kết nội bộ |
+| Conductance trung bình | 0.3122 | Tỷ lệ liên kết ra ngoài |
+
+**Top 10 cộng đồng lớn nhất** với đặc điểm:
+
+| # | Kích thước | Label chủ đạo | Đặc điểm |
+|---|------------|---------------|----------|
+| 1 | 198 nodes | Artist (49.0%) | Company-based (Pledis Entertainment) |
+| 2 | 188 nodes | Artist (56.9%) | Company-based (JYP Entertainment) |
+| 3 | 162 nodes | Artist (34.6%) | Company-based (Cube Entertainment) |
+| 4 | 119 nodes | Album (40.3%) | Group-centric (Girls' Generation) |
+| 5 | 107 nodes | Artist (33.6%) | Company-based (SM Entertainment) |
+| 6 | 104 nodes | Artist (31.7%) | Company-based (YG Entertainment) |
+| 7 | 85 nodes | Song (42.4%) | Group-centric (BLACKPINK) |
+| 8 | 80 nodes | Song (53.8%) | Company-based (HYBE) |
+| 9 | 78 nodes | Album (51.3%) | Group-centric (Big Bang) |
+| 10 | 70 nodes | Song (32.9%) | Mixed (T-ara, ITZY) |
+
+#### 3.3.3. Phân tích ngữ nghĩa cộng đồng (Semantic Community Analysis)
+
+Phần phân tích chuyên sâu này đi vào ý nghĩa thực tế của các cộng đồng được phát hiện, trả lời câu hỏi: "Cộng đồng được hình thành dựa trên yếu tố nào?"
+
+##### A. Phân tích theo Công ty (Company-based Analysis)
+
+Giả thuyết: Nghệ sĩ cùng công ty quản lý sẽ có xu hướng nằm trong cùng một cộng đồng.
+
+**Top 10 công ty có nhiều nghệ sĩ nhất:**
+
+| Công ty | # Artists | # Groups | Coherence |
+|---------|-----------|----------|-----------|
+| JYP Entertainment | 53 | 13 | 75.5% ✓ |
+| SM Entertainment | 37 | 22 | 54.1% |
+| Starship Entertainment | 15 | 5 | 66.7% |
+| Avex Trax | 14 | 11 | 64.3% |
+| Cube Entertainment | 14 | 1 | 57.1% |
+| DSP Media | 13 | 6 | 53.8% |
+| HYBE | 12 | 6 | 75.0% ✓ |
+| YG Entertainment | 12 | 9 | 41.7% |
+| FNC Entertainment | 12 | 4 | 91.7% ✓ |
+
+**Company-Community Coherence** đo lường tỷ lệ nghệ sĩ cùng công ty nằm trong cùng cộng đồng:
+- **Coherence trung bình: 63.4%** → Cấu trúc cộng đồng **PHẢN ÁNH TỐT** mối quan hệ theo công ty
+- Công ty có coherence cao nhất: **FNC Entertainment (91.7%)** - gần như tất cả nghệ sĩ FNC nằm trong cùng một cộng đồng
+- Công ty có coherence thấp nhất: **YG Entertainment (41.7%)** - nghệ sĩ YG phân tán qua nhiều cộng đồng
+
+##### B. Phân tích theo Nhóm nhạc (Group-Centric Analysis)
+
+Mỗi nhóm nhạc lớn tạo thành một "tiểu vũ trụ" với các thành viên, bài hát, album, và công ty liên quan.
+
+**Top 10 nhóm nhạc có Ecosystem lớn nhất:**
+
+| Nhóm | Members | Songs | Albums | Companies | Total | Member Coherence |
+|------|---------|-------|--------|-----------|-------|------------------|
+| BTS | 5 | 40 | 11 | 6 | 66 | 100.0% ✓ |
+| Girls' Generation | 5 | 19 | 17 | 3 | 48 | 60.0% |
+| Big Bang | 4 | 14 | 21 | 3 | 47 | 75.0% |
+| BLACKPINK | 6 | 23 | 7 | 4 | 43 | 100.0% ✓ |
+| EXO | 7 | 13 | 14 | 2 | 42 | 14.3% |
+| T-ara | 4 | 16 | 10 | 2 | 37 | - |
+| GFriend | 4 | 17 | 11 | 2 | 34 | - |
+| IZ*ONE | 11 | 7 | 5 | 4 | 33 | - |
+| Super Junior | 6 | 11 | 10 | 2 | 29 | - |
+| TWICE | 1 | 14 | 5 | 3 | 27 | - |
+
+**Member-Group Coherence** đo lường tỷ lệ thành viên nhóm nằm trong cùng cộng đồng với nhóm:
+- BTS và BLACKPINK đạt 100% - tất cả thành viên nằm cùng cộng đồng với nhóm
+- EXO chỉ đạt 14.3% - thành viên EXO phân tán qua nhiều cộng đồng (do hoạt động solo đa dạng)
+
+##### C. Phân tích theo Thể loại (Genre-based Analysis)
+
+Giả thuyết: Nghệ sĩ/nhóm cùng thể loại âm nhạc sẽ nằm trong các cộng đồng gần nhau.
+
+**Top 15 thể loại phổ biến nhất:**
+
+| Thể loại | Artists | Groups | Total | Coherence |
+|----------|---------|--------|-------|-----------|
+| R&B | 160 | 48 | 208 | 37.5% |
+| Dance-pop | 93 | 38 | 131 | 37.4% |
+| Hip hop | 85 | 40 | 125 | 24.8% |
+| Pop | 84 | 24 | 108 | 45.4% |
+| Ballad | 61 | 20 | 81 | 40.7% |
+| Dance | 45 | 23 | 68 | 30.9% |
+| J-pop | 33 | 19 | 52 | 46.2% |
+| EDM | 21 | 12 | 33 | 42.4% |
+| Rock | 22 | 6 | 28 | 50.0% ✓ |
+| Electropop | 15 | 12 | 27 | 29.6% |
+
+**Genre-Community Coherence trung bình: 38.5%** → Thể loại **KHÔNG phải là yếu tố chính** hình thành cộng đồng. Điều này cho thấy cộng đồng K-pop được hình thành bởi các yếu tố khác như công ty, quan hệ hợp tác, thế hệ nghệ sĩ, hơn là thể loại âm nhạc.
+
+##### D. Phân tích Nút cầu nối (Bridge Nodes Analysis)
+
+**Bridge Nodes** là các node kết nối nhiều cộng đồng khác nhau, đóng vai trò cầu nối xuyên suốt industry.
+
+**Top 20 Bridge Nodes:**
+
+| Node | Label | # CĐ kết nối | # Edges ngoài |
+|------|-------|--------------|---------------|
+| Occupation_Diễn viên | Occupation | 17 | 150 |
+| Genre_R&B | Genre | 17 | 130 |
+| Genre_Hip hop | Genre | 16 | 94 |
+| Genre_Dance-pop | Genre | 15 | 82 |
+| Occupation_Nhạc sĩ | Occupation | 14 | 69 |
+| Genre_Pop | Genre | 14 | 59 |
+| Genre_Dance | Genre | 13 | 47 |
+| Genre_J-pop | Genre | 13 | 28 |
+| Occupation_Rapper | Occupation | 12 | 42 |
+| Genre_Ballad | Genre | 11 | 48 |
+| Instrument_Piano | Instrument | 11 | 25 |
+| Company_SM Entertainment | Company | 9 | 27 |
+
+**Phân bố Bridge Nodes theo loại:**
+- **Genre**: 10/20 (50%) - Thể loại nhạc là bridge phổ biến nhất
+- **Occupation**: 4/20 (20%) - Nghề nghiệp (Diễn viên, Nhạc sĩ, Rapper)
+- **Company**: 3/20 (15%) - Công ty lớn (SM, JYP, Kakao)
+- **Artist**: 2/20 (10%) - Nhạc sĩ/Producer (Yoo Young-jin, Kenzie)
+- **Instrument**: 1/20 (5%) - Nhạc cụ (Piano)
+
+**Nhận xét về Bridge Nodes:**
+1. **Genre và Occupation** là các bridge tự nhiên vì nhiều nghệ sĩ chia sẻ cùng thể loại/nghề nghiệp
+2. **Các công ty lớn** (SM, JYP, YG, HYBE) đóng vai trò cầu nối giữa các cộng đồng nghệ sĩ
+3. **Yoo Young-jin và Kenzie** (nhạc sĩ/producer SM) kết nối nhiều cộng đồng qua các bài hát đã sáng tác
+
+##### E. Community Profiling (Xác định chủ đề cộng đồng)
+
+Hệ thống tự động phân loại các cộng đồng thành các loại sau:
+
+| Loại cộng đồng | Số lượng | Đặc điểm |
+|----------------|----------|----------|
+| **Company-based** | 7/10 | Cộng đồng xoay quanh công ty (JYP, SM, HYBE, YG, Cube, Pledis, Universal) |
+| **Group-centric** | 3/10 | Cộng đồng xoay quanh nhóm nhạc (Girls' Generation, BLACKPINK, Big Bang) |
+
+**Chi tiết top 5 cộng đồng:**
+
+1. **Cộng đồng #1 (198 nodes)** - Company-based
+   - Thực thể chính: Pledis Entertainment
+   - Đặc điểm: 97 nghệ sĩ, 12 nhóm, 30 công ty liên kết
+   - Top Artists: Park Bo-gum, Lee Jong-hyun
+   - Top Groups: FT Island, After School, SF9
+
+2. **Cộng đồng #2 (188 nodes)** - Company-based
+   - Thực thể chính: JYP Entertainment (49 connections)
+   - Đặc điểm: 107 nghệ sĩ, 21 nhóm
+   - Top Artists: Krystal Jung, Seven
+   - Top Groups: G.o.d, The Grace, CIX
+
+3. **Cộng đồng #4 (119 nodes)** - Group-centric
+   - Thực thể chính: Girls' Generation (40 connections)
+   - Đặc điểm: 48 album, 47 bài hát, 9 nghệ sĩ
+   - Top Artists: Chen, Seohyun, Bada
+   - Top Groups: Girls' Generation, TVXQ, S.E.S.
+
+4. **Cộng đồng #7 (85 nodes)** - Group-centric
+   - Thực thể chính: BLACKPINK (39 connections)
+   - Đặc điểm: 36 bài hát, 17 album, 14 nghệ sĩ
+   - Top Artists: Rosé, Changmo
+   - Top Groups: YG Family, Ateez, Treasure
+
+5. **Cộng đồng #8 (80 nodes)** - Company-based
+   - Thực thể chính: HYBE (12 connections)
+   - Đặc điểm: 43 bài hát, 14 album, 9 nghệ sĩ
+   - Top Artists: Jimin, Pdogg, Lee Hyun
+   - Top Groups: TXT, Bolbbalgan4, BTS
+
+#### 3.3.4. Kết luận và ứng dụng
+
+**Kết luận chính:**
+
+1. **Cộng đồng K-pop được hình thành bởi NHIỀU YẾU TỐ:**
+   - Quan hệ công ty (Company affiliation) - yếu tố mạnh nhất với coherence 63.4%
+   - Quan hệ nhóm nhạc (Group membership) - tạo thành các "tiểu vũ trụ"
+   - Thể loại âm nhạc (Genre similarity) - yếu tố yếu nhất với coherence 38.5%
+   - Quan hệ hợp tác (Collaboration)
+
+2. **Các Bridge Nodes quan trọng:**
+   - Genre (R&B, Dance-pop, Hip hop) kết nối nhiều cộng đồng
+   - Occupation (Diễn viên, Nhạc sĩ) là hub xuyên suốt
+   - Big 3/4 companies (SM, JYP, YG, HYBE) là cầu nối
+
+3. **Đặc điểm nổi bật:**
+   - Nhóm nhạc lớn tạo ecosystem riêng (members + songs + albums)
+   - Công ty lớn có coherence cao (nghệ sĩ cùng công ty = cùng cộng đồng)
+   - Thể loại nhạc phân tán hơn (không phải yếu tố quyết định)
+
+**Ứng dụng của phát hiện cộng đồng:**
+
+1. **Phân tích mối quan hệ**: Hiểu rõ cấu trúc xã hội và tổ chức của ngành K-pop
+2. **Gợi ý nghệ sĩ tương tự**: Nghệ sĩ cùng cộng đồng có khả năng có phong cách/background tương tự
+3. **Phân tích xu hướng**: Xem xét đặc điểm chung của các nghệ sĩ trong cùng cộng đồng
+4. **Dự đoán hợp tác**: Nghệ sĩ cùng cộng đồng hoặc được kết nối qua bridge nodes có tiềm năng hợp tác cao
 
 ---
 

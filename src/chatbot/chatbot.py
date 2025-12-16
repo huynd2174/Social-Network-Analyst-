@@ -20,13 +20,13 @@ try:
     from .knowledge_graph import KpopKnowledgeGraph
     from .knowledge_graph_neo4j import KpopKnowledgeGraphNeo4j
     from .graph_rag import GraphRAG
-    from .multi_hop_reasoning import MultiHopReasoner, ReasoningResult
+    from .multi_hop_reasoning import MultiHopReasoner, ReasoningResult, ReasoningStep, ReasoningType
     from .small_llm import SmallLLM, get_llm, TRANSFORMERS_AVAILABLE
 except ImportError:  # Fallback for no-package context
     from knowledge_graph import KpopKnowledgeGraph
     from knowledge_graph_neo4j import KpopKnowledgeGraphNeo4j
     from graph_rag import GraphRAG
-    from multi_hop_reasoning import MultiHopReasoner, ReasoningResult
+    from multi_hop_reasoning import MultiHopReasoner, ReasoningResult, ReasoningStep, ReasoningType
     from small_llm import SmallLLM, get_llm, TRANSFORMERS_AVAILABLE
 
 
@@ -263,6 +263,47 @@ class KpopChatbot:
             'có cùng công ty', 'có cùng hãng', 'có cùng label'
         ])
         
+        # ========== CÁC PATTERN MỚI ĐỂ TRÁNH HALLUCINATION ==========
+        
+        # Pattern: "X thuộc công ty nào?", "Công ty nào quản lý X?", "X là nghệ sĩ của công ty nào?"
+        is_find_company_question = (
+            ('thuộc công ty nào' in query_lower) or
+            ('công ty nào' in query_lower and ('quản lý' in query_lower or 'sở hữu' in query_lower)) or
+            ('là nghệ sĩ của công ty nào' in query_lower) or
+            ('thuộc hãng nào' in query_lower) or
+            ('thuộc label nào' in query_lower) or
+            (('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and 'thuộc' in query_lower and 'công ty' in query_lower)
+        )
+        
+        # Pattern: "Ai hát bài X?", "Ca sĩ hát bài X là ai?", "Bài X do ai hát?"
+        is_who_sings_question = (
+            ('ai hát' in query_lower and ('bài' in query_lower or 'ca khúc' in query_lower)) or
+            ('ca sĩ' in query_lower and 'hát bài' in query_lower) or
+            ('nghệ sĩ' in query_lower and ('hát bài' in query_lower or 'thể hiện' in query_lower)) or
+            (('bài hát' in query_lower or 'ca khúc' in query_lower) and ('do ai' in query_lower or 'của ai' in query_lower)) or
+            ('ai thể hiện' in query_lower) or
+            ('ca sĩ hát' in query_lower and 'là ai' in query_lower)
+        )
+        
+        # Pattern: "Album X thuộc nhóm nào?", "Album X của nhóm nào?"
+        is_album_belongs_to_question = (
+            ('album' in query_lower) and
+            (('thuộc' in query_lower and ('nhóm' in query_lower or 'ai' in query_lower)) or
+             ('của nhóm nào' in query_lower) or
+             ('do nhóm nào' in query_lower) or
+             ('thuộc về nhóm' in query_lower) or
+             ('thuộc về' in query_lower and 'nhóm' in query_lower))
+        )
+        
+        # Pattern: "Bài hát X nằm trong album nào?", "Bài X thuộc album nào?"
+        is_song_in_which_album_question = (
+            (('bài hát' in query_lower or 'ca khúc' in query_lower or 'bài' in query_lower) and
+             ('nằm trong album nào' in query_lower or 'thuộc album nào' in query_lower or 
+              'trong album nào' in query_lower or 'ở album nào' in query_lower))
+        )
+        
+        # ========== END PATTERN MỚI ==========
+        
         # Bổ sung nhận dạng cho các câu hỏi đa dạng trong dataset đánh giá
         is_genre_question = 'thể loại' in query_lower or 'genre' in query_lower
         # Câu hỏi về năm hoạt động/phát hành/thành lập
@@ -395,7 +436,13 @@ class KpopChatbot:
                 is_song_group_genre_question or
                 is_song_artist_group_genre_question or
                 is_album_group_genre_question or
-                is_album_artist_occupation_question
+                is_album_artist_occupation_question or
+                # ========== PATTERN MỚI ==========
+                is_find_company_question or
+                is_who_sings_question or
+                is_album_belongs_to_question or
+                is_song_in_which_album_question
+                # ========== END PATTERN MỚI ==========
             )
             
             if is_same_group_question or is_same_company_question or is_list_members_question or is_artist_group_question:
@@ -489,6 +536,228 @@ class KpopChatbot:
                         start_entities=[],
                         max_hops=max_hops
                     )
+            # ========== XỬ LÝ CÁC PATTERN FACTUAL MỚI ==========
+            elif is_find_company_question or is_who_sings_question or is_album_belongs_to_question or is_song_in_which_album_question:
+                # Đây là các câu hỏi factual cần truy vấn trực tiếp từ Knowledge Graph
+                extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
+                
+                if extracted:
+                    # Validate entities với KG
+                    validated_entities = []
+                    for e in extracted:
+                        entity_data = self.kg.get_entity(e)
+                        if entity_data:
+                            validated_entities.append(e)
+                    
+                    if validated_entities:
+                        # ========== DIRECT GRAPH QUERY ==========
+                        if is_find_company_question:
+                            # Tìm công ty quản lý entity
+                            for entity_id in validated_entities:
+                                entity_data = self.kg.get_entity(entity_id)
+                                if entity_data:
+                                    # Kiểm tra infobox trước
+                                    infobox = entity_data.get('infobox', {})
+                                    company_info = infobox.get('Hãng đĩa') or infobox.get('Công ty') or infobox.get('Label')
+                                    if company_info:
+                                        reasoning_result = ReasoningResult(
+                                            query=query,
+                                            reasoning_type=ReasoningType.CHAIN,
+                                            steps=[ReasoningStep(entity_id, 'HAS_COMPANY', company_info, 1.0)],
+                                            answer_entities=[company_info],
+                                            answer_text=f"{entity_id} thuộc công ty/hãng đĩa: {company_info}",
+                                            confidence=0.95,
+                                            explanation=f"Tìm thấy thông tin công ty trong infobox của {entity_id}"
+                                        )
+                                        break
+                                    # Nếu không có trong infobox, tìm qua edges MANAGED_BY
+                                    neighbors = self.kg.get_neighbors(entity_id)
+                                    for neighbor, rel_type in neighbors:
+                                        if rel_type == 'MANAGED_BY':
+                                            reasoning_result = ReasoningResult(
+                                                query=query,
+                                                reasoning_type=ReasoningType.CHAIN,
+                                                steps=[ReasoningStep(entity_id, rel_type, neighbor, 1.0)],
+                                                answer_entities=[neighbor],
+                                                answer_text=f"{entity_id} được quản lý bởi công ty: {neighbor}",
+                                                confidence=0.95,
+                                                explanation=f"Tìm thấy quan hệ MANAGED_BY từ {entity_id} đến {neighbor}"
+                                            )
+                                            break
+                        
+                        elif is_who_sings_question:
+                            # Tìm ca sĩ hát bài hát
+                            for entity_id in validated_entities:
+                                entity_data = self.kg.get_entity(entity_id)
+                                if entity_data and entity_data.get('label') == 'Song':
+                                    # Tìm ai SINGS bài này (incoming edge)
+                                    # Hoặc kiểm tra infobox
+                                    infobox = entity_data.get('infobox', {})
+                                    artist_info = infobox.get('Được thực hiện bởi') or infobox.get('Ca sĩ') or infobox.get('Nghệ sĩ')
+                                    if artist_info:
+                                        reasoning_result = ReasoningResult(
+                                            query=query,
+                                            reasoning_type=ReasoningType.CHAIN,
+                                            steps=[ReasoningStep(entity_id, 'SUNG_BY', artist_info, 1.0)],
+                                            answer_entities=[artist_info],
+                                            answer_text=f"Bài hát '{entity_id}' được thể hiện bởi: {artist_info}",
+                                            confidence=0.95,
+                                            explanation=f"Tìm thấy thông tin ca sĩ trong infobox"
+                                        )
+                                        break
+                                    # Tìm qua reverse edges
+                                    for src, tgt, edge_type in self.kg.graph.edges(data='type'):
+                                        if tgt == entity_id and edge_type == 'SINGS':
+                                            reasoning_result = ReasoningResult(
+                                                query=query,
+                                                reasoning_type=ReasoningType.CHAIN,
+                                                steps=[ReasoningStep(src, 'SINGS', entity_id, 1.0)],
+                                                answer_entities=[src],
+                                                answer_text=f"Bài hát '{entity_id}' được thể hiện bởi: {src}",
+                                                confidence=0.95,
+                                                explanation=f"Tìm thấy quan hệ SINGS từ {src}"
+                                            )
+                                            break
+                        
+                        elif is_album_belongs_to_question:
+                            # Tìm nhóm/nghệ sĩ ra album
+                            # Đầu tiên, thử extract tên album từ query
+                            album_name = self._extract_album_name_from_query(query)
+                            found_album = False
+                            
+                            # Nếu extract được album name, tìm trực tiếp
+                            if album_name:
+                                entity_data = self.kg.get_entity(album_name)
+                                if entity_data and entity_data.get('label') == 'Album':
+                                    found_album = True
+                                    infobox = entity_data.get('infobox', {})
+                                    artist_info = infobox.get('Được thực hiện bởi') or infobox.get('Nghệ sĩ') or infobox.get('Ca sĩ')
+                                    if artist_info:
+                                        reasoning_result = ReasoningResult(
+                                            query=query,
+                                            reasoning_type=ReasoningType.CHAIN,
+                                            steps=[ReasoningStep(album_name, 'RELEASED_BY', artist_info, 1.0)],
+                                            answer_entities=[artist_info],
+                                            answer_text=f"Album '{album_name}' thuộc về: {artist_info}",
+                                            confidence=0.95,
+                                            explanation=f"Tìm thấy thông tin nghệ sĩ trong infobox"
+                                        )
+                                    else:
+                                        # Tìm qua edges
+                                        for src, tgt, edge_type in self.kg.graph.edges(data='type'):
+                                            if tgt == album_name and edge_type == 'RELEASED':
+                                                reasoning_result = ReasoningResult(
+                                                    query=query,
+                                                    reasoning_type=ReasoningType.CHAIN,
+                                                    steps=[ReasoningStep(src, 'RELEASED', album_name, 1.0)],
+                                                    answer_entities=[src],
+                                                    answer_text=f"Album '{album_name}' thuộc về: {src}",
+                                                    confidence=0.95,
+                                                    explanation=f"Tìm thấy quan hệ RELEASED từ {src}"
+                                                )
+                                                break
+                            
+                            # Nếu không extract được hoặc không tìm thấy, thử với validated_entities
+                            if not found_album:
+                                for entity_id in validated_entities:
+                                    entity_data = self.kg.get_entity(entity_id)
+                                    if entity_data and entity_data.get('label') == 'Album':
+                                        found_album = True
+                                        infobox = entity_data.get('infobox', {})
+                                        artist_info = infobox.get('Được thực hiện bởi') or infobox.get('Nghệ sĩ') or infobox.get('Ca sĩ')
+                                        if artist_info:
+                                            reasoning_result = ReasoningResult(
+                                                query=query,
+                                                reasoning_type=ReasoningType.CHAIN,
+                                                steps=[ReasoningStep(entity_id, 'RELEASED_BY', artist_info, 1.0)],
+                                                answer_entities=[artist_info],
+                                                answer_text=f"Album '{entity_id}' thuộc về: {artist_info}",
+                                                confidence=0.95,
+                                                explanation=f"Tìm thấy thông tin nghệ sĩ trong infobox"
+                                            )
+                                            break
+                                        # Tìm qua edges
+                                        for src, tgt, edge_type in self.kg.graph.edges(data='type'):
+                                            if tgt == entity_id and edge_type == 'RELEASED':
+                                                reasoning_result = ReasoningResult(
+                                                    query=query,
+                                                    reasoning_type=ReasoningType.CHAIN,
+                                                    steps=[ReasoningStep(src, 'RELEASED', entity_id, 1.0)],
+                                                    answer_entities=[src],
+                                                    answer_text=f"Album '{entity_id}' thuộc về: {src}",
+                                                    confidence=0.95,
+                                                    explanation=f"Tìm thấy quan hệ RELEASED từ {src}"
+                                                )
+                                                break
+                            
+                            # Nếu vẫn không tìm thấy album → trả về lỗi rõ ràng
+                            if not found_album and reasoning_result is None:
+                                # Extract tên album từ query để báo lỗi chính xác
+                                import re
+                                album_match = re.search(r'album\s+["\']?([^"\'?]+)["\']?', query, re.IGNORECASE)
+                                album_mentioned = album_match.group(1).strip() if album_match else "được đề cập"
+                                reasoning_result = ReasoningResult(
+                                    query=query,
+                                    reasoning_type=ReasoningType.CHAIN,
+                                    steps=[],
+                                    answer_entities=[],
+                                    answer_text=f"Không tìm thấy album '{album_mentioned}' trong Knowledge Graph. Album này có thể chưa được thu thập trong hệ thống.",
+                                    confidence=0.0,
+                                    explanation=f"Album '{album_mentioned}' not found in Knowledge Graph"
+                                )
+                        
+                        elif is_song_in_which_album_question:
+                            # Tìm album chứa bài hát
+                            for entity_id in validated_entities:
+                                entity_data = self.kg.get_entity(entity_id)
+                                if entity_data and entity_data.get('label') == 'Song':
+                                    infobox = entity_data.get('infobox', {})
+                                    album_info = infobox.get('Tên album') or infobox.get('Album') or infobox.get('Mô tả album')
+                                    if album_info:
+                                        reasoning_result = ReasoningResult(
+                                            query=query,
+                                            reasoning_type=ReasoningType.CHAIN,
+                                            steps=[ReasoningStep(entity_id, 'IN_ALBUM', album_info, 1.0)],
+                                            answer_entities=[album_info],
+                                            answer_text=f"Bài hát '{entity_id}' nằm trong album: {album_info}",
+                                            confidence=0.95,
+                                            explanation=f"Tìm thấy thông tin album trong infobox"
+                                        )
+                                        break
+                                    # Tìm qua edges CONTAINS (album contains song)
+                                    for src, tgt, edge_type in self.kg.graph.edges(data='type'):
+                                        if tgt == entity_id and edge_type == 'CONTAINS':
+                                            reasoning_result = ReasoningResult(
+                                                query=query,
+                                                reasoning_type=ReasoningType.CHAIN,
+                                                steps=[ReasoningStep(src, 'CONTAINS', entity_id, 1.0)],
+                                                answer_entities=[src],
+                                                answer_text=f"Bài hát '{entity_id}' nằm trong album: {src}",
+                                                confidence=0.95,
+                                                explanation=f"Tìm thấy quan hệ CONTAINS từ album {src}"
+                                            )
+                                            break
+                        
+                        # Nếu không tìm được kết quả, vẫn gọi reasoner
+                        if reasoning_result is None:
+                            reasoning_result = self.reasoner.reason(
+                                query,
+                                start_entities=validated_entities,
+                                max_hops=max_hops
+                            )
+                else:
+                    # Không tìm được entity → trả về lỗi rõ ràng thay vì để LLM hallucinate
+                    reasoning_result = ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text="Không tìm thấy thực thể được đề cập trong Knowledge Graph. Vui lòng kiểm tra lại tên.",
+                        confidence=0.0,
+                        explanation="Entity not found in Knowledge Graph"
+                    )
+            # ========== END XỬ LÝ PATTERN MỚI ==========
+            
             elif (eval_pattern_question or is_artist_group_question) and len(context['entities']) < 2:
                 # Membership question: try to extract entities nếu GraphRAG không tìm đủ
                 extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
@@ -588,6 +857,12 @@ class KpopChatbot:
                 use_reasoning_result = True
         elif (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
             use_reasoning_result = True
+        # ========== ƯU TIÊN REASONING CHO CÁC CÂU HỎI FACTUAL MỚI ==========
+        elif (is_find_company_question or is_who_sings_question or is_album_belongs_to_question or is_song_in_which_album_question):
+            # Các câu hỏi factual cần câu trả lời chính xác từ KG, KHÔNG dùng LLM để tránh hallucination
+            if reasoning_result and reasoning_result.answer_text:
+                use_reasoning_result = True
+        # ========== END ==========
         
         if use_reasoning_result:
             # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
@@ -1683,6 +1958,41 @@ class KpopChatbot:
             
         return result
     
+    def _extract_album_name_from_query(self, query: str) -> Optional[str]:
+        """
+        Extract album name from query for album-related questions.
+        Returns the album name if found in Knowledge Graph, None otherwise.
+        """
+        import re
+        
+        # Pattern để extract tên album từ query
+        patterns = [
+            r'album\s+["\']([^"\']+)["\']',  # Album "Name" hoặc Album 'Name'
+            r'album\s+"([^"]+)"',  # Album "Name"
+            r"album\s+'([^']+)'",  # Album 'Name'
+            r'album\s+([A-Z][^?.,]+?)(?:\s+thuộc|\s+của|\s+do|\s+là)',  # Album Name thuộc/của/do/là
+            r'album\s+(.+?)\s+thuộc',  # Album ... thuộc
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                album_name = match.group(1).strip()
+                # Thử tìm trong KG với các biến thể
+                variants = [
+                    album_name,
+                    f"{album_name} (album)",
+                    album_name.replace(":", " -"),
+                    album_name.replace(" - ", ": "),
+                ]
+                for variant in variants:
+                    if self.kg.get_entity(variant):
+                        return variant
+                # Không tìm thấy exact match, trả về tên gốc để báo lỗi
+                return None
+        
+        return None
+    
     def _extract_entities_for_membership(self, query: str, expected_labels: Optional[set] = None) -> List[str]:
         """
         Extract entities from query for membership questions.
@@ -1799,6 +2109,126 @@ class KpopChatbot:
         words_in_matched_full_names = set()
 
         # ============================================
+        # BƯỚC 0: TỰ ĐỘNG TÌM ENTITY VỚI SUFFIX (ca sĩ), (nhóm nhạc), etc.
+        # ============================================
+        # Logic: Khi query có tên ngắn như "Kai", "IU", tự động tìm entity đầy đủ
+        # như "Kai (ca sĩ)", "IU (ca sĩ)" trong KG
+        
+        # Danh sách các suffix phổ biến theo thứ tự ưu tiên
+        artist_suffixes = ["(ca sĩ)", "(rapper)", "(ca sĩ Hàn Quốc)"]
+        group_suffixes = ["(nhóm nhạc)", "(nhóm nhạc Hàn Quốc)", "(ban nhạc)"]
+        album_suffixes = ["(EP)", "(album)"]  # Album suffixes cơ bản
+        song_suffixes = ["(bài hát)"]
+        
+        # Xác định context để ưu tiên suffix phù hợp
+        is_artist_context = any(kw in query_lower for kw in ['ca sĩ', 'nghệ sĩ', 'artist', 'hát', 'thể hiện'])
+        is_group_context = any(kw in query_lower for kw in ['nhóm', 'group', 'band', 'thành viên'])
+        is_album_context = any(kw in query_lower for kw in ['album', 'ep', 'đĩa'])
+        is_song_context = any(kw in query_lower for kw in ['bài hát', 'ca khúc', 'song', 'track'])
+        
+        # Ưu tiên suffix theo context
+        if is_album_context:
+            preferred_suffixes = album_suffixes  # Sẽ xử lý đặc biệt cho album
+        elif is_song_context:
+            preferred_suffixes = song_suffixes + artist_suffixes
+        elif is_group_context:
+            preferred_suffixes = group_suffixes + artist_suffixes
+        else:
+            preferred_suffixes = artist_suffixes + group_suffixes
+        
+        preferred_entities_found = []
+        
+        # Tìm các từ có thể là tên entity trong query
+        import re
+        # Tách query thành các tokens (words)
+        query_tokens = re.findall(r'\b[A-Za-z\u3131-\uD79D]+(?:[-\'][A-Za-z\u3131-\uD79D]+)*\b', query_lower)
+        
+        # Tạo n-grams từ tokens (1-3 words) để match tên có nhiều từ như "Rose", "J-Hope"
+        potential_names = set()
+        for i in range(len(query_tokens)):
+            for n in range(1, min(4, len(query_tokens) - i + 1)):
+                ngram = " ".join(query_tokens[i:i+n])
+                if len(ngram) >= 2:  # Tối thiểu 2 ký tự
+                    potential_names.add(ngram)
+                    # Thêm variant với dash
+                    potential_names.add(ngram.replace(" ", "-"))
+                    potential_names.add(ngram.replace("-", " "))
+        
+        for potential_name in potential_names:
+            # Bước 1: Kiểm tra nếu entity tồn tại với suffix
+            found_with_suffix = False
+            
+            # Bước 1a: Nếu là album context, tìm với pattern "(album của X)" hoặc "(EP)"
+            if is_album_context:
+                # Tìm tất cả albums trong KG có tên bắt đầu bằng potential_name
+                album_candidates = []
+                for node, data in self.kg.graph.nodes(data=True):
+                    if data.get('label') == 'Album':
+                        node_lower = node.lower()
+                        name_lower = potential_name.lower()
+                        # Match: "Alive (album của Big Bang)" với "alive"
+                        if node_lower.startswith(name_lower + " (") or node_lower == name_lower:
+                            album_candidates.append((node, data))
+                
+                # Ưu tiên album có infobox đầy đủ
+                album_candidates.sort(key=lambda x: len(x[1].get('infobox', {})), reverse=True)
+                
+                for album_name, album_data in album_candidates:
+                    if album_name not in seen_entities:
+                        seen_entities.add(album_name)
+                        normalized_seen.add(self._normalize_entity_name(album_name).lower())
+                        score = 3.5  # Score cao cho album match
+                        if album_data.get('infobox') and len(album_data.get('infobox', {})) > 0:
+                            score += 0.5
+                        candidate_scores.append((album_name, score, 'Album'))
+                        matched_from_graph.append({"name": album_name, "score": score})
+                        preferred_entities_found.append(album_name)
+                        found_with_suffix = True
+                        break
+            
+            # Bước 1b: Tìm với suffix thông thường (ca sĩ, nhóm nhạc, etc.)
+            if not found_with_suffix:
+                for suffix in preferred_suffixes:
+                    full_name = f"{potential_name.title()} {suffix}"
+                    entity_data = self.kg.get_entity(full_name)
+                    if entity_data:
+                        # Kiểm tra label phù hợp với expected_labels
+                        label = entity_data.get('label', 'Unknown')
+                        if not expected_labels or label in expected_labels:
+                            if full_name not in seen_entities:
+                                seen_entities.add(full_name)
+                                normalized_seen.add(self._normalize_entity_name(full_name).lower())
+                                # Score cao cho entity có suffix và infobox đầy đủ
+                                score = 3.0
+                                if entity_data.get('infobox') and len(entity_data.get('infobox', {})) > 0:
+                                    score += 0.5
+                                candidate_scores.append((full_name, score, label))
+                                matched_from_graph.append({"name": full_name, "score": score})
+                                preferred_entities_found.append(full_name)
+                                found_with_suffix = True
+                                break
+            
+            # Bước 2: Nếu không tìm thấy với suffix, thử tìm exact match
+            if not found_with_suffix:
+                # Thử với Title Case
+                for name_variant in [potential_name.title(), potential_name.upper(), potential_name]:
+                    entity_data = self.kg.get_entity(name_variant)
+                    if entity_data:
+                        label = entity_data.get('label', 'Unknown')
+                        if not expected_labels or label in expected_labels:
+                            if name_variant not in seen_entities:
+                                seen_entities.add(name_variant)
+                                normalized_seen.add(self._normalize_entity_name(name_variant).lower())
+                                # Score thấp hơn cho entity không có suffix
+                                score = 2.5
+                                if entity_data.get('infobox') and len(entity_data.get('infobox', {})) > 0:
+                                    score += 0.5
+                                candidate_scores.append((name_variant, score, label))
+                                matched_from_graph.append({"name": name_variant, "score": score})
+                                preferred_entities_found.append(name_variant)
+                                break
+        
+        # ============================================
         # BƯỚC 1: LOOKUP TỪ VARIANT_MAP (ƯU TIÊN - NHANH VÀ CHÍNH XÁC)
         # ============================================
         # QUAN TRỌNG: Variant map đã được build với tất cả biến thể từ graph
@@ -1896,13 +2326,43 @@ class KpopChatbot:
                             matched_from_graph.append({"name": entity_name, "score": entity_score})
                     
                     # Sau đó mới xử lý entities không có suffix match
-                    for ent, entity_name, normalized, label in entities_without_suffix:
+                    # QUAN TRỌNG: Ưu tiên entity có thông tin (infobox không trống) hơn entity trống
+                    entities_with_info = []
+                    entities_without_info = []
+                    
+                    for item in entities_without_suffix:
+                        ent, entity_name, normalized, label = item
+                        # Kiểm tra entity có infobox không trống
+                        entity_data = self.kg.get_entity(entity_name)
+                        has_info = entity_data and entity_data.get('infobox') and len(entity_data.get('infobox', {})) > 0
+                        if has_info:
+                            entities_with_info.append(item)
+                        else:
+                            entities_without_info.append(item)
+                    
+                    # Xử lý entities có thông tin TRƯỚC
+                    for ent, entity_name, normalized, label in entities_with_info:
                         if normalized not in normalized_seen:
                             normalized_seen.add(normalized)
                             seen_entities.add(entity_name)
                             entity_score = ent.get("score", 1.5)
                             if lookup_key == normalized:
                                 entity_score += 0.5
+                            # Bonus cho entity có thông tin
+                            entity_score += 0.3
+                            candidate_scores.append((entity_name, entity_score, label))
+                            matched_from_graph.append({"name": entity_name, "score": entity_score})
+                    
+                    # Cuối cùng mới xử lý entities không có thông tin
+                    for ent, entity_name, normalized, label in entities_without_info:
+                        if normalized not in normalized_seen:
+                            normalized_seen.add(normalized)
+                            seen_entities.add(entity_name)
+                            entity_score = ent.get("score", 1.5)
+                            if lookup_key == normalized:
+                                entity_score += 0.5
+                            # Penalty cho entity không có thông tin
+                            entity_score -= 0.5
                             candidate_scores.append((entity_name, entity_score, label))
                             matched_from_graph.append({"name": entity_name, "score": entity_score})
 

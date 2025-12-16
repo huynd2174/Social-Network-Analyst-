@@ -1,0 +1,1449 @@
+{
+  "company_analysis": [
+    {
+      "company": "JYP Entertainment",
+      "artist_count": 53,
+      "group_count": 13,
+      "artists": [
+        "Baek A-yeon",
+        "Baek Yerin",
+        "HyunA",
+        "Jay Park",
+        "Sunmi"
+      ],
+      "groups": [
+        "2AM",
+        "2PM",
+        "Day6",
+        "GOT7",
+        "ITZY"
+      ]
+    },
+    {
+      "company": "SM Entertainment",
+      "artist_count": 37,
+      "group_count": 22,
+      "artists": [
+        "BoA",
+        "Seulgi",
+        "Taeyeon",
+        "Wendy (ca sĩ)",
+        "Dana (ca sĩ Hàn Quốc)"
+      ],
+      "groups": [
+        "EXO",
+        "H.O.T.",
+        "NCT (nhóm nhạc)",
+        "Red Velvet (nhóm nhạc)",
+        "SHINee"
+      ]
+    },
+    {
+      "company": "Starship Entertainment",
+      "artist_count": 15,
+      "group_count": 5,
+      "artists": [
+        "Bona (ca sĩ)",
+        "Hyolyn",
+        "Jang Won-young",
+        "Jeong Se-woon",
+        "Soyou"
+      ],
+      "groups": [
+        "IVE",
+        "Boyfriend (nhóm nhạc)",
+        "SISTAR",
+        "Cravity",
+        "Sistar19"
+      ]
+    },
+    {
+      "company": "Avex Trax",
+      "artist_count": 14,
+      "group_count": 11,
+      "artists": [
+        "Psy",
+        "Doyoung (ca sĩ)",
+        "Kai (ca sĩ)",
+        "Lay Zhang",
+        "Lee Joo-yeon"
+      ],
+      "groups": [
+        "EXO",
+        "NCT (nhóm nhạc)",
+        "Red Velvet (nhóm nhạc)",
+        "S.E.S.",
+        "TVXQ"
+      ]
+    },
+    {
+      "company": "Cube",
+      "artist_count": 14,
+      "group_count": 1,
+      "artists": [
+        "HyunA",
+        "Cho Mi-yeon",
+        "Jeon So-yeon",
+        "Jo Kwon",
+        "Kwon So-hyun"
+      ],
+      "groups": [
+        "Highlight (nhóm nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "company": "DSP Media",
+      "artist_count": 13,
+      "group_count": 6,
+      "artists": [
+        "Heo Young-Ji",
+        "Hyunjoo",
+        "Lee Hyori",
+        "Lee Jin",
+        "Lee Na-eun"
+      ],
+      "groups": [
+        "April (nhóm nhạc)",
+        "K.A.R.D",
+        "Kara (nhóm nhạc Hàn Quốc)",
+        "Rainbow (nhóm nhạc Hàn Quốc)",
+        "SS501"
+      ]
+    },
+    {
+      "company": "HYBE",
+      "artist_count": 12,
+      "group_count": 6,
+      "artists": [
+        "Bang Si-hyuk",
+        "J-Hope",
+        "Jimin",
+        "Jo Kwon",
+        "Jungkook"
+      ],
+      "groups": [
+        "2AM",
+        "BTS",
+        "Illit (nhóm nhạc)",
+        "TXT (nhóm nhạc)",
+        "8Eight"
+      ]
+    },
+    {
+      "company": "YG Entertainment",
+      "artist_count": 12,
+      "group_count": 9,
+      "artists": [
+        "Psy",
+        "Bang Ye-dam",
+        "Eun Ji-won",
+        "Kang Seung-yoon",
+        "Kim Jin-Hwan"
+      ],
+      "groups": [
+        "AKMU",
+        "Sechs Kies",
+        "WINNER",
+        "1TYM",
+        "GD & TOP"
+      ]
+    },
+    {
+      "company": "FNC Entertainment",
+      "artist_count": 12,
+      "group_count": 4,
+      "artists": [
+        "Choi Jong-hoon",
+        "Im Do-hwa",
+        "Jung Yong Hwa",
+        "Kang Min Hyuk",
+        "Kim Seol-hyun"
+      ],
+      "groups": [
+        "CNBLUE",
+        "SF9",
+        "AOA Black",
+        "AOA Cream"
+      ]
+    },
+    {
+      "company": "Cube Entertainment",
+      "artist_count": 11,
+      "group_count": 8,
+      "artists": [
+        "Diệp Thư Hoa",
+        "Elkie Chong",
+        "G.NA",
+        "Jeon Ji-yoon",
+        "Kwon Eun-bin"
+      ],
+      "groups": [
+        "(G)I-dle",
+        "4Minute",
+        "BtoB",
+        "Lightsum",
+        "Pentagon (nhóm nhạc Hàn Quốc)"
+      ]
+    }
+  ],
+  "company_coherence": {
+    "JYP Entertainment": {
+      "total_artists": 53,
+      "main_community": 1,
+      "artists_in_main": 40,
+      "coherence_pct": 75.47169811320755,
+      "num_communities": 8
+    },
+    "SM Entertainment": {
+      "total_artists": 37,
+      "main_community": 4,
+      "artists_in_main": 20,
+      "coherence_pct": 54.054054054054056,
+      "num_communities": 8
+    },
+    "Starship Entertainment": {
+      "total_artists": 15,
+      "main_community": 10,
+      "artists_in_main": 10,
+      "coherence_pct": 66.66666666666666,
+      "num_communities": 5
+    },
+    "Avex Trax": {
+      "total_artists": 14,
+      "main_community": 4,
+      "artists_in_main": 9,
+      "coherence_pct": 64.28571428571429,
+      "num_communities": 4
+    },
+    "Cube": {
+      "total_artists": 14,
+      "main_community": 5,
+      "artists_in_main": 8,
+      "coherence_pct": 57.14285714285714,
+      "num_communities": 4
+    },
+    "DSP Media": {
+      "total_artists": 13,
+      "main_community": 10,
+      "artists_in_main": 7,
+      "coherence_pct": 53.84615384615385,
+      "num_communities": 4
+    },
+    "HYBE": {
+      "total_artists": 12,
+      "main_community": 7,
+      "artists_in_main": 9,
+      "coherence_pct": 75.0,
+      "num_communities": 2
+    },
+    "YG Entertainment": {
+      "total_artists": 12,
+      "main_community": 5,
+      "artists_in_main": 5,
+      "coherence_pct": 41.66666666666667,
+      "num_communities": 5
+    },
+    "FNC Entertainment": {
+      "total_artists": 12,
+      "main_community": 0,
+      "artists_in_main": 11,
+      "coherence_pct": 91.66666666666666,
+      "num_communities": 2
+    },
+    "Cube Entertainment": {
+      "total_artists": 11,
+      "main_community": 2,
+      "artists_in_main": 6,
+      "coherence_pct": 54.54545454545454,
+      "num_communities": 4
+    }
+  },
+  "group_ecosystems": [
+    {
+      "group": "BTS",
+      "members": [
+        "J-Hope",
+        "Jimin",
+        "Jungkook",
+        "RM (rapper)",
+        "V (ca sĩ)"
+      ],
+      "songs": [
+        "A Brand New Day (bài hát của BTS và Zara Larsson)",
+        "All Night (bài hát của BTS và Juice Wrld)",
+        "Bad Decisions (bài hát của Benny Blanco, BTS và Snoop Dogg)",
+        "Black Swan (bài hát)",
+        "Blood Sweat & Tears (bài hát)"
+      ],
+      "albums": [
+        "Be (album của BTS)",
+        "Proof (album)",
+        "Wake Up (album của BTS)",
+        "Wings (album của BTS)",
+        "Youth (album của BTS)"
+      ],
+      "companies": [
+        "HYBE",
+        "Pony Canyon",
+        "Def Jam Japan",
+        "Columbia Records",
+        "Universal Music",
+        "Geffen"
+      ],
+      "genres": [
+        "Pop",
+        "Hip hop",
+        "R&B",
+        "Edm"
+      ],
+      "total_size": 66
+    },
+    {
+      "group": "Girls' Generation",
+      "members": [
+        "Taeyeon",
+        "Tiffany (ca sĩ Hàn Quốc)",
+        "Hyoyeon",
+        "Seohyun",
+        "Sunny (ca sĩ)"
+      ],
+      "songs": [
+        "Gee (bài hát của Girls' Generation)",
+        "Tell Me Your Wish (Genie) (bài hát)",
+        "Into the New World (bài hát)",
+        "Oh! (bài hát của Girls' Generation)",
+        "Run Devil Run (bài hát của Girls' Generation)"
+      ],
+      "albums": [
+        "Oh! (album của Girls' Generation)",
+        "Girls' Generation (album 2007)",
+        "Girls' Generation (album 2011)",
+        "Lion Heart (album của Girls' Generation)",
+        "The Best (album của Girls' Generation)"
+      ],
+      "companies": [
+        "Genie Music",
+        "Emi Records Japan",
+        "Interscope Records"
+      ],
+      "genres": [
+        "J-pop",
+        "Dance-pop",
+        "Electropop",
+        "Bubblegum pop"
+      ],
+      "total_size": 48
+    },
+    {
+      "group": "Big Bang (nhóm nhạc)",
+      "members": [
+        "G-Dragon",
+        "Taeyang",
+        "Daesung",
+        "T.O.P"
+      ],
+      "songs": [
+        "Bang Bang Bang (bài hát của Big Bang)",
+        "If You (bài hát)",
+        "Loser (bài hát của Big Bang)",
+        "My Heaven (bài hát của Big Bang)",
+        "Sober (bài hát của Big Bang)"
+      ],
+      "albums": [
+        "Number 1 (album của Big Bang)",
+        "A (album của Big Bang)",
+        "Alive (album của Big Bang)",
+        "Big Bang (album 2006)",
+        "Big Bang (album của Big Bang)"
+      ],
+      "companies": [
+        "Universal Music",
+        "Ygex",
+        "Warner Taiwan"
+      ],
+      "genres": [
+        "J-pop",
+        "Hip hop",
+        "Dance",
+        "Electronic",
+        "R&B"
+      ],
+      "total_size": 47
+    },
+    {
+      "group": "BLACKPINK",
+      "members": [
+        "Jennie",
+        "Jisoo",
+        "Lisa",
+        "Rosé",
+        "Jennie (ca sĩ)",
+        "Rosé (ca sĩ)"
+      ],
+      "songs": [
+        "Kill This Love (bài hát)",
+        "Don't Know What to Do (bài hát của Blackpink)",
+        "Forever Young (bài hát của Blackpink)",
+        "Ice Cream (bài hát của Blackpink và Selena Gomez)",
+        "Jump (bài hát của Blackpink)"
+      ],
+      "albums": [
+        "The Album (album của Blackpink)",
+        "Square One (album đĩa đơn)",
+        "Blackpink (EP)",
+        "Blackpink in Your Area",
+        "Born Pink"
+      ],
+      "companies": [
+        "Ygex",
+        "Interscope Records",
+        "Universal Music",
+        "Polydor"
+      ],
+      "genres": [
+        "Edm",
+        "Hip hop",
+        "Trap"
+      ],
+      "total_size": 43
+    },
+    {
+      "group": "EXO",
+      "members": [
+        "Baekhyun",
+        "Kai",
+        "Chanyeol",
+        "Chen (ca sĩ)",
+        "Kai (ca sĩ)",
+        "Suho",
+        "Xiumin"
+      ],
+      "songs": [
+        "Obsession (bài hát của EXO)",
+        "Growl (bài hát)",
+        "Monster (bài hát của EXO)",
+        "Lightsaber (bài hát)",
+        "Wolf (bài hát)"
+      ],
+      "albums": [
+        "Countdown (album của EXO)",
+        "Exodus (album của EXO)",
+        "Obsession (album của EXO)",
+        "The War (album)",
+        "XOXO (album)"
+      ],
+      "companies": [
+        "SM Entertainment",
+        "Avex Trax"
+      ],
+      "genres": [
+        "Electropop",
+        "R&B",
+        "Ballad",
+        "Hip hop",
+        "Edm",
+        "Dance-pop"
+      ],
+      "total_size": 42
+    },
+    {
+      "group": "T-ara",
+      "members": [
+        "Hyomin",
+        "Qri",
+        "Dani",
+        "Areum"
+      ],
+      "songs": [
+        "Lie (bài hát của T-ara)",
+        "Little Apple (bài hát)",
+        "Number 9 (bài hát)",
+        "Day By Day (bài hát)",
+        "Cry Cry"
+      ],
+      "albums": [
+        "Treasure Box (album của T-ara)",
+        "Absolute First Album",
+        "And & End",
+        "Black Eyes (EP)",
+        "Day By Day"
+      ],
+      "companies": [
+        "Mbk Entertainment",
+        "Emi Music Japan"
+      ],
+      "genres": [
+        "J-pop",
+        "Electropop",
+        "Dance-pop",
+        "Ballad",
+        "Edm"
+      ],
+      "total_size": 37
+    },
+    {
+      "group": "GFriend",
+      "members": [
+        "SinB (ca sĩ)",
+        "Eunha",
+        "Umji",
+        "Yuju"
+      ],
+      "songs": [
+        "Rough (bài hát)",
+        "Mago (bài hát)",
+        "Fever (bài hát của GFriend)",
+        "Fingertip (bài hát)",
+        "Me Gustas Tu (bài hát của GFriend)"
+      ],
+      "albums": [
+        "LOL (album của GFriend)",
+        "Fallin' Light",
+        "Fever Season (EP)",
+        "Flower Bud",
+        "Parallel (EP)"
+      ],
+      "companies": [
+        "Source",
+        "King"
+      ],
+      "genres": [],
+      "total_size": 34
+    },
+    {
+      "group": "IZ*ONE",
+      "members": [
+        "Choi Ye-na",
+        "Honda Hitomi",
+        "Jang Won-young",
+        "Jo Yu-ri",
+        "Kim Chae-won (sinh 2000)",
+        "Kim Min-ju",
+        "Kwon Eun-bi",
+        "Lee Chae-yeon",
+        "Miyawaki Sakura",
+        "Yabuki Nako",
+        "Min (ca sĩ Hàn Quốc)"
+      ],
+      "songs": [
+        "Fiesta (bài hát của Iz*One)",
+        "La Vie en Rose (bài hát của Iz*One)",
+        "Panorama (bài hát của Iz*One)",
+        "Violeta (bài hát của Iz*One)",
+        "Suki to Iwasetai"
+      ],
+      "albums": [
+        "Color*Iz",
+        "Heart*Iz",
+        "One-reeler/Act IV",
+        "Oneiric Diary (EP)",
+        "Bloom*Iz"
+      ],
+      "companies": [
+        "Stone Music",
+        "Genie Music",
+        "Emi",
+        "Vernalossom"
+      ],
+      "genres": [
+        "J-pop",
+        "Edm",
+        "Synthpop",
+        "Dance",
+        "Acoustic",
+        "Ballad"
+      ],
+      "total_size": 33
+    },
+    {
+      "group": "Super Junior",
+      "members": [
+        "Eunhyuk",
+        "Yesung",
+        "Shindong",
+        "Leeteuk",
+        "Kangin",
+        "Han (ca sĩ)"
+      ],
+      "songs": [
+        "Oops! (bài hát của Super Junior)",
+        "U (bài hát của Super Junior)",
+        "Sorry, Sorry (bài hát)",
+        "Don't Don (bài hát)",
+        "Bonamana (bài hát)"
+      ],
+      "albums": [
+        "Devil (album của Super Junior)",
+        "Mamacita (album của Super Junior)",
+        "Play (album của Super Junior)",
+        "The Renaissance (album của Super Junior)",
+        "Time Slip (album của Super Junior)"
+      ],
+      "companies": [
+        "SM Entertainment",
+        "Avex Group"
+      ],
+      "genres": [],
+      "total_size": 29
+    },
+    {
+      "group": "TWICE",
+      "members": [
+        "Nayeon"
+      ],
+      "songs": [
+        "Cheer Up (bài hát)",
+        "Knock Knock (bài hát của Twice)",
+        "Signal (bài hát của Twice)",
+        "TT (bài hát)",
+        "Dance the Night Away (bài hát của Twice)"
+      ],
+      "albums": [
+        "Eyes Wide Open (album của Twice)",
+        "Fancy You (EP)",
+        "Feel Special",
+        "Summer Nights (album của Twice)",
+        "More & More (EP)"
+      ],
+      "companies": [
+        "JYP Entertainment",
+        "Warner Music Japan",
+        "Republic"
+      ],
+      "genres": [
+        "J-pop",
+        "Bubblegum pop",
+        "Dance-pop",
+        "Edm"
+      ],
+      "total_size": 27
+    }
+  ],
+  "genre_analysis": [
+    {
+      "genre": "R&B",
+      "artist_count": 160,
+      "group_count": 48,
+      "song_count": 0,
+      "sample_artists": [
+        "Ailee",
+        "BIBI (ca sĩ)",
+        "Baek A-yeon",
+        "Baek Yerin",
+        "Baekhyun"
+      ],
+      "sample_groups": [
+        "2AM",
+        "2NE1",
+        "2PM",
+        "AOA",
+        "B.A.P"
+      ]
+    },
+    {
+      "genre": "Dance-pop",
+      "artist_count": 93,
+      "group_count": 38,
+      "song_count": 0,
+      "sample_artists": [
+        "Chungha",
+        "G-Dragon",
+        "Jisoo",
+        "Seulgi",
+        "Suzy"
+      ],
+      "sample_groups": [
+        "2NE1",
+        "AOA",
+        "After School (nhóm nhạc)",
+        "Crayon Pop",
+        "EXO"
+      ]
+    },
+    {
+      "genre": "Hip hop",
+      "artist_count": 85,
+      "group_count": 40,
+      "song_count": 0,
+      "sample_artists": [
+        "BIBI (ca sĩ)",
+        "Crush (ca sĩ)",
+        "Dean (ca sĩ Hàn Quốc)",
+        "G-Dragon",
+        "Jay Park"
+      ],
+      "sample_groups": [
+        "2NE1",
+        "2PM",
+        "After School (nhóm nhạc)",
+        "Ateez",
+        "B.A.P"
+      ]
+    },
+    {
+      "genre": "Pop",
+      "artist_count": 84,
+      "group_count": 24,
+      "song_count": 0,
+      "sample_artists": [
+        "Baekhyun",
+        "Chungha",
+        "Jay Park",
+        "K.Will",
+        "Roy Kim"
+      ],
+      "sample_groups": [
+        "AKMU",
+        "BTS",
+        "CNBLUE",
+        "FT Island",
+        "IVE"
+      ]
+    },
+    {
+      "genre": "Ballad",
+      "artist_count": 61,
+      "group_count": 20,
+      "song_count": 0,
+      "sample_artists": [
+        "Ailee",
+        "Baek Yerin",
+        "Paul Kim",
+        "Seulgi",
+        "Wendy (ca sĩ)"
+      ],
+      "sample_groups": [
+        "AKMU",
+        "After School (nhóm nhạc)",
+        "Brown Eyed Girls",
+        "BtoB",
+        "EXO"
+      ]
+    },
+    {
+      "genre": "Dance",
+      "artist_count": 45,
+      "group_count": 23,
+      "song_count": 0,
+      "sample_artists": [
+        "Ailee",
+        "Lee Hi",
+        "Dana (ca sĩ Hàn Quốc)",
+        "Bae Woo-hee",
+        "Cho Kyu-hyun"
+      ],
+      "sample_groups": [
+        "Big Bang (nhóm nhạc)",
+        "Brown Eyed Girls",
+        "BtoB",
+        "H.O.T.",
+        "IZ*ONE"
+      ]
+    },
+    {
+      "genre": "J-pop",
+      "artist_count": 33,
+      "group_count": 19,
+      "song_count": 0,
+      "sample_artists": [
+        "Ailee",
+        "Seven (ca sĩ Hàn Quốc)",
+        "Ahn Yu-jin",
+        "Choi Ye-na",
+        "Honda Hitomi"
+      ],
+      "sample_groups": [
+        "AOA",
+        "Big Bang (nhóm nhạc)",
+        "Girls' Generation",
+        "IVE",
+        "IZ*ONE"
+      ]
+    },
+    {
+      "genre": "Edm",
+      "artist_count": 21,
+      "group_count": 12,
+      "song_count": 0,
+      "sample_artists": [
+        "Taeyang",
+        "Ham Eun-jeong",
+        "Jungkook",
+        "Kenzie",
+        "Kwon Eun-bin"
+      ],
+      "sample_groups": [
+        "Ateez",
+        "BLACKPINK",
+        "BTS",
+        "EXO",
+        "ITZY"
+      ]
+    },
+    {
+      "genre": "Rock",
+      "artist_count": 22,
+      "group_count": 6,
+      "song_count": 0,
+      "sample_artists": [
+        "Baekhyun",
+        "Roy Kim",
+        "Younha",
+        "Chen (ca sĩ)",
+        "Cho Seung-youn"
+      ],
+      "sample_groups": [
+        "AKMU",
+        "B.A.P",
+        "CNBLUE",
+        "FT Island",
+        "NCT (nhóm nhạc)"
+      ]
+    },
+    {
+      "genre": "Electropop",
+      "artist_count": 15,
+      "group_count": 12,
+      "song_count": 0,
+      "sample_artists": [
+        "Ailee",
+        "Lia (ca sĩ Hàn Quốc)",
+        "Diệp Thư Hoa",
+        "G.NA",
+        "Ham Eun-jeong"
+      ],
+      "sample_groups": [
+        "2NE1",
+        "EXO",
+        "Girls' Generation",
+        "K.A.R.D",
+        "SHINee"
+      ]
+    },
+    {
+      "genre": "Bubblegum pop",
+      "artist_count": 18,
+      "group_count": 9,
+      "song_count": 0,
+      "sample_artists": [
+        "Seulgi",
+        "Chu Khiết Quỳnh",
+        "Han Hye-ri",
+        "Im Na-young",
+        "Jung Chae-yeon"
+      ],
+      "sample_groups": [
+        "Apink",
+        "Girls' Generation",
+        "Lovelyz",
+        "TWICE",
+        "WJSN"
+      ]
+    },
+    {
+      "genre": "Mandopop",
+      "artist_count": 8,
+      "group_count": 6,
+      "song_count": 0,
+      "sample_artists": [
+        "Hyunjoo",
+        "Shin Ji-min",
+        "Ten (ca sĩ)",
+        "Gui Gui",
+        "Meng Jia"
+      ],
+      "sample_groups": [
+        "NCT (nhóm nhạc)",
+        "WJSN",
+        "Miss A",
+        "Super Junior-M",
+        "UNI.T"
+      ]
+    },
+    {
+      "genre": "C-pop",
+      "artist_count": 12,
+      "group_count": 0,
+      "song_count": 0,
+      "sample_artists": [
+        "D.O. (ca sĩ)",
+        "Hoàng Húc Hi",
+        "Kai (ca sĩ)",
+        "Kris Wu",
+        "Lai Kuan-lin"
+      ],
+      "sample_groups": []
+    },
+    {
+      "genre": "Synthpop",
+      "artist_count": 2,
+      "group_count": 9,
+      "song_count": 0,
+      "sample_artists": [
+        "Zion.T",
+        "Bae Woo-hee"
+      ],
+      "sample_groups": [
+        "Apink",
+        "IZ*ONE",
+        "Lovelyz",
+        "Nine Muses",
+        "WJSN"
+      ]
+    },
+    {
+      "genre": "Trot",
+      "artist_count": 8,
+      "group_count": 2,
+      "song_count": 0,
+      "sample_artists": [
+        "Hong Jin-young",
+        "Kim Hee-chul",
+        "Lee Sung-min",
+        "Lim Young-woong",
+        "Tae Jin-ah"
+      ],
+      "sample_groups": [
+        "Crayon Pop",
+        "Super Junior-T"
+      ]
+    }
+  ],
+  "genre_coherence": {
+    "R&B": {
+      "total_entities": 208,
+      "main_community": 1,
+      "entities_in_main": 78,
+      "coherence_pct": 37.5,
+      "num_communities": 18
+    },
+    "Dance-pop": {
+      "total_entities": 131,
+      "main_community": 2,
+      "entities_in_main": 49,
+      "coherence_pct": 37.404580152671755,
+      "num_communities": 16
+    },
+    "Hip hop": {
+      "total_entities": 125,
+      "main_community": 5,
+      "entities_in_main": 31,
+      "coherence_pct": 24.8,
+      "num_communities": 17
+    },
+    "Pop": {
+      "total_entities": 108,
+      "main_community": 1,
+      "entities_in_main": 49,
+      "coherence_pct": 45.370370370370374,
+      "num_communities": 15
+    },
+    "Ballad": {
+      "total_entities": 81,
+      "main_community": 2,
+      "entities_in_main": 33,
+      "coherence_pct": 40.74074074074074,
+      "num_communities": 12
+    },
+    "Dance": {
+      "total_entities": 68,
+      "main_community": 5,
+      "entities_in_main": 21,
+      "coherence_pct": 30.88235294117647,
+      "num_communities": 14
+    },
+    "J-pop": {
+      "total_entities": 52,
+      "main_community": 1,
+      "entities_in_main": 24,
+      "coherence_pct": 46.15384615384615,
+      "num_communities": 14
+    },
+    "Edm": {
+      "total_entities": 33,
+      "main_community": 1,
+      "entities_in_main": 14,
+      "coherence_pct": 42.42424242424242,
+      "num_communities": 10
+    },
+    "Rock": {
+      "total_entities": 28,
+      "main_community": 0,
+      "entities_in_main": 14,
+      "coherence_pct": 50.0,
+      "num_communities": 5
+    },
+    "Electropop": {
+      "total_entities": 27,
+      "main_community": 9,
+      "entities_in_main": 8,
+      "coherence_pct": 29.629629629629626,
+      "num_communities": 9
+    }
+  },
+  "bridge_nodes": [
+    {
+      "node": "Occupation_Diễn viên",
+      "label": "Occupation",
+      "communities_connected": 17,
+      "total_external_edges": 150
+    },
+    {
+      "node": "Genre_R&B",
+      "label": "Genre",
+      "communities_connected": 17,
+      "total_external_edges": 130
+    },
+    {
+      "node": "Genre_Hip hop",
+      "label": "Genre",
+      "communities_connected": 16,
+      "total_external_edges": 94
+    },
+    {
+      "node": "Genre_Dance-pop",
+      "label": "Genre",
+      "communities_connected": 15,
+      "total_external_edges": 82
+    },
+    {
+      "node": "Occupation_Nhạc sĩ",
+      "label": "Occupation",
+      "communities_connected": 14,
+      "total_external_edges": 69
+    },
+    {
+      "node": "Genre_Pop",
+      "label": "Genre",
+      "communities_connected": 14,
+      "total_external_edges": 59
+    },
+    {
+      "node": "Genre_Dance",
+      "label": "Genre",
+      "communities_connected": 13,
+      "total_external_edges": 47
+    },
+    {
+      "node": "Genre_J-pop",
+      "label": "Genre",
+      "communities_connected": 13,
+      "total_external_edges": 28
+    },
+    {
+      "node": "Occupation_Rapper",
+      "label": "Occupation",
+      "communities_connected": 12,
+      "total_external_edges": 42
+    },
+    {
+      "node": "Genre_Ballad",
+      "label": "Genre",
+      "communities_connected": 11,
+      "total_external_edges": 48
+    },
+    {
+      "node": "Instrument_Piano",
+      "label": "Instrument",
+      "communities_connected": 11,
+      "total_external_edges": 25
+    },
+    {
+      "node": "Company_SM Entertainment",
+      "label": "Company",
+      "communities_connected": 9,
+      "total_external_edges": 27
+    },
+    {
+      "node": "Occupation_Vũ Công",
+      "label": "Occupation",
+      "communities_connected": 9,
+      "total_external_edges": 21
+    },
+    {
+      "node": "Genre_Edm",
+      "label": "Genre",
+      "communities_connected": 9,
+      "total_external_edges": 19
+    },
+    {
+      "node": "Company_JYP Entertainment",
+      "label": "Company",
+      "communities_connected": 9,
+      "total_external_edges": 17
+    },
+    {
+      "node": "Genre_Bubblegum pop",
+      "label": "Genre",
+      "communities_connected": 9,
+      "total_external_edges": 15
+    },
+    {
+      "node": "Yoo Young-jin",
+      "label": "Artist",
+      "communities_connected": 8,
+      "total_external_edges": 19
+    },
+    {
+      "node": "Genre_Electropop",
+      "label": "Genre",
+      "communities_connected": 8,
+      "total_external_edges": 19
+    },
+    {
+      "node": "Company_Kakao Entertainment",
+      "label": "Company",
+      "communities_connected": 8,
+      "total_external_edges": 14
+    },
+    {
+      "node": "Kenzie",
+      "label": "Artist",
+      "communities_connected": 8,
+      "total_external_edges": 11
+    }
+  ],
+  "community_profiles": [
+    {
+      "id": 0,
+      "size": 198,
+      "type": "company-based",
+      "main_entity": "Pledis Entertainment",
+      "characteristics": [
+        "Công ty Pledis Entertainment (13 connections)",
+        "Thể loại: Soft Rock, Hard Rock, R&belectropop",
+        "97 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Artist": 97,
+        "Company": 30,
+        "Genre": 17,
+        "Album": 3,
+        "Occupation": 20,
+        "Instrument": 18,
+        "Group": 12,
+        "Song": 1
+      },
+      "top_artists": [
+        "Park Bo-gum",
+        "Lee Jong-hyun",
+        "Kim Do-yeon",
+        "Lee Seung-gi",
+        "Xiyeon"
+      ],
+      "top_groups": [
+        "FT Island",
+        "After School (nhóm nhạc)",
+        "SF9",
+        "fromis_9",
+        "Astro (nhóm nhạc)"
+      ]
+    },
+    {
+      "id": 1,
+      "size": 188,
+      "type": "company-based",
+      "main_entity": "JYP Entertainment",
+      "characteristics": [
+        "Công ty JYP Entertainment (49 connections)",
+        "Thể loại: R&B, Teenpop, Pop",
+        "107 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Artist": 107,
+        "Company": 31,
+        "Album": 6,
+        "Group": 21,
+        "Genre": 6,
+        "Occupation": 13,
+        "Instrument": 3,
+        "Song": 1
+      },
+      "top_artists": [
+        "Lina (ca sĩ Hàn Quốc)",
+        "Krystal Jung",
+        "Seven (ca sĩ Hàn Quốc)",
+        "Lee Chang-min",
+        "Jung Jin-young (ca sĩ)"
+      ],
+      "top_groups": [
+        "G.o.d",
+        "The Grace (nhóm nhạc)",
+        "CIX (nhóm nhạc)",
+        "Day6",
+        "Laboum"
+      ]
+    },
+    {
+      "id": 2,
+      "size": 162,
+      "type": "company-based",
+      "main_entity": "Cube Entertainment",
+      "characteristics": [
+        "Công ty Cube Entertainment (12 connections)",
+        "Thể loại: Coutry-pop, Ballad, Dance-pop",
+        "56 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Company": 31,
+        "Album": 17,
+        "Artist": 56,
+        "Group": 34,
+        "Occupation": 4,
+        "Instrument": 3,
+        "Song": 6,
+        "Genre": 11
+      },
+      "top_artists": [
+        "Park Sung-hoon",
+        "Lee Chang-sub",
+        "Jung Chae-yeon",
+        "Shannon Williams",
+        "Yang Jiwon"
+      ],
+      "top_groups": [
+        "Apink BnN",
+        "I.O.I",
+        "Hotshot (nhóm nhạc)",
+        "X1 (nhóm nhạc)",
+        "The Boyz"
+      ]
+    },
+    {
+      "id": 3,
+      "size": 119,
+      "type": "group-centric",
+      "main_entity": "Girls' Generation",
+      "characteristics": [
+        "Nhóm Girls' Generation (40 connections)",
+        "Thể loại: Thử Nghiệm, A Cappella",
+        "9 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Album": 48,
+        "Song": 47,
+        "Group": 6,
+        "Artist": 9,
+        "Company": 2,
+        "Occupation": 3,
+        "Instrument": 2,
+        "Genre": 2
+      },
+      "top_artists": [
+        "Chen (ca sĩ)",
+        "Seohyun",
+        "Bada (ca sĩ)",
+        "Yoo Young-jin",
+        "Heo Sol-ji"
+      ],
+      "top_groups": [
+        "Girls' Generation",
+        "TVXQ",
+        "S.E.S.",
+        "EXO",
+        "aespa"
+      ]
+    },
+    {
+      "id": 4,
+      "size": 107,
+      "type": "company-based",
+      "main_entity": "SM Entertainment",
+      "characteristics": [
+        "Công ty SM Entertainment (32 connections)",
+        "Thể loại: Hip Hopnhạc Điện Tửteen Pop, C-pop, Teen Pop",
+        "36 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Occupation": 3,
+        "Artist": 36,
+        "Genre": 8,
+        "Group": 18,
+        "Album": 21,
+        "Instrument": 3,
+        "Song": 11,
+        "Company": 7
+      },
+      "top_artists": [
+        "Hoàng Húc Hi",
+        "Yeri",
+        "Sulli",
+        "Jaehyun",
+        "Seulgi"
+      ],
+      "top_groups": [
+        "NCT Dream",
+        "EXO-CBX",
+        "NCT (nhóm nhạc)",
+        "Isak N Jiyeon",
+        "M&D"
+      ]
+    },
+    {
+      "id": 5,
+      "size": 104,
+      "type": "company-based",
+      "main_entity": "YG Entertainment",
+      "characteristics": [
+        "Công ty YG Entertainment (10 connections)",
+        "Thể loại: Alternative Hip Hop, Acoustic, Hip hop",
+        "33 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Group": 28,
+        "Company": 21,
+        "Artist": 33,
+        "Album": 7,
+        "Genre": 9,
+        "Occupation": 3,
+        "Song": 3
+      },
+      "top_artists": [
+        "Stephanie Kim",
+        "Seo Soo-jin",
+        "Koo Jun-hoe",
+        "BamBam",
+        "Ravi (rapper)"
+      ],
+      "top_groups": [
+        "Epik High",
+        "Highlight (nhóm nhạc Hàn Quốc)",
+        "Seventeen (nhóm nhạc)",
+        "Tri.be",
+        "Turbo (ban nhạc Hàn Quốc)"
+      ]
+    },
+    {
+      "id": 6,
+      "size": 85,
+      "type": "group-centric",
+      "main_entity": "BLACKPINK",
+      "characteristics": [
+        "Nhóm BLACKPINK (39 connections)",
+        "Thể loại: Trap",
+        "14 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Company": 9,
+        "Song": 36,
+        "Artist": 14,
+        "Album": 17,
+        "Group": 6,
+        "Occupation": 2,
+        "Genre": 1
+      },
+      "top_artists": [
+        "Rosé",
+        "Changmo",
+        "Rosé (ca sĩ)",
+        "Jennie (ca sĩ)",
+        "Gummy"
+      ],
+      "top_groups": [
+        "YG Family",
+        "Ateez",
+        "Treasure",
+        "BLACKPINK",
+        "Super Junior-M"
+      ]
+    },
+    {
+      "id": 7,
+      "size": 80,
+      "type": "company-based",
+      "main_entity": "HYBE",
+      "characteristics": [
+        "Công ty HYBE (12 connections)",
+        "Thể loại: Indie Pop, Pop-rock, Pop-punk",
+        "9 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Song": 43,
+        "Company": 3,
+        "Artist": 9,
+        "Group": 4,
+        "Genre": 6,
+        "Album": 14,
+        "Occupation": 1
+      },
+      "top_artists": [
+        "Jimin",
+        "Pdogg",
+        "Lee Hyun",
+        "V (ca sĩ)",
+        "Bang Si-hyuk"
+      ],
+      "top_groups": [
+        "TXT (nhóm nhạc)",
+        "Bolbbalgan4",
+        "BTS",
+        "8Eight"
+      ]
+    },
+    {
+      "id": 8,
+      "size": 78,
+      "type": "group-centric",
+      "main_entity": "Big Bang (nhóm nhạc)",
+      "characteristics": [
+        "Nhóm Big Bang (nhóm nhạc) (41 connections)",
+        "5 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Song": 23,
+        "Album": 40,
+        "Company": 5,
+        "Artist": 5,
+        "Group": 5
+      },
+      "top_artists": [
+        "Ahn Daniel",
+        "IU (ca sĩ)",
+        "Taeyang",
+        "G-Dragon",
+        "T.O.P"
+      ],
+      "top_groups": [
+        "Big Bang (nhóm nhạc)",
+        "GD & TOP",
+        "GD X Taeyang",
+        "Babymonster",
+        "Teen Top"
+      ]
+    },
+    {
+      "id": 9,
+      "size": 70,
+      "type": "company-based",
+      "main_entity": "Universal Music Japan",
+      "characteristics": [
+        "Công ty Universal Music Japan (6 connections)",
+        "Thể loại: Electropop, Contemporary R&b, Nhạc Nhảy",
+        "7 nghệ sĩ"
+      ],
+      "label_distribution": {
+        "Album": 16,
+        "Song": 23,
+        "Company": 7,
+        "Group": 11,
+        "Artist": 7,
+        "Genre": 5,
+        "Instrument": 1
+      },
+      "top_artists": [
+        "Shin Yu-na",
+        "Lia (ca sĩ Hàn Quốc)",
+        "Daesung",
+        "Taemin",
+        "G.NA"
+      ],
+      "top_groups": [
+        "SHINee",
+        "Classy (nhóm nhạc)",
+        "AOA Cream",
+        "AOA Black",
+        "ITZY"
+      ]
+    }
+  ]
+}

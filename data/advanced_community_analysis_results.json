@@ -1,0 +1,1040 @@
+{
+  "analysis_time": "2025-12-16T11:28:44.494146",
+  "graph_info": {
+    "nodes": 1692,
+    "edges": 3894
+  },
+  "algorithms": {
+    "louvain": 177,
+    "greedy_modularity": 177,
+    "label_propagation": 244,
+    "async_lpa": 253,
+    "k_clique_3": 114
+  },
+  "comparison": {
+    "louvain": {
+      "num_communities": 177,
+      "modularity": 0.5478991753475314,
+      "coverage": 0.6504879301489471,
+      "max_community_size": 198
+    },
+    "greedy_modularity": {
+      "num_communities": 177,
+      "modularity": 0.5307264887257576,
+      "coverage": 0.6813045711350796,
+      "max_community_size": 285
+    },
+    "label_propagation": {
+      "num_communities": 244,
+      "modularity": 0.26553748157715146,
+      "coverage": 0.9096045197740112,
+      "max_community_size": 1033
+    },
+    "async_lpa": {
+      "num_communities": 253,
+      "modularity": 0.3296900476916669,
+      "coverage": 0.871854134565999,
+      "max_community_size": 890
+    }
+  },
+  "quality": {
+    "num_communities": 177,
+    "communities_detail": [
+      {
+        "rank": 1,
+        "size": 198,
+        "internal_density": 0.019381633594831565,
+        "external_density": 0.001524616986464376,
+        "conductance": 0.3736536868268434,
+        "cut_ratio": 0.001524616986464376
+      },
+      {
+        "rank": 2,
+        "size": 188,
+        "internal_density": 0.02474684264421436,
+        "external_density": 0.0024650577184246263,
+        "conductance": 0.4447989789406509,
+        "cut_ratio": 0.0024650577184246263
+      },
+      {
+        "rank": 3,
+        "size": 162,
+        "internal_density": 0.02085729621961506,
+        "external_density": 0.0014847091099814411,
+        "conductance": 0.40350877192982454,
+        "cut_ratio": 0.0014847091099814411
+      },
+      {
+        "rank": 4,
+        "size": 119,
+        "internal_density": 0.025352513886910698,
+        "external_density": 0.0004861448711716091,
+        "conductance": 0.203579418344519,
+        "cut_ratio": 0.0004861448711716091
+      },
+      {
+        "rank": 5,
+        "size": 107,
+        "internal_density": 0.027684711691059776,
+        "external_density": 0.0010672484448244347,
+        "conductance": 0.3656565656565657,
+        "cut_ratio": 0.0010672484448244347
+      },
+      {
+        "rank": 6,
+        "size": 104,
+        "internal_density": 0.028005974607916356,
+        "external_density": 0.0017499031195504747,
+        "conductance": 0.4906621392190153,
+        "cut_ratio": 0.0017499031195504747
+      },
+      {
+        "rank": 7,
+        "size": 85,
+        "internal_density": 0.04201680672268908,
+        "external_density": 0.0007174493941945167,
+        "conductance": 0.24623115577889448,
+        "cut_ratio": 0.0007174493941945167
+      },
+      {
+        "rank": 8,
+        "size": 80,
+        "internal_density": 0.05411392405063291,
+        "external_density": 0.0003489454094292804,
+        "conductance": 0.11627906976744186,
+        "cut_ratio": 0.0003489454094292804
+      },
+      {
+        "rank": 9,
+        "size": 78,
+        "internal_density": 0.044622044622044624,
+        "external_density": 0.000389222508181616,
+        "conductance": 0.15457413249211358,
+        "cut_ratio": 0.000389222508181616
+      },
+      {
+        "rank": 10,
+        "size": 70,
+        "internal_density": 0.035196687370600416,
+        "external_density": 0.0007134049674123657,
+        "conductance": 0.32270916334661354,
+        "cut_ratio": 0.0007134049674123657
+      }
+    ],
+    "modularity": 0.5478991753475314,
+    "coverage": 0.6504879301489471,
+    "avg_internal_density": 0.032197843541051485,
+    "avg_conductance": 0.31216530823024824
+  },
+  "structure": {
+    "hub_nodes": [
+      {
+        "community_id": 1,
+        "size": 198,
+        "hubs": [
+          {
+            "node": "Occupation_Diễn viên",
+            "score": 0.09632572156971257,
+            "label": "Occupation"
+          },
+          {
+            "node": "Occupation_Người Mẫu",
+            "score": 0.027519555033957876,
+            "label": "Occupation"
+          },
+          {
+            "node": "Instrument_Piano",
+            "score": 0.026543595134005327,
+            "label": "Instrument"
+          }
+        ]
+      },
+      {
+        "community_id": 2,
+        "size": 188,
+        "hubs": [
+          {
+            "node": "Genre_R&B",
+            "score": 0.07905896914656044,
+            "label": "Genre"
+          },
+          {
+            "node": "Company_JYP Entertainment",
+            "score": 0.050608232236041814,
+            "label": "Company"
+          },
+          {
+            "node": "Genre_Pop",
+            "score": 0.04733750029648793,
+            "label": "Genre"
+          }
+        ]
+      },
+      {
+        "community_id": 3,
+        "size": 162,
+        "hubs": [
+          {
+            "node": "Genre_Dance-pop",
+            "score": 0.07181140441387085,
+            "label": "Genre"
+          },
+          {
+            "node": "Genre_Ballad",
+            "score": 0.04808363503371919,
+            "label": "Genre"
+          },
+          {
+            "node": "BtoB",
+            "score": 0.03675981736670705,
+            "label": "Group"
+          }
+        ]
+      },
+      {
+        "community_id": 4,
+        "size": 119,
+        "hubs": [
+          {
+            "node": "Girls' Generation",
+            "score": 0.10350801811495802,
+            "label": "Group"
+          },
+          {
+            "node": "EXO",
+            "score": 0.068559859035338,
+            "label": "Group"
+          },
+          {
+            "node": "Taeyeon",
+            "score": 0.045541249548513234,
+            "label": "Artist"
+          }
+        ]
+      },
+      {
+        "community_id": 5,
+        "size": 107,
+        "hubs": [
+          {
+            "node": "Company_SM Entertainment",
+            "score": 0.08969964948690387,
+            "label": "Company"
+          },
+          {
+            "node": "Red Velvet (nhóm nhạc)",
+            "score": 0.05451978960817433,
+            "label": "Group"
+          },
+          {
+            "node": "F(x) (nhóm nhạc)",
+            "score": 0.04462773194784801,
+            "label": "Group"
+          }
+        ]
+      }
+    ],
+    "bridge_nodes": [
+      {
+        "node": "Occupation_Diễn viên",
+        "label": "Occupation",
+        "communities_connected": 17,
+        "total_external_edges": 150
+      },
+      {
+        "node": "Genre_R&B",
+        "label": "Genre",
+        "communities_connected": 17,
+        "total_external_edges": 130
+      },
+      {
+        "node": "Genre_Hip hop",
+        "label": "Genre",
+        "communities_connected": 16,
+        "total_external_edges": 94
+      },
+      {
+        "node": "Genre_Dance-pop",
+        "label": "Genre",
+        "communities_connected": 15,
+        "total_external_edges": 82
+      },
+      {
+        "node": "Occupation_Nhạc sĩ",
+        "label": "Occupation",
+        "communities_connected": 14,
+        "total_external_edges": 69
+      },
+      {
+        "node": "Genre_Pop",
+        "label": "Genre",
+        "communities_connected": 14,
+        "total_external_edges": 59
+      },
+      {
+        "node": "Genre_Dance",
+        "label": "Genre",
+        "communities_connected": 13,
+        "total_external_edges": 47
+      },
+      {
+        "node": "Genre_J-pop",
+        "label": "Genre",
+        "communities_connected": 13,
+        "total_external_edges": 28
+      },
+      {
+        "node": "Occupation_Rapper",
+        "label": "Occupation",
+        "communities_connected": 12,
+        "total_external_edges": 42
+      },
+      {
+        "node": "Genre_Ballad",
+        "label": "Genre",
+        "communities_connected": 11,
+        "total_external_edges": 48
+      }
+    ],
+    "core_periphery": [
+      {
+        "community_id": 1,
+        "size": 198,
+        "core_count": 62,
+        "periphery_count": 136,
+        "avg_degree": 3.8181818181818183,
+        "top_core_nodes": [
+          {
+            "node": "Occupation_Diễn viên",
+            "degree": 81
+          },
+          {
+            "node": "Instrument_Piano",
+            "degree": 26
+          },
+          {
+            "node": "Occupation_Người Mẫu",
+            "degree": 25
+          }
+        ]
+      },
+      {
+        "community_id": 2,
+        "size": 188,
+        "core_count": 41,
+        "periphery_count": 147,
+        "avg_degree": 4.627659574468085,
+        "top_core_nodes": [
+          {
+            "node": "Genre_R&B",
+            "degree": 78
+          },
+          {
+            "node": "Company_JYP Entertainment",
+            "degree": 49
+          },
+          {
+            "node": "Genre_Pop",
+            "degree": 49
+          }
+        ]
+      },
+      {
+        "community_id": 3,
+        "size": 162,
+        "core_count": 46,
+        "periphery_count": 116,
+        "avg_degree": 3.3580246913580245,
+        "top_core_nodes": [
+          {
+            "node": "Genre_Dance-pop",
+            "degree": 49
+          },
+          {
+            "node": "Genre_Ballad",
+            "degree": 33
+          },
+          {
+            "node": "BtoB",
+            "degree": 16
+          }
+        ]
+      }
+    ]
+  },
+  "semantic": {
+    "company_communities": [
+      {
+        "rank": 1,
+        "size": 198,
+        "main_company": "FNC Entertainment",
+        "groups": [
+          "CNBLUE",
+          "SF9",
+          "AOA",
+          "N.Flying",
+          "Orange Caramel"
+        ],
+        "label_distribution": {
+          "Occupation": 20,
+          "Artist": 97,
+          "Company": 30,
+          "Genre": 17,
+          "Group": 12,
+          "Instrument": 18,
+          "Album": 3,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 2,
+        "size": 188,
+        "main_company": "JYP Entertainment",
+        "groups": [
+          "Block B",
+          "CIX (nhóm nhạc)",
+          "The Grace (nhóm nhạc)",
+          "Fifty Fifty",
+          "G.o.d"
+        ],
+        "label_distribution": {
+          "Artist": 107,
+          "Company": 31,
+          "Group": 21,
+          "Genre": 6,
+          "Occupation": 13,
+          "Album": 6,
+          "Instrument": 3,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 3,
+        "size": 162,
+        "main_company": "Cube Entertainment",
+        "groups": [
+          "Pentagon (nhóm nhạc Hàn Quốc)",
+          "Oh My Girl",
+          "Brown Eyed Girls",
+          "Lightsum",
+          "Wanna One"
+        ],
+        "label_distribution": {
+          "Artist": 56,
+          "Company": 31,
+          "Genre": 11,
+          "Group": 34,
+          "Album": 17,
+          "Song": 6,
+          "Instrument": 3,
+          "Occupation": 4
+        }
+      },
+      {
+        "rank": 4,
+        "size": 119,
+        "main_company": "Vap",
+        "groups": [
+          "TVXQ",
+          "Girls' Generation-TTS",
+          "Girls' Generation",
+          "EXO",
+          "S.E.S."
+        ],
+        "label_distribution": {
+          "Artist": 9,
+          "Album": 48,
+          "Song": 47,
+          "Group": 6,
+          "Genre": 2,
+          "Company": 2,
+          "Occupation": 3,
+          "Instrument": 2
+        }
+      },
+      {
+        "rank": 5,
+        "size": 107,
+        "main_company": "SM Entertainment",
+        "groups": [
+          "Isak N Jiyeon",
+          "Golden Child",
+          "NCT DoJaeJung",
+          "F(x) (nhóm nhạc)",
+          "SM Rookies"
+        ],
+        "label_distribution": {
+          "Album": 21,
+          "Artist": 36,
+          "Song": 11,
+          "Group": 18,
+          "Occupation": 3,
+          "Instrument": 3,
+          "Genre": 8,
+          "Company": 7
+        }
+      },
+      {
+        "rank": 6,
+        "size": 104,
+        "main_company": "YG Entertainment",
+        "groups": [
+          "Dynamic Duo (ban nhạc)",
+          "Everglow",
+          "Verivery",
+          "Tempest",
+          "Jewelry (nhóm nhạc)"
+        ],
+        "label_distribution": {
+          "Artist": 33,
+          "Company": 21,
+          "Album": 7,
+          "Group": 28,
+          "Genre": 9,
+          "Occupation": 3,
+          "Song": 3
+        }
+      },
+      {
+        "rank": 7,
+        "size": 85,
+        "main_company": "Interscope Records",
+        "groups": [
+          "2NE1",
+          "Ateez",
+          "YG Family",
+          "Treasure",
+          "BLACKPINK"
+        ],
+        "label_distribution": {
+          "Artist": 14,
+          "Company": 9,
+          "Album": 17,
+          "Group": 6,
+          "Song": 36,
+          "Occupation": 2,
+          "Genre": 1
+        }
+      },
+      {
+        "rank": 8,
+        "size": 80,
+        "main_company": "HYBE",
+        "groups": [
+          "TXT (nhóm nhạc)",
+          "BTS",
+          "8Eight",
+          "Bolbbalgan4"
+        ],
+        "label_distribution": {
+          "Song": 43,
+          "Artist": 9,
+          "Album": 14,
+          "Genre": 6,
+          "Group": 4,
+          "Company": 3,
+          "Occupation": 1
+        }
+      },
+      {
+        "rank": 9,
+        "size": 78,
+        "main_company": "Universal Music",
+        "groups": [
+          "Teen Top",
+          "GD & TOP",
+          "Babymonster",
+          "GD X Taeyang",
+          "Big Bang (nhóm nhạc)"
+        ],
+        "label_distribution": {
+          "Song": 23,
+          "Artist": 5,
+          "Album": 40,
+          "Group": 5,
+          "Company": 5
+        }
+      },
+      {
+        "rank": 10,
+        "size": 70,
+        "main_company": "Universal Music Japan",
+        "groups": [
+          "Supernova (South Korean band)",
+          "SHINee",
+          "AOA Black",
+          "K/DA",
+          "Classy (nhóm nhạc)"
+        ],
+        "label_distribution": {
+          "Song": 23,
+          "Company": 7,
+          "Group": 11,
+          "Artist": 7,
+          "Instrument": 1,
+          "Album": 16,
+          "Genre": 5
+        }
+      },
+      {
+        "rank": 11,
+        "size": 66,
+        "main_company": "Kakao Entertainment",
+        "groups": [
+          "SS501",
+          "5urprise",
+          "Rocket Punch",
+          "JBJ (nhóm nhạc)",
+          "Monsta X"
+        ],
+        "label_distribution": {
+          "Artist": 28,
+          "Group": 21,
+          "Genre": 4,
+          "Album": 1,
+          "Company": 11,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 12,
+        "size": 62,
+        "main_company": "Source",
+        "groups": [
+          "NewJeans",
+          "Glam (nhóm nhạc)",
+          "ViviZ",
+          "GFriend"
+        ],
+        "label_distribution": {
+          "Album": 15,
+          "Artist": 10,
+          "Group": 4,
+          "Song": 23,
+          "Occupation": 1,
+          "Company": 7,
+          "Instrument": 1,
+          "Genre": 1
+        }
+      },
+      {
+        "rank": 13,
+        "size": 53,
+        "main_company": "Source Music",
+        "groups": [
+          "Apink",
+          "IZ*ONE",
+          "LE SSERAFIM"
+        ],
+        "label_distribution": {
+          "Song": 10,
+          "Album": 16,
+          "Occupation": 4,
+          "Artist": 10,
+          "Company": 9,
+          "Genre": 1,
+          "Group": 3
+        }
+      },
+      {
+        "rank": 14,
+        "size": 45,
+        "main_company": "Genie Music",
+        "groups": [
+          "NU'EST",
+          "Super Junior-D&E",
+          "AKB48",
+          "Super Junior-T",
+          "Super Junior"
+        ],
+        "label_distribution": {
+          "Company": 8,
+          "Album": 10,
+          "Song": 11,
+          "Group": 6,
+          "Artist": 4,
+          "Instrument": 1,
+          "Genre": 4,
+          "Occupation": 1
+        }
+      },
+      {
+        "rank": 15,
+        "size": 27,
+        "main_company": "RBW",
+        "groups": [
+          "PURPLE KISS",
+          "MAMAMOO",
+          "ONEUS",
+          "Kara (nhóm nhạc Hàn Quốc)"
+        ],
+        "label_distribution": {
+          "Company": 5,
+          "Artist": 5,
+          "Group": 4,
+          "Album": 8,
+          "Genre": 5
+        }
+      }
+    ],
+    "genre_communities": [
+      {
+        "rank": 1,
+        "size": 198,
+        "genres": [
+          "Rock Ballad",
+          "Hard Rock",
+          "Soft Rock",
+          "Rock",
+          "Alternative Rock",
+          "Rap Rock",
+          "Country",
+          "Pop Rock",
+          "La - Tinh",
+          "Post-punk Revival",
+          "Dân Ca",
+          "R&belectropop",
+          "Vlogging",
+          "Indie Rock",
+          "Dancer&b",
+          "Trot",
+          "Garage Rock"
+        ],
+        "label_distribution": {
+          "Occupation": 20,
+          "Artist": 97,
+          "Company": 30,
+          "Genre": 17,
+          "Group": 12,
+          "Instrument": 18,
+          "Album": 3,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 2,
+        "size": 188,
+        "genres": [
+          "J-pop",
+          "Edm",
+          "Teenpop",
+          "R&B",
+          "Soul",
+          "Pop"
+        ],
+        "label_distribution": {
+          "Artist": 107,
+          "Company": 31,
+          "Group": 21,
+          "Genre": 6,
+          "Occupation": 13,
+          "Album": 6,
+          "Instrument": 3,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 3,
+        "size": 162,
+        "genres": [
+          "Ballad",
+          "Dance-pop",
+          "Folk Rock",
+          "Teen-pop",
+          "Electro Swing",
+          "Electronic-pop",
+          "Rap",
+          "Bubblegum pop",
+          "Electro House",
+          "Coutry-pop",
+          "Popr&b"
+        ],
+        "label_distribution": {
+          "Artist": 56,
+          "Company": 31,
+          "Genre": 11,
+          "Group": 34,
+          "Album": 17,
+          "Song": 6,
+          "Instrument": 3,
+          "Occupation": 4
+        }
+      },
+      {
+        "rank": 5,
+        "size": 107,
+        "genres": [
+          "Pop/ballad",
+          "Electronica",
+          "Mandopop",
+          "Teen Pop",
+          "Hip Hopnhạc Điện Tử",
+          "Hip Hopnhạc Điện Tửteen Pop",
+          "R&b/soul",
+          "C-pop"
+        ],
+        "label_distribution": {
+          "Album": 21,
+          "Artist": 36,
+          "Song": 11,
+          "Group": 18,
+          "Occupation": 3,
+          "Instrument": 3,
+          "Genre": 8,
+          "Company": 7
+        }
+      },
+      {
+        "rank": 6,
+        "size": 104,
+        "genres": [
+          "Hip hop",
+          "Acapella",
+          "Synthpop",
+          "Dance",
+          "Drum & Bass",
+          "Acoustic",
+          "Alternative Hip Hop",
+          "Trapr&b",
+          "Nhạc Dance Điện Tử"
+        ],
+        "label_distribution": {
+          "Artist": 33,
+          "Company": 21,
+          "Album": 7,
+          "Group": 28,
+          "Genre": 9,
+          "Occupation": 3,
+          "Song": 3
+        }
+      },
+      {
+        "rank": 8,
+        "size": 80,
+        "genres": [
+          "Neo Soul",
+          "Pop-punk",
+          "Pop-rock",
+          "Alternative R&b",
+          "Folk Rockr&b",
+          "Indie Pop"
+        ],
+        "label_distribution": {
+          "Song": 43,
+          "Artist": 9,
+          "Album": 14,
+          "Genre": 6,
+          "Group": 4,
+          "Company": 3,
+          "Occupation": 1
+        }
+      },
+      {
+        "rank": 10,
+        "size": 70,
+        "genres": [
+          "Contemporary R&b",
+          "&j-pop",
+          "Electropop",
+          "House",
+          "Nhạc Nhảy"
+        ],
+        "label_distribution": {
+          "Song": 23,
+          "Company": 7,
+          "Group": 11,
+          "Artist": 7,
+          "Instrument": 1,
+          "Album": 16,
+          "Genre": 5
+        }
+      },
+      {
+        "rank": 11,
+        "size": 66,
+        "genres": [
+          "Synthpopedm",
+          "Indie Folk",
+          "Alt Hip Hop",
+          "Dancehall"
+        ],
+        "label_distribution": {
+          "Artist": 28,
+          "Group": 21,
+          "Genre": 4,
+          "Album": 1,
+          "Company": 11,
+          "Song": 1
+        }
+      },
+      {
+        "rank": 14,
+        "size": 45,
+        "genres": [
+          "Electro-hopr&b",
+          "Popdance Popdancerhythm And Bluesr&bnhạc Trot",
+          "Novelty",
+          "Disco"
+        ],
+        "label_distribution": {
+          "Company": 8,
+          "Album": 10,
+          "Song": 11,
+          "Group": 6,
+          "Artist": 4,
+          "Instrument": 1,
+          "Genre": 4,
+          "Occupation": 1
+        }
+      },
+      {
+        "rank": 15,
+        "size": 27,
+        "genres": [
+          "Latin Pop",
+          "Blue",
+          "Reggae",
+          "Retro",
+          "Jazz"
+        ],
+        "label_distribution": {
+          "Company": 5,
+          "Artist": 5,
+          "Group": 4,
+          "Album": 8,
+          "Genre": 5
+        }
+      }
+    ],
+    "group_centric_communities": [],
+    "top_companies_by_artists": [
+      {
+        "company": "JYP Entertainment",
+        "artist_count": 53,
+        "sample_artists": [
+          "Baek A-yeon",
+          "Baek Yerin",
+          "HyunA",
+          "Jay Park",
+          "Sunmi"
+        ]
+      },
+      {
+        "company": "SM Entertainment",
+        "artist_count": 37,
+        "sample_artists": [
+          "BoA",
+          "Seulgi",
+          "Taeyeon",
+          "Wendy (ca sĩ)",
+          "Dana (ca sĩ Hàn Quốc)"
+        ]
+      },
+      {
+        "company": "Starship Entertainment",
+        "artist_count": 15,
+        "sample_artists": [
+          "Bona (ca sĩ)",
+          "Hyolyn",
+          "Jang Won-young",
+          "Jeong Se-woon",
+          "Soyou"
+        ]
+      },
+      {
+        "company": "Cube",
+        "artist_count": 14,
+        "sample_artists": [
+          "HyunA",
+          "Cho Mi-yeon",
+          "Jeon So-yeon",
+          "Jo Kwon",
+          "Kwon So-hyun"
+        ]
+      },
+      {
+        "company": "Avex Trax",
+        "artist_count": 14,
+        "sample_artists": [
+          "Psy",
+          "Doyoung (ca sĩ)",
+          "Kai (ca sĩ)",
+          "Lay Zhang",
+          "Lee Joo-yeon"
+        ]
+      }
+    ]
+  },
+  "hierarchical": {
+    "levels": [
+      {
+        "resolution": 0.5,
+        "num_communities": 263,
+        "modularity": 0.8703746867898141,
+        "sizes": [
+          48,
+          30,
+          23,
+          21,
+          20,
+          17,
+          15,
+          10,
+          8,
+          7
+        ]
+      },
+      {
+        "resolution": 1.0,
+        "num_communities": 267,
+        "modularity": 0.879282967193054,
+        "sizes": [
+          30,
+          21,
+          20,
+          17,
+          17,
+          15,
+          13,
+          13,
+          13,
+          10
+        ]
+      },
+      {
+        "resolution": 1.5,
+        "num_communities": 269,
+        "modularity": 0.8772434590058854,
+        "sizes": [
+          22,
+          20,
+          17,
+          17,
+          15,
+          13,
+          13,
+          13,
+          11,
+          10
+        ]
+      },
+      {
+        "resolution": 2.0,
+        "num_communities": 270,
+        "modularity": 0.8759396305576598,
+        "sizes": [
+          22,
+          20,
+          17,
+          15,
+          13,
+          13,
+          12,
+          11,
+          10,
+          10
+        ]
+      }
+    ]
+  }
+}
