@@ -647,12 +647,14 @@ class MultiHopReasoner:
                         
                         genres = list(set(genres))  # Remove duplicates
                         if genres:
+                            # Clean prefix "Genre_" để output tự nhiên hơn
+                            genres_clean = [g[6:] if g.startswith("Genre_") else g for g in genres]
                             return ReasoningResult(
                                 query=query,
                                 reasoning_type=ReasoningType.CHAIN,
                                 steps=steps,
                                 answer_entities=genres,
-                                answer_text=f"Thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity} là: {', '.join(genres)}",
+                                answer_text=f"Thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity} là: {', '.join(genres_clean)}",
                                 confidence=0.95,
                                 explanation=f"3-hop: {song_entity} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → IS_GENRE → {', '.join(genres)}"
                             )
@@ -758,9 +760,9 @@ class MultiHopReasoner:
                             reasoning_type=ReasoningType.CHAIN,
                             steps=steps,
                             answer_entities=genres,
-                            answer_text=f"Thể loại của nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join(genres)}",
+                            answer_text=f"Thể loại của nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join([g[6:] if g.startswith('Genre_') else g for g in genres])}",
                             confidence=0.95,
-                            explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups)} → IS_GENRE → {', '.join(genres)}"
+                            explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups)} → IS_GENRE → {', '.join([g[6:] if g.startswith('Genre_') else g for g in genres])}"
                         )
                     else:
                         return ReasoningResult(
@@ -852,9 +854,9 @@ class MultiHopReasoner:
                             reasoning_type=ReasoningType.CHAIN,
                             steps=steps,
                             answer_entities=genres,
-                            answer_text=f"Thể loại của nhóm nhạc đã ra mắt album {album_entity} là: {', '.join(genres)}",
+                            answer_text=f"Thể loại của nhóm nhạc đã ra mắt album {album_entity} là: {', '.join([g[6:] if g.startswith('Genre_') else g for g in genres])}",
                             confidence=0.95,
-                            explanation=f"2-hop: {album_entity} → RELEASED → {', '.join(groups)} → IS_GENRE → {', '.join(genres)}"
+                            explanation=f"2-hop: {album_entity} → RELEASED → {', '.join(groups)} → IS_GENRE → {', '.join([g[6:] if g.startswith('Genre_') else g for g in genres])}"
                         )
                     else:
                         return ReasoningResult(
@@ -3447,7 +3449,7 @@ class MultiHopReasoner:
             reasoning_type=ReasoningType.AGGREGATION,
             steps=[step],
             answer_entities=genres,
-            answer_text=f"{entity_name} thuộc thể loại: {', '.join(genres) if genres else 'Không xác định'}",
+            answer_text=f"{entity_name} thuộc thể loại: {', '.join([g[6:] if g.startswith('Genre_') else g for g in genres]) if genres else 'Không xác định'}",
             confidence=1.0 if genres else 0.0,
             explanation=f"1-hop: {entity_name} → IS_GENRE → Genre"
         )
