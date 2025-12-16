@@ -563,7 +563,7 @@ class KpopChatbot:
                                         reasoning_result = ReasoningResult(
                                             query=query,
                                             reasoning_type=ReasoningType.CHAIN,
-                                            steps=[ReasoningStep(entity_id, 'HAS_COMPANY', company_info, 1.0)],
+                                            steps=[ReasoningStep(hop_number=1, operation='get_company', source_entities=[entity_id], relationship='HAS_COMPANY', target_entities=[company_info], explanation=f"Lấy công ty từ infobox của {entity_id}")],
                                             answer_entities=[company_info],
                                             answer_text=f"{entity_id} thuộc công ty/hãng đĩa: {company_info}",
                                             confidence=0.95,
@@ -577,7 +577,7 @@ class KpopChatbot:
                                             reasoning_result = ReasoningResult(
                                                 query=query,
                                                 reasoning_type=ReasoningType.CHAIN,
-                                                steps=[ReasoningStep(entity_id, rel_type, neighbor, 1.0)],
+                                                steps=[ReasoningStep(hop_number=1, operation='get_company', source_entities=[entity_id], relationship=rel_type, target_entities=[neighbor], explanation=f"Lấy công ty từ edge {rel_type}")],
                                                 answer_entities=[neighbor],
                                                 answer_text=f"{entity_id} được quản lý bởi công ty: {neighbor}",
                                                 confidence=0.95,
@@ -598,7 +598,7 @@ class KpopChatbot:
                                         reasoning_result = ReasoningResult(
                                             query=query,
                                             reasoning_type=ReasoningType.CHAIN,
-                                            steps=[ReasoningStep(entity_id, 'SUNG_BY', artist_info, 1.0)],
+                                            steps=[ReasoningStep(hop_number=1, operation='get_singer', source_entities=[entity_id], relationship='SUNG_BY', target_entities=[artist_info], explanation=f"Lấy ca sĩ từ infobox của {entity_id}")],
                                             answer_entities=[artist_info],
                                             answer_text=f"Bài hát '{entity_id}' được thể hiện bởi: {artist_info}",
                                             confidence=0.95,
@@ -611,7 +611,7 @@ class KpopChatbot:
                                             reasoning_result = ReasoningResult(
                                                 query=query,
                                                 reasoning_type=ReasoningType.CHAIN,
-                                                steps=[ReasoningStep(src, 'SINGS', entity_id, 1.0)],
+                                                steps=[ReasoningStep(hop_number=1, operation='get_singer', source_entities=[src], relationship='SINGS', target_entities=[entity_id], explanation=f"Tìm ca sĩ hát bài {entity_id}")],
                                                 answer_entities=[src],
                                                 answer_text=f"Bài hát '{entity_id}' được thể hiện bởi: {src}",
                                                 confidence=0.95,
@@ -636,7 +636,7 @@ class KpopChatbot:
                                         reasoning_result = ReasoningResult(
                                             query=query,
                                             reasoning_type=ReasoningType.CHAIN,
-                                            steps=[ReasoningStep(album_name, 'RELEASED_BY', artist_info, 1.0)],
+                                            steps=[ReasoningStep(hop_number=1, operation='get_artist', source_entities=[album_name], relationship='RELEASED_BY', target_entities=[artist_info], explanation=f"Lấy nghệ sĩ từ infobox của {album_name}")],
                                             answer_entities=[artist_info],
                                             answer_text=f"Album '{album_name}' thuộc về: {artist_info}",
                                             confidence=0.95,
@@ -649,7 +649,7 @@ class KpopChatbot:
                                                 reasoning_result = ReasoningResult(
                                                     query=query,
                                                     reasoning_type=ReasoningType.CHAIN,
-                                                    steps=[ReasoningStep(src, 'RELEASED', album_name, 1.0)],
+                                                    steps=[ReasoningStep(hop_number=1, operation='get_artist', source_entities=[src], relationship='RELEASED', target_entities=[album_name], explanation=f"Tìm nghệ sĩ phát hành album {album_name}")],
                                                     answer_entities=[src],
                                                     answer_text=f"Album '{album_name}' thuộc về: {src}",
                                                     confidence=0.95,
@@ -669,7 +669,7 @@ class KpopChatbot:
                                             reasoning_result = ReasoningResult(
                                                 query=query,
                                                 reasoning_type=ReasoningType.CHAIN,
-                                                steps=[ReasoningStep(entity_id, 'RELEASED_BY', artist_info, 1.0)],
+                                                steps=[ReasoningStep(hop_number=1, operation='get_artist', source_entities=[entity_id], relationship='RELEASED_BY', target_entities=[artist_info], explanation=f"Lấy nghệ sĩ từ infobox của {entity_id}")],
                                                 answer_entities=[artist_info],
                                                 answer_text=f"Album '{entity_id}' thuộc về: {artist_info}",
                                                 confidence=0.95,
@@ -682,7 +682,7 @@ class KpopChatbot:
                                                 reasoning_result = ReasoningResult(
                                                     query=query,
                                                     reasoning_type=ReasoningType.CHAIN,
-                                                    steps=[ReasoningStep(src, 'RELEASED', entity_id, 1.0)],
+                                                    steps=[ReasoningStep(hop_number=1, operation='get_artist', source_entities=[src], relationship='RELEASED', target_entities=[entity_id], explanation=f"Tìm nghệ sĩ phát hành album {entity_id}")],
                                                     answer_entities=[src],
                                                     answer_text=f"Album '{entity_id}' thuộc về: {src}",
                                                     confidence=0.95,
@@ -717,7 +717,7 @@ class KpopChatbot:
                                         reasoning_result = ReasoningResult(
                                             query=query,
                                             reasoning_type=ReasoningType.CHAIN,
-                                            steps=[ReasoningStep(entity_id, 'IN_ALBUM', album_info, 1.0)],
+                                            steps=[ReasoningStep(hop_number=1, operation='get_album', source_entities=[entity_id], relationship='IN_ALBUM', target_entities=[album_info], explanation=f"Lấy album từ infobox của {entity_id}")],
                                             answer_entities=[album_info],
                                             answer_text=f"Bài hát '{entity_id}' nằm trong album: {album_info}",
                                             confidence=0.95,
@@ -730,7 +730,7 @@ class KpopChatbot:
                                             reasoning_result = ReasoningResult(
                                                 query=query,
                                                 reasoning_type=ReasoningType.CHAIN,
-                                                steps=[ReasoningStep(src, 'CONTAINS', entity_id, 1.0)],
+                                                steps=[ReasoningStep(hop_number=1, operation='get_album', source_entities=[src], relationship='CONTAINS', target_entities=[entity_id], explanation=f"Tìm album chứa bài hát {entity_id}")],
                                                 answer_entities=[src],
                                                 answer_text=f"Bài hát '{entity_id}' nằm trong album: {src}",
                                                 confidence=0.95,
@@ -2107,6 +2107,9 @@ class KpopChatbot:
         # Track các từ đã được match trong tên đầy đủ để tránh match single word khi đã có match đầy đủ
         # Ví dụ: nếu đã match "Yoo Jeong-yeon", thì không match "Yoo" nữa
         words_in_matched_full_names = set()
+        
+        # QUAN TRỌNG: Khởi tạo seen_entities TRƯỚC khi sử dụng
+        seen_entities = set()
 
         # ============================================
         # BƯỚC 0: TỰ ĐỘNG TÌM ENTITY VỚI SUFFIX (ca sĩ), (nhóm nhạc), etc.
