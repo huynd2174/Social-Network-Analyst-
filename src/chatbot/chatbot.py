@@ -862,6 +862,11 @@ class KpopChatbot:
             # Các câu hỏi factual cần câu trả lời chính xác từ KG, KHÔNG dùng LLM để tránh hallucination
             if reasoning_result and reasoning_result.answer_text:
                 use_reasoning_result = True
+        # ========== ƯU TIÊN REASONING CHO CÁC CÂU HỎI VỀ THỂ LOẠI ==========
+        elif (is_song_group_genre_question or is_song_artist_group_genre_question or is_album_group_genre_question):
+            # Các câu hỏi về thể loại cần câu trả lời chính xác từ KG, KHÔNG dùng LLM để tránh hallucination
+            if reasoning_result and reasoning_result.answer_text:
+                use_reasoning_result = True
         # ========== END ==========
         
         if use_reasoning_result:
