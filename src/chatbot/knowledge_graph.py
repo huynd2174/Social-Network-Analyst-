@@ -297,6 +297,20 @@ class KpopKnowledgeGraph:
             
             # If extract_first_year is True, return only the first year from range
             if extract_first_year:
+                # Xử lý trường hợp có nhiều năm dính liền (ví dụ: "20122016–nay")
+                # Tìm tất cả các năm 4 chữ số
+                years_found = re.findall(r'\d{4}', year_str)
+                if len(years_found) > 1:
+                    # Kiểm tra xem có năm dính liền không
+                    first_year_pos = year_str.find(years_found[0])
+                    second_year_pos = year_str.find(years_found[1])
+                    distance = second_year_pos - first_year_pos
+                    # Nếu hai năm dính liền (khoảng cách 4 ký tự) và có dấu nối sau
+                    if 4 <= distance <= 5 and ('–' in year_str or '-' in year_str):
+                        # Với "ra mắt/debut", lấy năm cuối cùng trước dấu nối (thường là năm debut chính thức)
+                        # Ví dụ: "20122016–nay" → lấy "2016" (năm debut), không phải "2012"
+                        return years_found[-1] if years_found[-1] in year_str[:year_str.find('–' if '–' in year_str else '-')] else years_found[0]
+                # Trường hợp thông thường: lấy năm đầu tiên
                 return year_match.group(1)
             
             # Otherwise return the full range

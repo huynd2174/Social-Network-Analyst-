@@ -3726,6 +3726,8 @@ class MultiHopReasoner:
         - "2016–nay" → "từ 2016 đến nay"
         - "2013–2023" → "từ 2013 đến 2023"
         - "2019" → "2019"
+        - "20122016–nay" → "từ 2016 đến nay" (xử lý nhiều năm dính liền)
+        - "2012–2016–nay" → "từ 2016 đến nay" (lấy năm cuối cùng trước "nay")
         
         Args:
             year_str: Year string từ infobox (có thể là range)
@@ -3736,27 +3738,120 @@ class MultiHopReasoner:
         if not year_str:
             return year_str
         
-        # Kiểm tra range với "–" hoặc "-"
+        import re
+        
+        # Xử lý trường hợp có nhiều ranges với text trong ngoặc
+        # Ví dụ: "2009–2017 (MBK)2018–nay (tự do)" → "từ 2009 đến 2017 (MBK), từ 2018 đến nay (tự do)"
+        # Tìm tất cả các ranges có dạng: YYYY–YYYY hoặc YYYY–nay, cùng với text trong ngoặc (nếu có)
+        # Pattern để tìm range và text trong ngoặc ngay sau đó
+        range_pattern = r'(\d{4})\s*[–-]\s*(\d{4}|nay)\s*(\([^)]+\))?'
+        ranges_found = re.findall(range_pattern, year_str, re.IGNORECASE)
+        
+        if len(ranges_found) > 1:
+            # Có nhiều ranges → format tất cả và ngăn cách bằng dấu phẩy
+            formatted_ranges = []
+            for start_year, end_year, note in ranges_found:
+                note_text = f" {note.strip()}" if note else ""
+                if end_year.lower() == 'nay':
+                    formatted = f"từ {start_year} đến nay{note_text}"
+                else:
+                    formatted = f"từ {start_year} đến {end_year}{note_text}"
+                formatted_ranges.append(formatted)
+            return ", ".join(formatted_ranges)
+        elif len(ranges_found) == 1:
+            # Chỉ có 1 range
+            start_year, end_year, note = ranges_found[0]
+            note_text = f" {note.strip()}" if note else ""
+            if end_year.lower() == 'nay':
+                return f"từ {start_year} đến nay{note_text}"
+            else:
+                return f"từ {start_year} đến {end_year}{note_text}"
+        
+        # Xử lý trường hợp có nhiều năm dính liền (ví dụ: "20122016–nay" hoặc "2017)2018")
+        # Tách các năm 4 chữ số
+        year_pattern = r'\d{4}'
+        years_found = re.findall(year_pattern, year_str)
+        
+        # Nếu có nhiều năm 4 chữ số, kiểm tra xem có dính liền không
+        # Ví dụ: "20122016–nay" → ["2012", "2016"] - cần tách phần đầu
+        # Ví dụ: "2017)2018" → ["2017", "2018"] - năm dính liền với ký tự đặc biệt
+        if len(years_found) > 1:
+            # Tìm vị trí của năm đầu tiên và năm thứ hai
+            first_year_pos = year_str.find(years_found[0])
+            second_year_pos = year_str.find(years_found[1])
+            
+            # Kiểm tra xem có năm dính liền không (khoảng cách <= 5 ký tự, có thể có ký tự đặc biệt)
+            # Ví dụ: "20122016" (4 ký tự), "2017)2018" (5 ký tự)
+            distance = second_year_pos - first_year_pos
+            if 4 <= distance <= 5:
+                # Có nhiều năm dính liền hoặc gần nhau, lấy năm cuối cùng
+                end_year = years_found[-1]
+                # Kiểm tra xem có "nay" hoặc dấu nối không
+                if 'nay' in year_str.lower():
+                    return f"từ {end_year} đến nay"
+                elif '–' in year_str or '-' in year_str:
+                    # Có dấu nối sau các năm dính liền, lấy phần sau dấu nối
+                    separator = '–' if '–' in year_str else '-'
+                    after_sep = year_str.split(separator, 1)[1].strip()
+                    if after_sep.lower() == 'nay':
+                        return f"từ {end_year} đến nay"
+                    else:
+                        # Lấy năm cuối cùng từ phần sau dấu nối
+                        years_after = re.findall(year_pattern, after_sep)
+                        if years_after:
+                            return f"từ {end_year} đến {years_after[-1]}"
+                        else:
+                            return f"từ {end_year} đến {after_sep}"
+                else:
+                    return f"từ {years_found[0]} đến {end_year}"
+        
+        # Xử lý range với "–" (en dash) hoặc "-" (hyphen)
         if '–' in year_str:
-            parts = year_str.split('–', 1)
-            start = parts[0].strip()
-            end = parts[1].strip() if len(parts) > 1 else ""
-            if end.lower() == 'nay':
-                return f"từ {start} đến nay"
-            elif end:
-                return f"từ {start} đến {end}"
+            # Xử lý trường hợp có nhiều dấu nối: "2012–2016–nay"
+            parts = year_str.split('–')
+            # Loại bỏ các phần rỗng
+            parts = [p.strip() for p in parts if p.strip()]
+            
+            if len(parts) >= 2:
+                # Lấy phần đầu và phần cuối
+                start = parts[0]
+                end = parts[-1]
+                
+                if end.lower() == 'nay':
+                    return f"từ {start} đến nay"
+                elif re.match(r'\d{4}', end):
+                    return f"từ {start} đến {end}"
+                else:
+                    return f"từ {start} đến {end}"
+            elif len(parts) == 1:
+                return parts[0]
             else:
-                return start
-        elif '-' in year_str and len(year_str.split('-')) == 2:
-            parts = year_str.split('-', 1)
-            start = parts[0].strip()
-            end = parts[1].strip() if len(parts) > 1 else ""
-            if end.lower() == 'nay':
-                return f"từ {start} đến nay"
-            elif end:
-                return f"từ {start} đến {end}"
+                return year_str
+                
+        elif '-' in year_str:
+            # Xử lý với hyphen, chỉ xử lý khi có đúng 2 phần
+            parts = year_str.split('-')
+            parts = [p.strip() for p in parts if p.strip()]
+            
+            if len(parts) == 2:
+                start = parts[0]
+                end = parts[1]
+                if end.lower() == 'nay':
+                    return f"từ {start} đến nay"
+                elif re.match(r'\d{4}', end):
+                    return f"từ {start} đến {end}"
+                else:
+                    return f"từ {start} đến {end}"
+            elif len(parts) == 1:
+                return parts[0]
             else:
-                return start
+                # Nhiều hơn 2 phần, lấy đầu và cuối
+                start = parts[0]
+                end = parts[-1]
+                if end.lower() == 'nay':
+                    return f"từ {start} đến nay"
+                else:
+                    return f"từ {start} đến {end}"
         
         return year_str
         
