@@ -937,36 +937,19 @@ class KpopChatbot:
                         year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
                         if year_match and reasoning_result.answer_entities:
                             entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
-                            # Format: "X ra mắt vào năm Y"
-                            response = f"{entity_display} ra mắt vào năm {year_match.group(0)}"
-                        # Tìm năm trong answer text và entity để format lại
-                        import re
-                        year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
-                        if year_match and reasoning_result.answer_entities:
-                            entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
                             # Extract năm đầu tiên nếu là range (ví dụ: "2016–nay" -> "2016")
                             year_str = year_match.group(0)
                             if '–' in year_str or '-' in year_str:
                                 year_str = year_str.split('–')[0].split('-')[0]
+                            # Format: "X ra mắt vào năm Y"
                             response = f"{entity_display} ra mắt vào năm {year_str}"
-                    # Nếu đã có format nhưng entity name chưa được normalize, normalize lại
+                    # Nếu đã có format "ra mắt vào năm" nhưng entity name chưa được normalize, normalize lại
                     elif 'ra mắt vào năm' in answer_text_lower and reasoning_result.answer_entities:
                         # Đảm bảo entity name được normalize
                         entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
                         # Nếu entity ID (có suffix) xuất hiện trong response, thay thế bằng normalized name
                         if reasoning_result.answer_entities[0] != entity_display and reasoning_result.answer_entities[0] in response:
                             response = response.replace(reasoning_result.answer_entities[0], entity_display)
-                            # Đảm bảo format là "X ra mắt vào năm Y"
-                            if 'ra mắt vào năm' not in response.lower():
-                                response = f"{entity_display} ra mắt vào năm {year_match.group(0)}"
-                elif 'năm hoạt động' in query_lower_for_normalize:
-                    # Câu hỏi về năm hoạt động → Format: "Năm hoạt động của X là: Y"
-                    if reasoning_result.answer_entities:
-                        entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
-                        import re
-                        year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
-                        if year_match and 'năm hoạt động' not in response.lower():
-                            response = f"Năm hoạt động của {entity_display} là: {year_match.group(0)}"
             
             if reasoning_result.answer_entities:
                 entities_str = ", ".join(reasoning_result.answer_entities[:10])
