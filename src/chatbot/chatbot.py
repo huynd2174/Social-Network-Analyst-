@@ -317,10 +317,12 @@ class KpopChatbot:
         
         # Bổ sung nhận dạng cho các câu hỏi đa dạng trong dataset đánh giá
         is_genre_question = 'thể loại' in query_lower or 'genre' in query_lower
-        # Câu hỏi về năm hoạt động/phát hành/thành lập
+        # Câu hỏi về năm hoạt động/phát hành/thành lập/ra mắt/debut
         is_year_question = (
-            ('năm' in query_lower) and
-            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower)
+            (('năm' in query_lower) and
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'ra mắt' in query_lower or 'debut' in query_lower)) or
+            # Pattern "X debut vào năm nào"
+            ('debut' in query_lower and any(kw in query_lower for kw in ['vào năm', 'năm nào']))
         )
         is_song_in_album_question = (
             ('bài hát' in query_lower and 'album' in query_lower)
@@ -870,22 +872,26 @@ class KpopChatbot:
             and len(context.get('entities', [])) >= 1
         )
         
-        # Nếu là câu hỏi giới thiệu, thêm infobox đầy đủ vào context
+        # Nếu là câu hỏi giới thiệu, CHỈ dùng infobox, không dùng facts/relationships khác
         if is_intro_question and context.get('entities'):
             main_entity_id = context['entities'][0]['id']
             entity_data = self.kg.get_entity(main_entity_id)
             if entity_data:
                 infobox = entity_data.get('infobox', {})
                 if infobox:
+                    # QUAN TRỌNG: Với câu hỏi giới thiệu, CHỈ gửi infobox vào context
+                    # KHÔNG gửi facts/relationships khác để tránh LLM bịa thông tin
+                    formatted_context = ""  # Reset context, chỉ dùng infobox
+                    
                     # Format infobox đầy đủ thành text để LLM dễ diễn đạt
                     # QUAN TRỌNG: Format rõ ràng để LLM dễ nhận biết và sử dụng
-                    infobox_text = f"\n\n=== THÔNG TIN CHI TIẾT VỀ {main_entity_id} (Infobox) ==="
-                    infobox_text += "\n(Đây là thông tin chi tiết từ Knowledge Graph - SỬ DỤNG để tạo câu trả lời giới thiệu)\n"
+                    infobox_text = f"\n=== THÔNG TIN CHI TIẾT VỀ {main_entity_id} (Infobox) ===\n"
+                    infobox_text += "(Đây là THÔNG TIN DUY NHẤT từ Knowledge Graph - CHỈ sử dụng thông tin này, KHÔNG sử dụng thông tin khác)\n\n"
                     for key, value in infobox.items():
                         if value:  # Chỉ hiển thị fields có giá trị
                             infobox_text += f"{key}: {value}\n"
-                    infobox_text += "=== HẾT THÔNG TIN INFOBOX ===\n"
-                    formatted_context += infobox_text
+                    infobox_text += "\n=== HẾT THÔNG TIN INFOBOX ===\n"
+                    formatted_context = infobox_text  # CHỈ dùng infobox, không có facts/relationships khác
         
         # ✅ QUAN TRỌNG: ƯU TIÊN TẤT CẢ REASONING RESULT TRƯỚC
         # Nếu có reasoning result với answer_text → LUÔN dùng reasoning (tránh LLM hallucination)
@@ -962,38 +968,47 @@ class KpopChatbot:
                 except Exception:
                     pass
                 
-                # Đảm bảo infobox được thêm vào context (nếu chưa có từ phần trên)
-                if 'THÔNG TIN CHI TIẾT' not in formatted_context and 'Infobox' not in formatted_context:
-                    entity_data = self.kg.get_entity(main_entity)
-                    if entity_data:
-                        infobox = entity_data.get('infobox', {})
-                        if infobox:
-                            infobox_text = f"\n\n=== THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox) ==="
-                            infobox_text += "\n(Đây là thông tin chi tiết từ Knowledge Graph - SỬ DỤNG để tạo câu trả lời giới thiệu)\n"
-                            for key, value in infobox.items():
-                                if value:  # Chỉ hiển thị fields có giá trị
-                                    infobox_text += f"{key}: {value}\n"
-                            infobox_text += "=== HẾT THÔNG TIN INFOBOX ===\n"
-                            formatted_context += infobox_text
+                # Lấy infobox của entity
+                entity_data = self.kg.get_entity(main_entity)
+                infobox_only_context = ""  # Context CHỈ chứa infobox
+                
+                if entity_data:
+                    infobox = entity_data.get('infobox', {})
+                    if infobox:
+                        # Tạo context CHỈ chứa infobox, KHÔNG có facts/relationships khác
+                        infobox_text = f"=== THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox) ===\n"
+                        infobox_text += "(Đây là THÔNG TIN DUY NHẤT bạn được phép sử dụng để trả lời câu hỏi giới thiệu)\n\n"
+                        for key, value in infobox.items():
+                            if value:  # Chỉ hiển thị fields có giá trị
+                                infobox_text += f"{key}: {value}\n"
+                        infobox_text += "\n=== HẾT THÔNG TIN INFOBOX ===\n"
+                        infobox_text += "\nQUAN TRỌNG: CHỈ sử dụng thông tin từ phần Infobox ở trên. KHÔNG sử dụng bất kỳ thông tin nào khác."
+                        infobox_only_context = infobox_text
                 
                 # Prompt chuyên biệt cho giới thiệu entity - yêu cầu LLM diễn đạt lại từ infobox
-                # QUAN TRỌNG: LLM PHẢI sử dụng thông tin từ phần "THÔNG TIN CHI TIẾT VỀ ... (Infobox)" trong context
+                # QUAN TRỌNG: LLM PHẢI sử dụng THÔNG TIN TỪ INFOBOX, KHÔNG được bịa thêm
                 llm_query = (
                     f"Bạn được yêu cầu giới thiệu về thực thể K-pop '{base_name}' bằng tiếng Việt.\n\n"
+                    f"QUY TẮC NGHIÊM NGẶT:\n"
+                    f"- CHỈ được sử dụng thông tin từ phần 'Infobox' được cung cấp trong CONTEXT bên dưới\n"
+                    f"- KHÔNG được sử dụng kiến thức từ training data của bạn\n"
+                    f"- KHÔNG được bịa thêm tên thành viên, bài hát, album, công ty KHÔNG có trong infobox\n"
+                    f"- Nếu infobox không có thông tin về thành viên → KHÔNG được liệt kê thành viên\n"
+                    f"- Nếu infobox không có thông tin về bài hát/album → KHÔNG được liệt kê bài hát/album\n"
+                    f"- Nếu infobox ít thông tin → giới thiệu ngắn gọn dựa trên những gì có, KHÔNG bịa thêm\n\n"
                     f"YÊU CẦU:\n"
-                    f"- Sử dụng THÔNG TIN TỪ PHẦN 'THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox)' trong CONTEXT bên dưới\n"
-                    f"- Diễn đạt lại một cách tự nhiên, mạch lạc (2-4 câu)\n"
-                    f"- KHÔNG chỉ liệt kê các trường thông tin một cách cứng nhắc\n"
-                    f"- Kết hợp các thông tin quan trọng như: năm hoạt động/thành lập, công ty/hãng đĩa, thể loại, thành viên (nếu có)\n"
-                    f"- Tạo thành một đoạn văn giới thiệu hoàn chỉnh, dễ đọc\n"
-                    f"- KHÔNG bịa thêm thông tin không có trong infobox\n\n"
-                    f"Câu hỏi gốc: {query}\n\n"
-                    f"Hãy viết giới thiệu dựa trên thông tin infobox được cung cấp:"
+                    f"- Diễn đạt lại thông tin từ infobox một cách tự nhiên, mạch lạc (2-4 câu)\n"
+                    f"- Kết hợp các thông tin có trong infobox như: năm hoạt động/thành lập, công ty/hãng đĩa, thể loại, thành viên (CHỈ nếu có trong infobox)\n"
+                    f"- Tạo thành một đoạn văn giới thiệu hoàn chỉnh, dễ đọc\n\n"
+                    f"Câu hỏi: {query}"
                 )
+            
+            # Với câu hỏi giới thiệu, CHỈ gửi infobox context, KHÔNG gửi formatted_context có chứa facts/relationships
+            intro_context = infobox_only_context if infobox_only_context else formatted_context
             
             response = self.llm.generate(
                 llm_query,
-                context=formatted_context,  # Context từ GraphRAG (Knowledge Graph) + infobox đầy đủ nếu là câu hỏi giới thiệu
+                context=intro_context,  # CHỈ gửi infobox context để tránh LLM bịa thêm từ facts/relationships
                 history=history
             )
         elif context['facts']:

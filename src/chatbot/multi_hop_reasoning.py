@@ -156,20 +156,27 @@ class MultiHopReasoner:
         # MULTI-HOP QUESTIONS (ƯU TIÊN CAO NHẤT)
         # ============================================
         
-        # -1. Câu hỏi về năm hoạt động/phát hành/sáng tác (1-hop, 2-hop, 3-hop)
-        # Pattern: "năm hoạt động của X", "năm phát hành của X", "năm sáng tác của X"
+        # -1. Câu hỏi về năm hoạt động/phát hành/sáng tác/ra mắt/debut (1-hop, 2-hop, 3-hop)
+        # Pattern: "năm hoạt động của X", "năm phát hành của X", "năm sáng tác của X", "X ra mắt vào năm nào", "X debut vào năm nào"
         is_year_question = (
             ('năm' in query_lower) and
-            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'sáng tác' in query_lower)
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'sáng tác' in query_lower or 'ra mắt' in query_lower or 'debut' in query_lower) or
+            # Pattern "X debut vào năm nào" (không cần từ "năm" ở đầu)
+            ('debut' in query_lower and 'năm' in query_lower) or
+            ('debut' in query_lower and any(kw in query_lower for kw in ['vào năm', 'năm nào']))
         )
         
         if is_year_question:
             # Determine year type
             year_type = 'activity'  # default
+            extract_first_year = False  # Flag để extract năm đầu tiên từ range
             if 'phát hành' in query_lower or 'sáng tác' in query_lower:
                 year_type = 'release'
             elif 'thành lập' in query_lower:
                 year_type = 'founding'
+            elif 'ra mắt' in query_lower or 'debut' in query_lower:
+                year_type = 'activity'  # "ra mắt"/"debut" = năm hoạt động
+                extract_first_year = True  # "ra mắt"/"debut" cần lấy năm đầu tiên (ví dụ: "2016–nay" -> "2016")
             
             # 3-hop: năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện ca khúc X (Song → Artist → Group → Year)
             is_song_artist_group_year_question = (
@@ -497,17 +504,22 @@ class MultiHopReasoner:
             all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=expected_types)
             if all_entities:
                 entity = all_entities[0]
-                year = self.kg.extract_year_from_infobox(entity, year_type)
+                # Nếu là câu hỏi "ra mắt", extract năm đầu tiên từ range
+                year = self.kg.extract_year_from_infobox(entity, year_type, extract_first_year=extract_first_year)
                 if year:
                     # Format answer text based on year_type
+                    entity_display = self._normalize_entity_name(entity)
                     if year_type == 'release':
-                        answer_text = f"Năm phát hành của {entity} là: {year}"
+                        answer_text = f"Năm phát hành của {entity_display} là: {year}"
                     elif year_type == 'activity':
-                        answer_text = f"Năm hoạt động của {entity} là: {year}"
+                        if 'ra mắt' in query_lower or 'debut' in query_lower:
+                            answer_text = f"{entity_display} ra mắt vào năm {year}"
+                        else:
+                            answer_text = f"Năm hoạt động của {entity_display} là: {year}"
                     elif year_type == 'founding':
-                        answer_text = f"Năm thành lập của {entity} là: {year}"
+                        answer_text = f"Năm thành lập của {entity_display} là: {year}"
                     else:
-                        answer_text = f"Năm của {entity} là: {year}"
+                        answer_text = f"Năm của {entity_display} là: {year}"
                     
                     return ReasoningResult(
                         query=query,
@@ -1326,8 +1338,9 @@ class MultiHopReasoner:
         # SINGLE-HOP QUESTIONS (ƯU TIÊN THẤP HƠN)
         # ============================================
         
-        # 3a. Câu hỏi Yes/No về membership: "Jungkook có phải thành viên BTS không?" hoặc "BTS có thành viên V không?"
-        if any(kw in query_lower for kw in ['có phải', 'phải', 'là thành viên', 'is a member', 'belongs to', 'có thành viên']):
+        # 3a. Câu hỏi Yes/No về membership: "Jungkook có phải thành viên BTS không?" hoặc "BTS có thành viên V không?" hoặc "IU có thuộc blackpink không?"
+        # QUAN TRỌNG: Check membership questions TRƯỚC comparison để tránh nhầm lẫn
+        if any(kw in query_lower for kw in ['có phải', 'phải', 'là thành viên', 'is a member', 'belongs to', 'có thành viên', 'có thuộc']):
             # Pattern 1: "X có thành viên Y không?" (group has member)
             if 'có thành viên' in query_lower or 'has member' in query_lower:
                 # Find group entity
@@ -1412,9 +1425,11 @@ class MultiHopReasoner:
                                     explanation=f"1-hop: {member} → MEMBER_OF → {group_entity}"
                                 )
             
-            # Pattern 2: "X có phải thành viên của Y không?" (artist is member of group)
+            # Pattern 2: "X có phải thành viên của Y không?" hoặc "X có thuộc Y không?" (artist is member of group)
             # Extract artist and group names từ query với LLM fallback
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            # QUAN TRỌNG: Với "có thuộc", có thể chỉ có 1 entity (artist), cần extract group từ query
+            min_count = 1 if 'có thuộc' in query_lower else 2
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=min_count, expected_types=['Artist', 'Group'])
             
             artist_entity = None
             group_entity = None
@@ -1425,6 +1440,20 @@ class MultiHopReasoner:
                     artist_entity = entity
                 elif entity_type == 'Group' and not group_entity:
                     group_entity = entity
+            
+            # Nếu chỉ có artist và không có group, thử extract group từ query
+            if artist_entity and not group_entity:
+                # Thử extract group name từ query (sau "có thuộc" hoặc "thuộc")
+                group_extracted = self._extract_group_name_from_query(query)
+                if group_extracted:
+                    group_entity = group_extracted
+                else:
+                    # Fallback: extract tất cả entities và tìm group
+                    all_entities_fallback = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Group'])
+                    for entity in all_entities_fallback:
+                        if self.kg.get_entity_type(entity) == 'Group':
+                            group_entity = entity
+                            break
             
             if artist_entity and group_entity:
                 groups = self.kg.get_artist_groups(artist_entity)
@@ -1462,6 +1491,8 @@ class MultiHopReasoner:
                         confidence=1.0,
                         explanation=f"1-hop: {artist_entity} không có quan hệ MEMBER_OF với {group_entity}"
                     )
+            # QUAN TRỌNG: Nếu không extract được đầy đủ artist và group, KHÔNG trả lời mà để LLM xử lý
+            # (không return gì ở đây, sẽ fallback sang LLM)
         
         # 1b. Câu hỏi về thành viên: "BTS có bao nhiêu thành viên", "Thành viên của BTS", "Ai là thành viên"
         # Pattern: "Ai là thành viên", "Who are members", "thành viên của X", "members of X", "có bao nhiêu/mấy thành viên"
@@ -1613,12 +1644,106 @@ class MultiHopReasoner:
                 if entity_type == 'Album':
                     return self.get_album_producers(entity)
         
-        # 15. Câu hỏi về bài hát trong album: "Album này có bài hát nào"
-        if any(kw in query_lower for kw in ['bài hát trong album', 'songs in album', 'track trong']):
+        # 15. Câu hỏi về bài hát trong album: "Album này có bài hát nào", "kể tên bài hát có trong album X"
+        is_songs_in_album_question = (
+            (any(kw in query_lower for kw in ['bài hát trong album', 'songs in album', 'track trong', 'bài hát có trong album']) or
+             ('kể tên' in query_lower and 'bài hát' in query_lower)) and
+            'album nào' not in query_lower  # Không phải "bài hát trong album nào"
+        )
+        
+        if is_songs_in_album_question:
+            # Tìm album entity từ start_entities hoặc extract từ query
+            album_entity = None
             for entity in start_entities:
                 entity_type = self.kg.get_entity_type(entity)
                 if entity_type == 'Album':
-                    return self.get_album_songs(entity)
+                    album_entity = entity
+                    break
+            
+            # Nếu không tìm được từ start_entities, thử extract từ query
+            if not album_entity:
+                album_entity = self._extract_album_name_from_query(query)
+                if not album_entity:
+                    # Fallback: extract tất cả entities và tìm album
+                    all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Album'])
+                    for entity in all_entities:
+                        if self.kg.get_entity_type(entity) == 'Album':
+                            album_entity = entity
+                            break
+            
+            if album_entity:
+                return self.get_album_songs(album_entity)
+        
+        # 16. Câu hỏi về album chứa bài hát: "Bài hát X thuộc album nào?", "Bài hát X nằm trong album nào?", "X thuộc album nào?"
+        is_song_in_which_album_question = (
+            ('nằm trong album nào' in query_lower or 'thuộc album nào' in query_lower or 
+             'trong album nào' in query_lower or 'ở album nào' in query_lower) and
+            (('bài hát' in query_lower or 'ca khúc' in query_lower or 'bài' in query_lower) or
+             # Nếu không có từ khóa "bài hát", kiểm tra xem có extract được song entity không
+             any(self.kg.get_entity_type(e) == 'Song' for e in start_entities) if start_entities else False)
+        )
+        
+        if is_song_in_which_album_question:
+            # Extract song entity - ưu tiên dùng helper để extract chính xác tên bài hát
+            song_entity = self._extract_song_name_from_query(query)
+            
+            # Nếu helper không tìm được, dùng _extract_entities_robust
+            if not song_entity:
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                for entity in all_entities:
+                    if self.kg.get_entity_type(entity) == 'Song':
+                        song_entity = entity
+                        break
+            
+            if song_entity:
+                # Normalize song name để hiển thị sạch
+                song_display = self._normalize_entity_name(song_entity)
+                
+                # Lấy albums chứa bài hát này
+                albums = self.kg.get_song_albums(song_entity)
+                
+                if albums:
+                    # Ưu tiên album đầu tiên (hoặc có thể lấy tất cả)
+                    album = albums[0]
+                    album_display = self._normalize_entity_name(album)
+                    
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[ReasoningStep(
+                            hop_number=1,
+                            operation='get_album_from_song',
+                            source_entities=[song_entity],
+                            relationship='CONTAINS',
+                            target_entities=[album],
+                            explanation=f"Tìm album chứa bài hát {song_entity}"
+                        )],
+                        answer_entities=[album],
+                        answer_text=f"Bài hát '{song_display}' nằm trong album: {album_display}",
+                        confidence=0.95,
+                        explanation=f"1-hop: {song_entity} ← CONTAINS ← {album}"
+                    )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy thông tin về album chứa bài hát '{song_display}' trong đồ thị tri thức.",
+                        confidence=0.3,
+                        explanation=f"Không tìm thấy album nào có quan hệ CONTAINS với {song_entity}"
+                    )
+            else:
+                # Không tìm thấy song entity
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm thấy thông tin về bài hát trong câu hỏi. Vui lòng cung cấp tên bài hát cụ thể.",
+                    confidence=0.0,
+                    explanation=f"Không extract được song entity từ query: {query}"
+                )
                     
         # ============================================
         # FALLBACK - LLM-based understanding khi không có pattern khớp
@@ -1641,7 +1766,14 @@ class MultiHopReasoner:
         elif reasoning_type == ReasoningType.AGGREGATION:
             return self._aggregation_reasoning(query, start_entities, max_hops)
         elif reasoning_type == ReasoningType.COMPARISON:
-            return self._comparison_reasoning(query, start_entities)
+            # QUAN TRỌNG: Chỉ so sánh khi có đủ 2 entities, nếu không thì để LLM xử lý
+            if len(start_entities) >= 2:
+                comparison_result = self._comparison_reasoning(query, start_entities)
+                # Nếu comparison_result là None (không đủ entities), không return, để LLM xử lý
+                if comparison_result:
+                    return comparison_result
+            # Nếu không đủ entities hoặc comparison_result là None, không trả lời comparison mà để LLM xử lý
+            # (không return gì, sẽ tiếp tục fallback)
         elif reasoning_type == ReasoningType.INTERSECTION:
             return self._intersection_reasoning(query, start_entities)
         else:
@@ -2162,16 +2294,10 @@ class MultiHopReasoner:
         """
         steps = []
         
+        # QUAN TRỌNG: Kiểm tra đủ entities và đúng loại trước khi so sánh
         if len(entities) < 2:
-            return ReasoningResult(
-                query=query,
-                reasoning_type=ReasoningType.COMPARISON,
-                steps=[],
-                answer_entities=entities,
-                answer_text="Cần ít nhất 2 entities để so sánh",
-                confidence=0.0,
-                explanation="Insufficient entities for comparison"
-            )
+            # Nếu không đủ entities, return None để LLM xử lý (không trả lời sai)
+            return None
             
         entity1, entity2 = entities[0], entities[1]
         
@@ -2617,9 +2743,12 @@ class MultiHopReasoner:
         
         # Pattern để extract tên bài hát từ query - ưu tiên patterns cụ thể trước
         patterns = [
-            # Pattern với quotes
+            # Pattern với quotes - ưu tiên cao nhất
             r'bài hát\s+["\']([^"\']+)["\']',  # Bài hát "Name"
             r'ca khúc\s+["\']([^"\']+)["\']',  # Ca khúc "Name"
+            # Pattern "bài hát X thuộc album nào" - ưu tiên cao để extract chính xác
+            r'bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+(?:thuộc|nằm trong|trong|ở)\s+album)',  # Bài hát Name thuộc/nằm trong album
+            r'ca khúc\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+(?:thuộc|nằm trong|trong|ở)\s+album)',  # Ca khúc Name thuộc/nằm trong album
             # Pattern với "có ca sĩ thể hiện bài hát X" hoặc "nhóm nhạc có ca sĩ thể hiện bài hát X"
             r'có\s+ca sĩ\s+thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # có ca sĩ thể hiện bài hát Name
             r'nhóm nhạc\s+có\s+ca sĩ\s+thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # nhóm nhạc có ca sĩ thể hiện bài hát Name

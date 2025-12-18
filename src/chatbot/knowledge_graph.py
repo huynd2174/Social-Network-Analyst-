@@ -251,7 +251,7 @@ class KpopKnowledgeGraph:
         
         return None
     
-    def extract_year_from_infobox(self, entity_id: str, year_type: str = 'activity') -> Optional[str]:
+    def extract_year_from_infobox(self, entity_id: str, year_type: str = 'activity', extract_first_year: bool = False) -> Optional[str]:
         """
         Extract year information from entity infobox.
         
@@ -261,9 +261,10 @@ class KpopKnowledgeGraph:
                 - 'activity': Năm hoạt động (for groups/artists)
                 - 'release': Phát hành (for songs/albums)
                 - 'founding': Năm thành lập (for companies)
+            extract_first_year: If True, extract only the first year from range (e.g., "2016–nay" -> "2016")
         
         Returns:
-            Year string (e.g., "2013–nay", "2021", "2016–2023") or None
+            Year string (e.g., "2013–nay", "2021", "2016–2023") or first year only if extract_first_year=True
         """
         entity = self.get_entity(entity_id)
         if not entity:
@@ -286,10 +287,6 @@ class KpopKnowledgeGraph:
         if not year_str:
             return None
         
-        # Extract year from various formats:
-        # - "2013–nay" -> "2013–nay"
-        # - "10 tháng 9 năm 2021 (2021-09-10)" -> "2021"
-        # - "2016–2023" -> "2016–2023"
         import re
         # Try to extract year from date format like "10 tháng 9 năm 2021"
         year_match = re.search(r'(\d{4})', year_str)
@@ -297,6 +294,11 @@ class KpopKnowledgeGraph:
             # If it's a date format, return just the year
             if 'tháng' in year_str or 'năm' in year_str:
                 return year_match.group(1)
+            
+            # If extract_first_year is True, return only the first year from range
+            if extract_first_year:
+                return year_match.group(1)
+            
             # Otherwise return the full range
             return year_str
         
@@ -663,6 +665,44 @@ class KpopKnowledgeGraph:
                 if target_type == 'Group':
                     groups.append(target)
         return list(set(groups))  # Remove duplicates
+    
+    def get_song_albums(self, song_name: str) -> List[str]:
+        """
+        Get all albums that contain a song.
+        
+        Args:
+            song_name: Song entity ID
+            
+        Returns:
+            List of album entity IDs
+        """
+        albums = []
+        # Check in_edges: Album → CONTAINS → Song (Album is source, Song is target)
+        for source, _, data in self.graph.in_edges(song_name, data=True):
+            if self._has_relationship_type(data, 'CONTAINS'):
+                source_type = self.get_entity_type(source)
+                if source_type == 'Album':
+                    albums.append(source)
+        # Also check infobox
+        song_data = self.get_entity(song_name)
+        if song_data and song_data.get('infobox'):
+            infobox = song_data['infobox']
+            album_info = infobox.get('Tên album') or infobox.get('Album') or infobox.get('Mô tả album')
+            if album_info:
+                # Try to find album entity
+                album_entity = album_info
+                if album_entity not in albums:
+                    # Check if it exists in graph
+                    if album_entity in self.graph:
+                        albums.append(album_entity)
+                    else:
+                        # Try to find by name
+                        for node, data in self.graph.nodes(data=True):
+                            if data.get('label') == 'Album' and album_entity.lower() in node.lower():
+                                if node not in albums:
+                                    albums.append(node)
+                                break
+        return list(set(albums))  # Remove duplicates
     
     def get_album_artists(self, album_name: str) -> List[str]:
         """Get all artists that released an album."""
