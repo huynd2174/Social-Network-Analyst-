@@ -694,15 +694,20 @@ class MultiHopReasoner:
         )
         
         if is_song_artist_group_genre_question:
-            # Extract song entity từ query
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
-            song_entity = None
-            for entity in all_entities:
-                if self.kg.get_entity_type(entity) == 'Song':
-                    song_entity = entity
-                    break
+            # Extract song entity - ưu tiên dùng helper để extract chính xác tên bài hát
+            song_entity = self._extract_song_name_from_query(query)
+            
+            # Nếu helper không tìm được, dùng _extract_entities_robust
+            if not song_entity:
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                for entity in all_entities:
+                    if self.kg.get_entity_type(entity) == 'Song':
+                        song_entity = entity
+                        break
             
             if song_entity:
+                # Normalize song name để hiển thị sạch (bỏ hậu tố)
+                song_display = self._normalize_entity_name(song_entity)
                 # Bước 1: Lấy artists thể hiện bài hát này (Song → Artist)
                 artists = self.kg.get_song_artists(song_entity)
                 if artists:
@@ -760,7 +765,7 @@ class MultiHopReasoner:
                                 reasoning_type=ReasoningType.CHAIN,
                                 steps=steps,
                                 answer_entities=genres,
-                                answer_text=f"Thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity} là: {', '.join(genres_clean)}",
+                                answer_text=f"Thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_display} là: {', '.join(genres_clean)}",
                                 confidence=0.95,
                                 explanation=f"3-hop: {song_entity} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → IS_GENRE → {', '.join(genres)}"
                             )
@@ -770,7 +775,7 @@ class MultiHopReasoner:
                                 reasoning_type=ReasoningType.CHAIN,
                                 steps=steps,
                                 answer_entities=[],
-                                answer_text=f"Không tìm thấy thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_entity}",
+                                answer_text=f"Không tìm thấy thể loại của nhóm nhạc có ca sĩ thể hiện bài hát {song_display}",
                                 confidence=0.5,
                                 explanation=f"Tìm thấy nhóm nhạc {', '.join(groups[:3])} nhưng không có thông tin về thể loại"
                             )
@@ -780,7 +785,7 @@ class MultiHopReasoner:
                             reasoning_type=ReasoningType.CHAIN,
                             steps=steps,
                             answer_entities=[],
-                            answer_text=f"Không tìm thấy nhóm nhạc nào của ca sĩ đã thể hiện bài hát {song_entity}",
+                            answer_text=f"Không tìm thấy nhóm nhạc nào của ca sĩ đã thể hiện bài hát {song_display}",
                             confidence=0.4,
                             explanation=f"Tìm thấy ca sĩ {', '.join(artists[:3])} nhưng không tìm thấy nhóm nhạc"
                         )
@@ -790,7 +795,7 @@ class MultiHopReasoner:
                         reasoning_type=ReasoningType.CHAIN,
                         steps=[],
                         answer_entities=[],
-                        answer_text=f"Không tìm thấy ca sĩ nào đã thể hiện bài hát {song_entity}",
+                        answer_text=f"Không tìm thấy ca sĩ nào đã thể hiện bài hát {song_display}",
                         confidence=0.3,
                         explanation=f"Không tìm thấy ca sĩ nào có quan hệ SINGS với {song_entity}"
                     )
@@ -2410,16 +2415,16 @@ class MultiHopReasoner:
             # Pattern với quotes
             r'bài hát\s+["\']([^"\']+)["\']',  # Bài hát "Name"
             r'ca khúc\s+["\']([^"\']+)["\']',  # Ca khúc "Name"
+            # Pattern với "có ca sĩ thể hiện bài hát X" hoặc "nhóm nhạc có ca sĩ thể hiện bài hát X"
+            r'có\s+ca sĩ\s+thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # có ca sĩ thể hiện bài hát Name
+            r'nhóm nhạc\s+có\s+ca sĩ\s+thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # nhóm nhạc có ca sĩ thể hiện bài hát Name
+            # Pattern với "thể hiện bài hát"
+            r'thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể hiện bài hát Name
+            # Pattern "thể loại của nhóm nhạc có ca sĩ thể hiện ca khúc X"
+            r'thể loại\s+của\s+nhóm nhạc\s+có\s+ca sĩ\s+thể hiện\s+(?:bài hát|ca khúc)\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể loại của nhóm nhạc có ca sĩ thể hiện ca khúc Name
             # Pattern với từ khóa cụ thể sau tên bài hát
             r'bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+là\s+|$)',  # Bài hát Name là hoặc end
             r'ca khúc\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+là\s+|$)',  # Ca khúc Name là hoặc end
-            # Pattern với "thể hiện bài hát"
-            r'thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể hiện bài hát Name
-            r'thể hiện\s+ca khúc\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể hiện ca khúc Name
-            # Pattern "có ca sĩ thể hiện bài hát X"
-            r'có\s+ca sĩ\s+thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # có ca sĩ thể hiện bài hát Name
-            # Pattern "nhóm nhạc có ca sĩ thể hiện bài hát X"
-            r'nhóm nhạc\s+có\s+ca sĩ\s+thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # nhóm nhạc có ca sĩ thể hiện bài hát Name
             # Pattern tổng quát hơn - tìm từ sau "bài hát" hoặc "ca khúc" đến cuối câu hoặc đến từ khóa
             r'(?:bài hát|ca khúc)\s+([A-Z][A-Za-z0-9\s\-:\.]+?)(?:\s+(?:của|do|thuộc|là)|$)',  # Bài hát Name (của/do/thuộc/là) hoặc end
         ]

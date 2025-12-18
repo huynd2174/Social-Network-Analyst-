@@ -843,6 +843,27 @@ class KpopChatbot:
         # - Facts: từ triples (source, relationship, target) trong graph
         # - Reasoning: từ graph traversal (paths, hops)
         
+        # Nhận diện câu hỏi giới thiệu để thêm infobox đầy đủ vào context
+        intro_keywords = ['giới thiệu về', 'giới thiệu sơ lược về', 'giới thiệu ngắn gọn về']
+        is_intro_question = any(kw in query_lower for kw in intro_keywords) or (
+            ('là ai' in query_lower or 'là nhóm nhạc nào' in query_lower or 'là ca sĩ nào' in query_lower)
+            and len(context.get('entities', [])) >= 1
+        )
+        
+        # Nếu là câu hỏi giới thiệu, thêm infobox đầy đủ vào context
+        if is_intro_question and context.get('entities'):
+            main_entity_id = context['entities'][0]['id']
+            entity_data = self.kg.get_entity(main_entity_id)
+            if entity_data:
+                infobox = entity_data.get('infobox', {})
+                if infobox:
+                    # Format infobox đầy đủ thành text để LLM dễ diễn đạt
+                    infobox_text = f"\n\n=== THÔNG TIN CHI TIẾT VỀ {main_entity_id} (Infobox) ==="
+                    for key, value in infobox.items():
+                        if value:  # Chỉ hiển thị fields có giá trị
+                            infobox_text += f"\n{key}: {value}"
+                    formatted_context += infobox_text
+        
         # ✅ QUAN TRỌNG: ƯU TIÊN TẤT CẢ REASONING RESULT TRƯỚC
         # Nếu có reasoning result với answer_text → LUÔN dùng reasoning (tránh LLM hallucination)
         # Chỉ dùng LLM khi KHÔNG có reasoning result hoặc reasoning result không có answer_text
@@ -852,7 +873,11 @@ class KpopChatbot:
             len(reasoning_result.answer_text.strip()) > 0
         )
         
-        if use_reasoning_result:
+        # Nhận diện câu hỏi về năm hoạt động - có thể dùng LLM để diễn đạt lại tự nhiên hơn
+        # Nhưng thông tin vẫn từ KG (infobox và graph)
+        is_year_question_for_llm = is_year_question and use_reasoning_result
+        
+        if use_reasoning_result and not is_year_question_for_llm:
             # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
             # Reasoning is more accurate than LLM for factual checks
             # ✅ QUAN TRỌNG: LUÔN dùng reasoning result trực tiếp, KHÔNG qua LLM để tránh hallucination
@@ -862,12 +887,66 @@ class KpopChatbot:
                 if entities_str and entities_str not in response:
                     response += f"\n\nDanh sách: {entities_str}"
             # ✅ Bỏ qua LLM generation cho same_group/same_company/song-group questions để tránh trả lời sai
+        elif use_reasoning_result and is_year_question_for_llm:
+            # Câu hỏi về năm hoạt động: Dùng LLM để diễn đạt lại tự nhiên hơn
+            # Nhưng thông tin vẫn từ KG (infobox và graph)
+            history = session.get_history(max_turns=3)
+            
+            # Thêm infobox của các entities liên quan vào context (chỉ lấy thông tin về năm)
+            year_context = formatted_context
+            if reasoning_result.answer_entities:
+                for entity_id in reasoning_result.answer_entities[:3]:  # Tối đa 3 entities
+                    entity_data = self.kg.get_entity(entity_id)
+                    if entity_data:
+                        infobox = entity_data.get('infobox', {})
+                        if infobox:
+                            # Chỉ lấy năm hoạt động từ infobox
+                            year_info = infobox.get('Năm hoạt động') or infobox.get('Phát hành') or infobox.get('Năm thành lập')
+                            if year_info:
+                                entity_display = self.reasoner._normalize_entity_name(entity_id)
+                                year_context += f"\n\n=== Thông tin năm của {entity_display} (từ Infobox) ===\n"
+                                year_context += f"Năm hoạt động/phát hành/thành lập: {year_info}"
+            
+            # Prompt để LLM diễn đạt lại một cách tự nhiên, CHỈ về năm hoạt động
+            llm_query = (
+                f"Dựa trên thông tin từ Knowledge Graph trong CONTEXT bên dưới, "
+                f"hãy trả lời câu hỏi sau một cách tự nhiên và mạch lạc bằng tiếng Việt (CHỈ về năm hoạt động/phát hành/thành lập): {query}\n\n"
+                f"Thông tin từ reasoning: {reasoning_result.answer_text}\n\n"
+                f"YÊU CẦU: Chỉ trả lời về năm hoạt động/phát hành/thành lập, không thêm thông tin khác như công ty, thể loại, thành viên, v.v. "
+                f"Diễn đạt lại một cách tự nhiên nhưng giữ nguyên thông tin về năm từ Knowledge Graph."
+            )
+            
+            response = self.llm.generate(
+                llm_query,
+                context=year_context,
+                history=history
+            )
         elif self.llm and use_llm:
             # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (chỉ khi KHÔNG có reasoning result)
             history = session.get_history(max_turns=3)
+            
+            llm_query = query
+            if is_intro_question and context.get('entities'):
+                # Lấy entity chính từ context (ưu tiên entity đầu tiên)
+                main_entity = context['entities'][0]['id']
+                base_name = main_entity
+                try:
+                    # Dùng reasoner để normalize tên (bỏ hậu tố như "(nhóm nhạc)", "(ca sĩ)")
+                    base_name = self.reasoner._normalize_entity_name(main_entity)
+                except Exception:
+                    pass
+                
+                # Prompt chuyên biệt cho giới thiệu entity - yêu cầu LLM diễn đạt lại từ infobox
+                llm_query = (
+                    f"Hãy giới thiệu về thực thể K-pop '{base_name}' bằng tiếng Việt (2-4 câu). "
+                    f"Sử dụng thông tin từ phần 'Infobox' trong CONTEXT bên dưới, diễn đạt lại một cách tự nhiên, "
+                    f"không chỉ liệt kê các trường thông tin. Nếu có thông tin về năm hoạt động, thành viên, công ty, thể loại, "
+                    f"hãy kết hợp chúng thành một đoạn văn mạch lạc. Câu hỏi gốc: {query}"
+                )
+            
             response = self.llm.generate(
-                query,
-                context=formatted_context,  # Context từ GraphRAG (Knowledge Graph)
+                llm_query,
+                context=formatted_context,  # Context từ GraphRAG (Knowledge Graph) + infobox đầy đủ nếu là câu hỏi giới thiệu
                 history=history
             )
         elif context['facts']:
