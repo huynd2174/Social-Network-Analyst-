@@ -156,17 +156,17 @@ class MultiHopReasoner:
         # MULTI-HOP QUESTIONS (ƯU TIÊN CAO NHẤT)
         # ============================================
         
-        # -1. Câu hỏi về năm hoạt động (1-hop, 2-hop, 3-hop)
-        # Pattern: "năm hoạt động của X", "năm phát hành của X"
+        # -1. Câu hỏi về năm hoạt động/phát hành/sáng tác (1-hop, 2-hop, 3-hop)
+        # Pattern: "năm hoạt động của X", "năm phát hành của X", "năm sáng tác của X"
         is_year_question = (
             ('năm' in query_lower) and
-            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower)
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'sáng tác' in query_lower)
         )
         
         if is_year_question:
             # Determine year type
             year_type = 'activity'  # default
-            if 'phát hành' in query_lower:
+            if 'phát hành' in query_lower or 'sáng tác' in query_lower:
                 year_type = 'release'
             elif 'thành lập' in query_lower:
                 year_type = 'founding'
@@ -180,13 +180,16 @@ class MultiHopReasoner:
             )
             
             if is_song_artist_group_year_question:
-                # Extract song entity
-                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
-                song_entity = None
-                for entity in all_entities:
-                    if self.kg.get_entity_type(entity) == 'Song':
-                        song_entity = entity
-                        break
+                # Extract song entity - ưu tiên dùng helper để extract chính xác tên bài hát
+                song_entity = self._extract_song_name_from_query(query)
+                
+                # Nếu helper không tìm được, dùng _extract_entities_robust
+                if not song_entity:
+                    all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                    for entity in all_entities:
+                        if self.kg.get_entity_type(entity) == 'Song':
+                            song_entity = entity
+                            break
                 
                 if not song_entity:
                     # Không tìm thấy song entity
@@ -200,6 +203,9 @@ class MultiHopReasoner:
                         explanation=f"Không extract được song entity từ query: {query}"
                     )
                 
+                # Dùng tên hiển thị sạch (loại hậu tố như "(bài hát của Rosé)")
+                song_display = self._normalize_entity_name(song_entity)
+                
                 # Step 1: Get artists
                 artists = self.kg.get_song_artists(song_entity)
                 if not artists:
@@ -212,12 +218,12 @@ class MultiHopReasoner:
                             source_entities=[song_entity],
                             relationship='SINGS',
                             target_entities=[],
-                            explanation=f"Không tìm thấy ca sĩ nào đã thể hiện {song_entity}"
+                            explanation=f"Không tìm thấy ca sĩ nào đã thể hiện {song_display}"
                         )],
                         answer_entities=[],
-                        answer_text=f"Không tìm thấy thông tin về ca sĩ đã thể hiện bài hát {song_entity} trong đồ thị tri thức.",
+                        answer_text=f"Không tìm thấy thông tin về ca sĩ đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
                         confidence=0.0,
-                        explanation=f"1-hop: {song_entity} không có quan hệ SINGS với Artist nào"
+                        explanation=f"1-hop: {song_display} không có quan hệ SINGS với Artist nào"
                     )
                 
                 steps = []
@@ -227,7 +233,7 @@ class MultiHopReasoner:
                     source_entities=[song_entity],
                     relationship='SINGS',
                     target_entities=artists,
-                    explanation=f"Lấy các ca sĩ đã thể hiện {song_entity}"
+                    explanation=f"Lấy các ca sĩ đã thể hiện {song_display}"
                 ))
                 
                 # Step 2: Get groups
@@ -252,7 +258,7 @@ class MultiHopReasoner:
                         reasoning_type=ReasoningType.CHAIN,
                         steps=steps,
                         answer_entities=[],
-                        answer_text=f"Không tìm thấy thông tin về nhóm nhạc của các ca sĩ đã thể hiện bài hát {song_entity} trong đồ thị tri thức.",
+                        answer_text=f"Không tìm thấy thông tin về nhóm nhạc của các ca sĩ đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
                         confidence=0.0,
                         explanation=f"2-hop: Các ca sĩ {', '.join(artists[:3])} không có quan hệ MEMBER_OF với nhóm nhạc nào"
                     )
@@ -270,7 +276,7 @@ class MultiHopReasoner:
                         reasoning_type=ReasoningType.CHAIN,
                         steps=steps,
                         answer_entities=groups,
-                        answer_text=f"Không tìm thấy thông tin về năm hoạt động của các nhóm nhạc ({', '.join(groups[:3])}) đã thể hiện bài hát {song_entity} trong đồ thị tri thức.",
+                        answer_text=f"Không tìm thấy thông tin về năm hoạt động của các nhóm nhạc ({', '.join(groups[:3])}) đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
                         confidence=0.3,
                         explanation=f"3-hop: Tìm thấy nhóm nhạc {', '.join(groups[:3])} nhưng không có thông tin năm hoạt động trong infobox"
                     )
@@ -282,9 +288,9 @@ class MultiHopReasoner:
                     reasoning_type=ReasoningType.CHAIN,
                     steps=steps,
                     answer_entities=[group for group, _ in years],
-                    answer_text=f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_entity} là: {', '.join([year for _, year in years])}",
+                    answer_text=f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_display} là: {', '.join([year for _, year in years])}",
                     confidence=0.95,
-                    explanation=f"3-hop: {song_entity} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → Year"
+                    explanation=f"3-hop: {song_display} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → Year"
                 )
             
             # 2-hop: năm hoạt động của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Year)
@@ -296,13 +302,16 @@ class MultiHopReasoner:
             )
             
             if is_song_group_year_question:
-                # Extract song entity
-                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
-                song_entity = None
-                for entity in all_entities:
-                    if self.kg.get_entity_type(entity) == 'Song':
-                        song_entity = entity
-                        break
+                # Extract song entity - ưu tiên dùng helper để extract chính xác tên bài hát
+                song_entity = self._extract_song_name_from_query(query)
+                
+                # Nếu helper không tìm được, dùng _extract_entities_robust
+                if not song_entity:
+                    all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                    for entity in all_entities:
+                        if self.kg.get_entity_type(entity) == 'Song':
+                            song_entity = entity
+                            break
                 
                 if not song_entity:
                     return ReasoningResult(
@@ -314,6 +323,9 @@ class MultiHopReasoner:
                         confidence=0.0,
                         explanation=f"Không extract được song entity từ query: {query}"
                     )
+                
+                # Dùng tên hiển thị sạch cho bài hát
+                song_display = self._normalize_entity_name(song_entity)
                 
                 # Step 1: Get groups
                 groups = self.kg.get_song_groups(song_entity)
@@ -327,12 +339,12 @@ class MultiHopReasoner:
                             source_entities=[song_entity],
                             relationship='SINGS',
                             target_entities=[],
-                            explanation=f"Không tìm thấy nhóm nhạc nào đã thể hiện {song_entity}"
+                            explanation=f"Không tìm thấy nhóm nhạc nào đã thể hiện {song_display}"
                         )],
                         answer_entities=[],
-                        answer_text=f"Không tìm thấy thông tin về nhóm nhạc đã thể hiện bài hát {song_entity} trong đồ thị tri thức.",
+                        answer_text=f"Không tìm thấy thông tin về nhóm nhạc đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
                         confidence=0.0,
-                        explanation=f"1-hop: {song_entity} không có quan hệ SINGS với Group nào"
+                        explanation=f"1-hop: {song_display} không có quan hệ SINGS với Group nào"
                     )
                 
                 steps = []
@@ -342,7 +354,7 @@ class MultiHopReasoner:
                     source_entities=[song_entity],
                     relationship='SINGS',
                     target_entities=groups,
-                    explanation=f"Lấy các nhóm nhạc đã thể hiện {song_entity}"
+                    explanation=f"Lấy các nhóm nhạc đã thể hiện {song_display}"
                 ))
                 
                 # Step 2: Get year from groups
@@ -358,7 +370,7 @@ class MultiHopReasoner:
                         reasoning_type=ReasoningType.CHAIN,
                         steps=steps,
                         answer_entities=groups,
-                        answer_text=f"Không tìm thấy thông tin về năm hoạt động của các nhóm nhạc ({', '.join(groups[:3])}) đã thể hiện bài hát {song_entity} trong đồ thị tri thức.",
+                        answer_text=f"Không tìm thấy thông tin về năm hoạt động của các nhóm nhạc ({', '.join(groups[:3])}) đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
                         confidence=0.3,
                         explanation=f"2-hop: Tìm thấy nhóm nhạc {', '.join(groups[:3])} nhưng không có thông tin năm hoạt động trong infobox"
                     )
@@ -368,9 +380,103 @@ class MultiHopReasoner:
                     reasoning_type=ReasoningType.CHAIN,
                     steps=steps,
                     answer_entities=[group for group, _ in years],
-                    answer_text=f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_entity} là: {', '.join([year for _, year in years])}",
+                    answer_text=f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_display} là: {', '.join([year for _, year in years])}",
                     confidence=0.95,
-                    explanation=f"2-hop: {song_entity} → SINGS → {', '.join(groups[:3])} → Year"
+                    explanation=f"2-hop: {song_display} → SINGS → {', '.join(groups[:3])} → Year"
+                )
+            
+            # 2-hop: năm hoạt động của ca sĩ thể hiện bài hát X (Song → Artist → Year)
+            is_song_artist_year_question = (
+                ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+                ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower) and
+                ('thể hiện' in query_lower or 'trình bày' in query_lower or 'hát' in query_lower) and
+                not ('nhóm nhạc' in query_lower or 'nhóm' in query_lower)  # Không phải 3-hop (song-artist-group-year)
+            )
+            
+            if is_song_artist_year_question:
+                # Extract song entity - ưu tiên dùng helper để extract chính xác tên bài hát
+                song_entity = self._extract_song_name_from_query(query)
+                
+                # Nếu helper không tìm được, dùng _extract_entities_robust
+                if not song_entity:
+                    all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Song'])
+                    for entity in all_entities:
+                        if self.kg.get_entity_type(entity) == 'Song':
+                            song_entity = entity
+                            break
+                
+                if not song_entity:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy thông tin về bài hát trong câu hỏi. Vui lòng cung cấp tên bài hát cụ thể.",
+                        confidence=0.0,
+                        explanation=f"Không extract được song entity từ query: {query}"
+                    )
+                
+                # Dùng tên hiển thị sạch cho bài hát
+                song_display = self._normalize_entity_name(song_entity)
+                
+                # Step 1: Get artists
+                artists = self.kg.get_song_artists(song_entity)
+                if not artists:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=[ReasoningStep(
+                            hop_number=1,
+                            operation='get_artists_from_song',
+                            source_entities=[song_entity],
+                            relationship='SINGS',
+                            target_entities=[],
+                            explanation=f"Không tìm thấy ca sĩ nào đã thể hiện {song_display}"
+                        )],
+                        answer_entities=[],
+                        answer_text=f"Không tìm thấy thông tin về ca sĩ đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
+                        confidence=0.0,
+                        explanation=f"1-hop: {song_display} không có quan hệ SINGS với Artist nào"
+                    )
+                
+                steps = []
+                steps.append(ReasoningStep(
+                    hop_number=1,
+                    operation='get_artists_from_song',
+                    source_entities=[song_entity],
+                    relationship='SINGS',
+                    target_entities=artists,
+                    explanation=f"Lấy các ca sĩ đã thể hiện {song_display}"
+                ))
+                
+                # Step 2: Get year from artists
+                years = []
+                for artist in artists:
+                    year = self.kg.extract_year_from_infobox(artist, year_type)
+                    if year:
+                        years.append((artist, year))
+                
+                if not years:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.CHAIN,
+                        steps=steps,
+                        answer_entities=artists,
+                        answer_text=f"Không tìm thấy thông tin về năm hoạt động của ca sĩ ({', '.join(artists[:3])}) đã thể hiện bài hát {song_display} trong đồ thị tri thức.",
+                        confidence=0.3,
+                        explanation=f"2-hop: Tìm thấy ca sĩ {', '.join(artists[:3])} nhưng không có thông tin năm hoạt động trong infobox"
+                    )
+                
+                # Format answer
+                year_info = [f"{artist}: {year}" for artist, year in years]
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.CHAIN,
+                    steps=steps,
+                    answer_entities=[artist for artist, _ in years],
+                    answer_text=f"Năm hoạt động của ca sĩ thể hiện bài hát {song_display} là: {', '.join([year for _, year in years])}",
+                    confidence=0.95,
+                    explanation=f"2-hop: {song_display} → SINGS → {', '.join(artists[:3])} → Year"
                 )
             
             # 1-hop: năm hoạt động/phát hành của X (direct)
@@ -2291,6 +2397,69 @@ class MultiHopReasoner:
                     normalized_seen.add(normalized)
         
         return all_entities
+    
+    def _extract_song_name_from_query(self, query: str) -> Optional[str]:
+        """
+        Extract song name from query for song-related questions.
+        Returns the song name if found in Knowledge Graph, None otherwise.
+        """
+        import re
+        
+        # Pattern để extract tên bài hát từ query - ưu tiên patterns cụ thể trước
+        patterns = [
+            # Pattern với quotes
+            r'bài hát\s+["\']([^"\']+)["\']',  # Bài hát "Name"
+            r'ca khúc\s+["\']([^"\']+)["\']',  # Ca khúc "Name"
+            # Pattern với từ khóa cụ thể sau tên bài hát
+            r'bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+là\s+|$)',  # Bài hát Name là hoặc end
+            r'ca khúc\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+là\s+|$)',  # Ca khúc Name là hoặc end
+            # Pattern với "thể hiện bài hát"
+            r'thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể hiện bài hát Name
+            r'thể hiện\s+ca khúc\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # thể hiện ca khúc Name
+            # Pattern "có ca sĩ thể hiện bài hát X"
+            r'có\s+ca sĩ\s+thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # có ca sĩ thể hiện bài hát Name
+            # Pattern "nhóm nhạc có ca sĩ thể hiện bài hát X"
+            r'nhóm nhạc\s+có\s+ca sĩ\s+thể hiện\s+bài hát\s+([A-Za-z0-9][A-Za-z0-9\s\-:\.]+?)(?:\s+|$)',  # nhóm nhạc có ca sĩ thể hiện bài hát Name
+            # Pattern tổng quát hơn - tìm từ sau "bài hát" hoặc "ca khúc" đến cuối câu hoặc đến từ khóa
+            r'(?:bài hát|ca khúc)\s+([A-Z][A-Za-z0-9\s\-:\.]+?)(?:\s+(?:của|do|thuộc|là)|$)',  # Bài hát Name (của/do/thuộc/là) hoặc end
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                song_name = match.group(1).strip().rstrip('.,;:!?').strip()
+                if not song_name:
+                    continue
+                    
+                # Thử tìm trong KG với các biến thể
+                variants = [
+                    song_name,
+                    song_name + " (bài hát)",
+                    song_name.replace(":", " -"),
+                    song_name.replace(" - ", ": "),
+                ]
+                for variant in variants:
+                    entity_data = self.kg.get_entity(variant)
+                    if entity_data and entity_data.get('label') == 'Song':
+                        return variant
+                
+                # Thử tìm case-insensitive với normalize
+                song_name_lower = self._normalize_entity_name(song_name).lower()
+                for node, data in self.kg.graph.nodes(data=True):
+                    if data.get('label') == 'Song':
+                        base_name = self._normalize_entity_name(node)
+                        base_name_lower = base_name.lower()
+                        # Exact match hoặc starts with
+                        if base_name_lower == song_name_lower or base_name_lower.startswith(song_name_lower):
+                            # Ưu tiên exact match
+                            if base_name_lower == song_name_lower:
+                                return node
+                            # Nếu không có exact match, giữ lại để kiểm tra tiếp
+                            elif not any(self._normalize_entity_name(n).lower() == song_name_lower 
+                                       for n, d in self.kg.graph.nodes(data=True) if d.get('label') == 'Song'):
+                                return node
+        
+        return None
     
     def _extract_entities_from_query(self, query: str, expected_types: Optional[List[str]] = None) -> List[str]:
         """
