@@ -905,54 +905,74 @@ class KpopChatbot:
             not is_intro_question  # Câu hỏi giới thiệu LUÔN dùng LLM
         )
         
-        # Nhận diện câu hỏi về năm hoạt động - có thể dùng LLM để diễn đạt lại tự nhiên hơn
-        # Nhưng thông tin vẫn từ KG (infobox và graph)
-        is_year_question_for_llm = is_year_question and use_reasoning_result
-        
-        if use_reasoning_result and not is_year_question_for_llm:
-            # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
+        # ✅ QUAN TRỌNG: Câu hỏi về năm hoạt động/phát hành/thành lập → DÙNG REASONING RESULT TRỰC TIẾP
+        # KHÔNG dùng LLM để tránh trả lời sai/chán
+        # Reasoning result đã được format chuẩn từ multi_hop_reasoning.py
+        if use_reasoning_result:
+            # For membership/same group/same company/year questions, ALWAYS prioritize reasoning result if available
             # Reasoning is more accurate than LLM for factual checks
             # ✅ QUAN TRỌNG: LUÔN dùng reasoning result trực tiếp, KHÔNG qua LLM để tránh hallucination
             response = reasoning_result.answer_text
+            
+            # Chuẩn hóa answer text cho year questions để đảm bảo format phù hợp với câu hỏi
+            # Đảm bảo entity name được normalize (bỏ suffix như "(nhóm nhạc)", "(ca sĩ)")
+            if is_year_question and reasoning_result.answer_text and reasoning_result.answer_entities:
+                query_lower_for_normalize = query.lower()
+                
+                # Normalize entity names trong answer text nếu cần
+                for entity in reasoning_result.answer_entities:
+                    entity_display = self.reasoner._normalize_entity_name(entity)
+                    # Thay thế entity ID bằng entity_display nếu entity ID xuất hiện trong answer text
+                    if entity != entity_display and entity in response:
+                        response = response.replace(entity, entity_display)
+                
+                # Đảm bảo format phù hợp với câu hỏi về debut/ra mắt
+                # Nếu câu hỏi là "debut" hoặc "ra mắt" nhưng answer text không có format đúng, chuẩn hóa lại
+                if ('debut' in query_lower_for_normalize or 'ra mắt' in query_lower_for_normalize):
+                    answer_text_lower = response.lower()
+                    # Kiểm tra xem answer text đã có format "ra mắt vào năm" chưa
+                    if 'ra mắt vào năm' not in answer_text_lower and 'debut' not in answer_text_lower:
+                        # Tìm năm trong answer text và format lại
+                        import re
+                        year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
+                        if year_match and reasoning_result.answer_entities:
+                            entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
+                            # Format: "X ra mắt vào năm Y"
+                            response = f"{entity_display} ra mắt vào năm {year_match.group(0)}"
+                        # Tìm năm trong answer text và entity để format lại
+                        import re
+                        year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
+                        if year_match and reasoning_result.answer_entities:
+                            entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
+                            # Extract năm đầu tiên nếu là range (ví dụ: "2016–nay" -> "2016")
+                            year_str = year_match.group(0)
+                            if '–' in year_str or '-' in year_str:
+                                year_str = year_str.split('–')[0].split('-')[0]
+                            response = f"{entity_display} ra mắt vào năm {year_str}"
+                    # Nếu đã có format nhưng entity name chưa được normalize, normalize lại
+                    elif 'ra mắt vào năm' in answer_text_lower and reasoning_result.answer_entities:
+                        # Đảm bảo entity name được normalize
+                        entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
+                        # Nếu entity ID (có suffix) xuất hiện trong response, thay thế bằng normalized name
+                        if reasoning_result.answer_entities[0] != entity_display and reasoning_result.answer_entities[0] in response:
+                            response = response.replace(reasoning_result.answer_entities[0], entity_display)
+                            # Đảm bảo format là "X ra mắt vào năm Y"
+                            if 'ra mắt vào năm' not in response.lower():
+                                response = f"{entity_display} ra mắt vào năm {year_match.group(0)}"
+                elif 'năm hoạt động' in query_lower_for_normalize:
+                    # Câu hỏi về năm hoạt động → Format: "Năm hoạt động của X là: Y"
+                    if reasoning_result.answer_entities:
+                        entity_display = self.reasoner._normalize_entity_name(reasoning_result.answer_entities[0])
+                        import re
+                        year_match = re.search(r'\b(19|20)\d{2}(?:[–-]nay|[–-]\d{4})?\b', response)
+                        if year_match and 'năm hoạt động' not in response.lower():
+                            response = f"Năm hoạt động của {entity_display} là: {year_match.group(0)}"
+            
             if reasoning_result.answer_entities:
                 entities_str = ", ".join(reasoning_result.answer_entities[:10])
                 if entities_str and entities_str not in response:
                     response += f"\n\nDanh sách: {entities_str}"
-            # ✅ Bỏ qua LLM generation cho same_group/same_company/song-group questions để tránh trả lời sai
-        elif use_reasoning_result and is_year_question_for_llm:
-            # Câu hỏi về năm hoạt động: Dùng LLM để diễn đạt lại tự nhiên hơn
-            # Nhưng thông tin vẫn từ KG (infobox và graph)
-            history = session.get_history(max_turns=3)
-            
-            # Thêm infobox của các entities liên quan vào context (chỉ lấy thông tin về năm)
-            year_context = formatted_context
-            if reasoning_result.answer_entities:
-                for entity_id in reasoning_result.answer_entities[:3]:  # Tối đa 3 entities
-                    entity_data = self.kg.get_entity(entity_id)
-                    if entity_data:
-                        infobox = entity_data.get('infobox', {})
-                        if infobox:
-                            # Chỉ lấy năm hoạt động từ infobox
-                            year_info = infobox.get('Năm hoạt động') or infobox.get('Phát hành') or infobox.get('Năm thành lập')
-                            if year_info:
-                                entity_display = self.reasoner._normalize_entity_name(entity_id)
-                                year_context += f"\n\n=== Thông tin năm của {entity_display} (từ Infobox) ===\n"
-                                year_context += f"Năm hoạt động/phát hành/thành lập: {year_info}"
-            
-            # Prompt để LLM diễn đạt lại một cách tự nhiên, CHỈ về năm hoạt động
-            llm_query = (
-                f"Dựa trên thông tin từ Knowledge Graph trong CONTEXT bên dưới, "
-                f"hãy trả lời câu hỏi sau một cách tự nhiên và mạch lạc bằng tiếng Việt (CHỈ về năm hoạt động/phát hành/thành lập): {query}\n\n"
-                f"Thông tin từ reasoning: {reasoning_result.answer_text}\n\n"
-                f"YÊU CẦU: Chỉ trả lời về năm hoạt động/phát hành/thành lập, không thêm thông tin khác như công ty, thể loại, thành viên, v.v. "
-                f"Diễn đạt lại một cách tự nhiên nhưng giữ nguyên thông tin về năm từ Knowledge Graph."
-            )
-            
-            response = self.llm.generate(
-                llm_query,
-                context=year_context,
-                history=history
-            )
+            # ✅ Bỏ qua LLM generation cho tất cả factual questions (same_group/same_company/year questions) để tránh trả lời sai
         elif self.llm and use_llm:
             # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (chỉ khi KHÔNG có reasoning result)
             history = session.get_history(max_turns=3)
@@ -976,41 +996,70 @@ class KpopChatbot:
                     infobox = entity_data.get('infobox', {})
                     if infobox:
                         # Tạo context CHỈ chứa infobox, KHÔNG có facts/relationships khác
-                        infobox_text = f"=== THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox) ===\n"
-                        infobox_text += "(Đây là THÔNG TIN DUY NHẤT bạn được phép sử dụng để trả lời câu hỏi giới thiệu)\n\n"
+                        # Format rất rõ ràng với warnings nghiêm ngặt
+                        infobox_text = f"⚠️⚠️⚠️ CẢNH BÁO QUAN TRỌNG ⚠️⚠️⚠️\n"
+                        infobox_text += f"ĐÂY LÀ THÔNG TIN DUY NHẤT BẠN ĐƯỢC PHÉP SỬ DỤNG.\n"
+                        infobox_text += f"KHÔNG ĐƯỢC SỬ DỤNG BẤT KỲ KIẾN THỨC NÀO KHÁC TỪ TRAINING DATA.\n"
+                        infobox_text += f"KHÔNG ĐƯỢC BỊA THÊM THÔNG TIN KHÔNG CÓ TRONG INFOBOX DƯỚI ĐÂY.\n\n"
+                        infobox_text += f"=== THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox) ===\n\n"
                         for key, value in infobox.items():
                             if value:  # Chỉ hiển thị fields có giá trị
                                 infobox_text += f"{key}: {value}\n"
-                        infobox_text += "\n=== HẾT THÔNG TIN INFOBOX ===\n"
-                        infobox_text += "\nQUAN TRỌNG: CHỈ sử dụng thông tin từ phần Infobox ở trên. KHÔNG sử dụng bất kỳ thông tin nào khác."
+                        infobox_text += f"\n=== HẾT THÔNG TIN INFOBOX ===\n\n"
+                        infobox_text += f"⚠️ LƯU Ý CUỐI CÙNG:\n"
+                        infobox_text += f"- Nếu một trường không có trong infobox → KHÔNG được đề cập đến\n"
+                        infobox_text += f"- Nếu không có thông tin về bài hát → KHÔNG được liệt kê bài hát\n"
+                        infobox_text += f"- Nếu không có thông tin về album → KHÔNG được liệt kê album\n"
+                        infobox_text += f"- Nếu không có thông tin về thành viên → KHÔNG được liệt kê thành viên\n"
+                        infobox_text += f"- CHỈ diễn đạt lại những gì CÓ TRONG INFOBOX ở trên\n"
                         infobox_only_context = infobox_text
                 
                 # Prompt chuyên biệt cho giới thiệu entity - yêu cầu LLM diễn đạt lại từ infobox
                 # QUAN TRỌNG: LLM PHẢI sử dụng THÔNG TIN TỪ INFOBOX, KHÔNG được bịa thêm
                 llm_query = (
                     f"Bạn được yêu cầu giới thiệu về thực thể K-pop '{base_name}' bằng tiếng Việt.\n\n"
-                    f"QUY TẮC NGHIÊM NGẶT:\n"
-                    f"- CHỈ được sử dụng thông tin từ phần 'Infobox' được cung cấp trong CONTEXT bên dưới\n"
-                    f"- KHÔNG được sử dụng kiến thức từ training data của bạn\n"
-                    f"- KHÔNG được bịa thêm tên thành viên, bài hát, album, công ty KHÔNG có trong infobox\n"
-                    f"- Nếu infobox không có thông tin về thành viên → KHÔNG được liệt kê thành viên\n"
-                    f"- Nếu infobox không có thông tin về bài hát/album → KHÔNG được liệt kê bài hát/album\n"
-                    f"- Nếu infobox ít thông tin → giới thiệu ngắn gọn dựa trên những gì có, KHÔNG bịa thêm\n\n"
+                    f"QUY TẮC NGHIÊM NGẶT - ĐỌC KỸ:\n"
+                    f"1. CHỈ được sử dụng thông tin từ phần 'Infobox' được cung cấp trong CONTEXT bên dưới\n"
+                    f"2. KHÔNG được sử dụng kiến thức từ training data của bạn\n"
+                    f"3. KHÔNG được bịa thêm tên thành viên, bài hát, album, công ty KHÔNG có trong infobox\n"
+                    f"4. Nếu infobox không có thông tin về thành viên → KHÔNG được liệt kê thành viên\n"
+                    f"5. Nếu infobox không có thông tin về bài hát/album → KHÔNG được liệt kê bài hát/album\n"
+                    f"6. Nếu infobox ít thông tin → giới thiệu ngắn gọn dựa trên những gì có, KHÔNG bịa thêm\n"
+                    f"7. Nếu không chắc chắn thông tin có trong infobox → KHÔNG được đề cập đến\n\n"
                     f"YÊU CẦU:\n"
                     f"- Diễn đạt lại thông tin từ infobox một cách tự nhiên, mạch lạc (2-4 câu)\n"
                     f"- Kết hợp các thông tin có trong infobox như: năm hoạt động/thành lập, công ty/hãng đĩa, thể loại, thành viên (CHỈ nếu có trong infobox)\n"
                     f"- Tạo thành một đoạn văn giới thiệu hoàn chỉnh, dễ đọc\n\n"
-                    f"Câu hỏi: {query}"
+                    f"Câu hỏi: {query}\n\n"
+                    f"Hãy viết giới thiệu CHỈ dựa trên thông tin infobox được cung cấp:"
                 )
             
             # Với câu hỏi giới thiệu, CHỈ gửi infobox context, KHÔNG gửi formatted_context có chứa facts/relationships
             intro_context = infobox_only_context if infobox_only_context else formatted_context
             
-            response = self.llm.generate(
-                llm_query,
-                context=intro_context,  # CHỈ gửi infobox context để tránh LLM bịa thêm từ facts/relationships
-                history=history
-            )
+            # Override system prompt cho intro questions để nhấn mạnh hơn
+            original_system_prompt = self.llm.system_prompt
+            intro_system_prompt = """Bạn là trợ lý AI chuyên về K-pop.
+
+QUY TẮC NGHIÊM NGẶT:
+- CHỈ sử dụng thông tin từ phần Infobox được cung cấp trong CONTEXT
+- KHÔNG được sử dụng kiến thức từ training data
+- KHÔNG được bịa thêm thông tin không có trong Infobox
+- Nếu một trường không có trong Infobox → KHÔNG được đề cập đến
+- Trả lời ngắn gọn, chính xác, chỉ dựa trên Infobox được cung cấp"""
+            
+            # Tạm thời override system prompt
+            self.llm.system_prompt = intro_system_prompt
+            
+            try:
+                response = self.llm.generate(
+                    llm_query,
+                    context=intro_context,  # CHỈ gửi infobox context để tránh LLM bịa thêm từ facts/relationships
+                    history=history
+                )
+            finally:
+                # Khôi phục system prompt gốc
+                self.llm.system_prompt = original_system_prompt
         elif context['facts']:
             # Fallback: Dùng facts từ Knowledge Graph
             response = "Dựa trên đồ thị tri thức:\n" + "\n".join(f"• {f}" for f in context['facts'][:5])

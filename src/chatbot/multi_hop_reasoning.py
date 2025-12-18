@@ -288,14 +288,44 @@ class MultiHopReasoner:
                         explanation=f"3-hop: Tìm thấy nhóm nhạc {', '.join(groups[:3])} nhưng không có thông tin năm hoạt động trong infobox"
                     )
                 
-                # Format answer
-                year_info = [f"{group}: {year}" for group, year in years]
+                # Format answer - chuẩn hóa format dựa trên query
+                if 'ra mắt' in query_lower or 'debut' in query_lower:
+                    # Format cho câu hỏi về ra mắt/debut
+                    if len(years) == 1:
+                        group_display = self._normalize_entity_name(years[0][0])
+                        year_str = years[0][1]
+                        # Extract năm đầu tiên nếu là range
+                        if '–' in year_str or '-' in year_str:
+                            year_str = year_str.split('–')[0].split('-')[0]
+                        answer_text = f"{group_display} ra mắt vào năm {year_str}"
+                    else:
+                        # Nhiều nhóm → format: "Nhóm X ra mắt vào năm Y; Nhóm Z ra mắt vào năm W"
+                        group_year_pairs = []
+                        for group, year in years:
+                            group_display = self._normalize_entity_name(group)
+                            year_str = year.split('–')[0].split('-')[0] if ('–' in year or '-' in year) else year
+                            group_year_pairs.append(f"{group_display} ra mắt vào năm {year_str}")
+                        answer_text = '; '.join(group_year_pairs)
+                else:
+                    # Format năm thành ngôn ngữ tự nhiên và ngăn cách rõ ràng
+                    if len(years) == 1:
+                        year_formatted = self._format_year_natural(years[0][1])
+                        answer_text = f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_display} là: {year_formatted}"
+                    else:
+                        # Nhiều nhóm → format: "Nhóm X: từ Y đến nay; Nhóm Z: từ W đến nay"
+                        group_year_pairs = []
+                        for group, year in years:
+                            group_display = self._normalize_entity_name(group)
+                            year_formatted = self._format_year_natural(year)
+                            group_year_pairs.append(f"{group_display}: {year_formatted}")
+                        answer_text = f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_display} là: {'; '.join(group_year_pairs)}"
+                
                 return ReasoningResult(
                     query=query,
                     reasoning_type=ReasoningType.CHAIN,
                     steps=steps,
                     answer_entities=[group for group, _ in years],
-                    answer_text=f"Năm hoạt động của nhóm nhạc có ca sĩ đã thể hiện bài hát {song_display} là: {', '.join([year for _, year in years])}",
+                    answer_text=answer_text,
                     confidence=0.95,
                     explanation=f"3-hop: {song_display} → SINGS → {', '.join(artists[:3])} → MEMBER_OF → {', '.join(groups[:3])} → Year"
                 )
@@ -387,7 +417,18 @@ class MultiHopReasoner:
                     reasoning_type=ReasoningType.CHAIN,
                     steps=steps,
                     answer_entities=[group for group, _ in years],
-                    answer_text=f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_display} là: {', '.join([year for _, year in years])}",
+                    # Format năm thành ngôn ngữ tự nhiên và ngăn cách rõ ràng
+                    if len(years) == 1:
+                        year_formatted = self._format_year_natural(years[0][1])
+                        answer_text = f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_display} là: {year_formatted}"
+                    else:
+                        # Nhiều nhóm → format: "Nhóm X: năm Y; Nhóm Z: năm W"
+                        group_year_pairs = []
+                        for group, year in years:
+                            group_display = self._normalize_entity_name(group)
+                            year_formatted = self._format_year_natural(year)
+                            group_year_pairs.append(f"{group_display}: {year_formatted}")
+                        answer_text = f"Năm hoạt động của nhóm nhạc đã thể hiện ca khúc {song_display} là: {'; '.join(group_year_pairs)}"
                     confidence=0.95,
                     explanation=f"2-hop: {song_display} → SINGS → {', '.join(groups[:3])} → Year"
                 )
@@ -481,7 +522,18 @@ class MultiHopReasoner:
                     reasoning_type=ReasoningType.CHAIN,
                     steps=steps,
                     answer_entities=[artist for artist, _ in years],
-                    answer_text=f"Năm hoạt động của ca sĩ thể hiện bài hát {song_display} là: {', '.join([year for _, year in years])}",
+                    # Format năm thành ngôn ngữ tự nhiên và ngăn cách rõ ràng
+                    year_list = [self._format_year_natural(year) for _, year in years]
+                    if len(years) == 1:
+                        answer_text = f"Năm hoạt động của ca sĩ thể hiện bài hát {song_display} là: {year_list[0]}"
+                    else:
+                        # Nhiều ca sĩ → format: "Ca sĩ X: năm Y; Ca sĩ Z: năm W"
+                        artist_year_pairs = []
+                        for artist, year in years:
+                            artist_display = self._normalize_entity_name(artist)
+                            year_formatted = self._format_year_natural(year)
+                            artist_year_pairs.append(f"{artist_display}: {year_formatted}")
+                        answer_text = f"Năm hoạt động của ca sĩ thể hiện bài hát {song_display} là: {'; '.join(artist_year_pairs)}"
                     confidence=0.95,
                     explanation=f"2-hop: {song_display} → SINGS → {', '.join(artists[:3])} → Year"
                 )
@@ -507,19 +559,27 @@ class MultiHopReasoner:
                 # Nếu là câu hỏi "ra mắt", extract năm đầu tiên từ range
                 year = self.kg.extract_year_from_infobox(entity, year_type, extract_first_year=extract_first_year)
                 if year:
+                    # Format year thành ngôn ngữ tự nhiên (trừ khi là debut/ra mắt)
+                    if 'ra mắt' in query_lower or 'debut' in query_lower:
+                        # Với "ra mắt"/"debut", chỉ lấy năm đầu tiên, không format "từ...đến"
+                        year_formatted = year.split('–')[0].split('-')[0] if ('–' in year or '-' in year) else year
+                    else:
+                        # Format năm thành ngôn ngữ tự nhiên (ví dụ: "2016–nay" → "từ 2016 đến nay")
+                        year_formatted = self._format_year_natural(year)
+                    
                     # Format answer text based on year_type
                     entity_display = self._normalize_entity_name(entity)
                     if year_type == 'release':
-                        answer_text = f"Năm phát hành của {entity_display} là: {year}"
+                        answer_text = f"Năm phát hành của {entity_display} là: {year_formatted}"
                     elif year_type == 'activity':
                         if 'ra mắt' in query_lower or 'debut' in query_lower:
-                            answer_text = f"{entity_display} ra mắt vào năm {year}"
+                            answer_text = f"{entity_display} ra mắt vào năm {year_formatted}"
                         else:
-                            answer_text = f"Năm hoạt động của {entity_display} là: {year}"
+                            answer_text = f"Năm hoạt động của {entity_display} là: {year_formatted}"
                     elif year_type == 'founding':
-                        answer_text = f"Năm thành lập của {entity_display} là: {year}"
+                        answer_text = f"Năm thành lập của {entity_display} là: {year_formatted}"
                     else:
-                        answer_text = f"Năm của {entity_display} là: {year}"
+                        answer_text = f"Năm của {entity_display} là: {year_formatted}"
                     
                     return ReasoningResult(
                         query=query,
@@ -3655,6 +3715,48 @@ class MultiHopReasoner:
         # Remove suffixes trong parentheses
         normalized = re.sub(r'\s*\([^)]+\)\s*$', '', entity_name)
         return normalized.strip()
+    
+    def _format_year_natural(self, year_str: str) -> str:
+        """
+        Format year string thành ngôn ngữ tự nhiên hơn.
+        
+        Ví dụ:
+        - "2016–nay" → "từ 2016 đến nay"
+        - "2013–2023" → "từ 2013 đến 2023"
+        - "2019" → "2019"
+        
+        Args:
+            year_str: Year string từ infobox (có thể là range)
+            
+        Returns:
+            Formatted year string
+        """
+        if not year_str:
+            return year_str
+        
+        # Kiểm tra range với "–" hoặc "-"
+        if '–' in year_str:
+            parts = year_str.split('–', 1)
+            start = parts[0].strip()
+            end = parts[1].strip() if len(parts) > 1 else ""
+            if end.lower() == 'nay':
+                return f"từ {start} đến nay"
+            elif end:
+                return f"từ {start} đến {end}"
+            else:
+                return start
+        elif '-' in year_str and len(year_str.split('-')) == 2:
+            parts = year_str.split('-', 1)
+            start = parts[0].strip()
+            end = parts[1].strip() if len(parts) > 1 else ""
+            if end.lower() == 'nay':
+                return f"từ {start} đến nay"
+            elif end:
+                return f"từ {start} đến {end}"
+            else:
+                return start
+        
+        return year_str
         
     def check_same_group(self, entity1: str, entity2: str) -> ReasoningResult:
         """Check if two artists are in the same group (1-hop comparison)."""
