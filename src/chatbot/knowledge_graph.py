@@ -568,6 +568,28 @@ class KpopKnowledgeGraph:
                             # Members usually don't have suffixes like "(Album)", "(Song)", etc.
                             if '(' not in source or any(kw in source.lower() for kw in ['rapper', 'ca sĩ', 'singer']):
                                 members.append(source)
+
+        # Deduplicate members that represent the same person, e.g. "Jennie" và "Jennie (ca sĩ)"
+        if members:
+            import re
+            deduped = {}
+            for m in members:
+                base = re.sub(r'\s*\([^)]*\)\s*$', '', m).strip().lower()
+                if not base:
+                    base = m.strip().lower()
+                # Nếu chưa có base này → nhận luôn
+                if base not in deduped:
+                    deduped[base] = m
+                else:
+                    # Nếu đã có, ưu tiên phiên bản có thông tin rõ hơn (chứa "ca sĩ", "singer", "rapper")
+                    current = deduped[base]
+                    score_current = int(any(kw in current.lower() for kw in ['ca sĩ', 'singer', 'rapper']))
+                    score_new = int(any(kw in m.lower() for kw in ['ca sĩ', 'singer', 'rapper']))
+                    # Nếu candidate mới có score cao hơn → thay thế
+                    if score_new > score_current:
+                        deduped[base] = m
+            members = list(deduped.values())
+
         return members
         
     def get_artist_groups(self, artist_name: str) -> List[str]:

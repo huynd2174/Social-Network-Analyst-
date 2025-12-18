@@ -217,9 +217,11 @@ class KpopChatbot:
         )
         
         # Check if this is a "list members" question: "Ai là thành viên", "Who are members"
+        # Bao gồm cả câu hỏi đếm số lượng: "BTS có bao nhiêu thành viên", "nhóm nhạc BLACKPINK có mấy thành viên"
         is_list_members_question = any(kw in query_lower for kw in [
             'ai là thành viên', 'who are', 'thành viên của', 'members of',
-            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên'
+            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên',
+            'bao nhiêu thành viên', 'mấy thành viên', 'có mấy thành viên'
         ]) and 'có phải' not in query_lower and 'không' not in query_lower
         
         # Check if this is an "artist group" question: "Lisa thuộc nhóm nhạc nào"
@@ -302,6 +304,15 @@ class KpopChatbot:
               'trong album nào' in query_lower or 'ở album nào' in query_lower))
         )
         
+        # Pattern: "X có những bài hát nào phát hành năm Y"
+        # Ví dụ: "BTS có những bài hát nào phát hành năm 2019"
+        is_songs_by_year_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower) and
+            ('phát hành' in query_lower or 'ra mắt' in query_lower) and
+            'năm' in query_lower and
+            any(char.isdigit() for char in query)  # Có chứa số (năm)
+        )
+        
         # ========== END PATTERN MỚI ==========
         
         # Bổ sung nhận dạng cho các câu hỏi đa dạng trong dataset đánh giá
@@ -371,6 +382,14 @@ class KpopChatbot:
             ('ra mắt' in query_lower or 'phát hành' in query_lower or 'đã' in query_lower) and
             ('nghề nghiệp' in query_lower or 'occupation' in query_lower or 'vai trò' in query_lower)
         )
+        # Câu hỏi về nghề nghiệp của ca sĩ đã thể hiện bài hát X (Song → Artist → Occupation)
+        is_song_artist_occupation_question = (
+            ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
+            ('ca sĩ' in query_lower or 'nghệ sĩ' in query_lower or 'artist' in query_lower) and
+            ('thể hiện' in query_lower or 'trình bày' in query_lower or 'hát' in query_lower) and
+            ('nghề nghiệp' in query_lower or 'occupation' in query_lower or 'vai trò' in query_lower) and
+            not ('nhóm nhạc' in query_lower or 'nhóm' in query_lower)  # Không phải song-artist-group-occupation
+        )
         
         # Xác định label kỳ vọng từ câu hỏi để lọc thực thể đúng loại
         # QUAN TRỌNG: Với same_group question, KHÔNG include Company để tránh extract sai
@@ -437,6 +456,7 @@ class KpopChatbot:
                 is_song_artist_group_genre_question or
                 is_album_group_genre_question or
                 is_album_artist_occupation_question or
+                is_song_artist_occupation_question or
                 # ========== PATTERN MỚI ==========
                 is_find_company_question or
                 is_who_sings_question or
@@ -537,7 +557,7 @@ class KpopChatbot:
                         max_hops=max_hops
                     )
             # ========== XỬ LÝ CÁC PATTERN FACTUAL MỚI ==========
-            elif is_find_company_question or is_who_sings_question or is_album_belongs_to_question or is_song_in_which_album_question:
+            elif is_find_company_question or is_who_sings_question or is_album_belongs_to_question or is_song_in_which_album_question or is_songs_by_year_question:
                 # Đây là các câu hỏi factual cần truy vấn trực tiếp từ Knowledge Graph
                 extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
                 
@@ -858,19 +878,25 @@ class KpopChatbot:
                 infobox = entity_data.get('infobox', {})
                 if infobox:
                     # Format infobox đầy đủ thành text để LLM dễ diễn đạt
+                    # QUAN TRỌNG: Format rõ ràng để LLM dễ nhận biết và sử dụng
                     infobox_text = f"\n\n=== THÔNG TIN CHI TIẾT VỀ {main_entity_id} (Infobox) ==="
+                    infobox_text += "\n(Đây là thông tin chi tiết từ Knowledge Graph - SỬ DỤNG để tạo câu trả lời giới thiệu)\n"
                     for key, value in infobox.items():
                         if value:  # Chỉ hiển thị fields có giá trị
-                            infobox_text += f"\n{key}: {value}"
+                            infobox_text += f"{key}: {value}\n"
+                    infobox_text += "=== HẾT THÔNG TIN INFOBOX ===\n"
                     formatted_context += infobox_text
         
         # ✅ QUAN TRỌNG: ƯU TIÊN TẤT CẢ REASONING RESULT TRƯỚC
         # Nếu có reasoning result với answer_text → LUÔN dùng reasoning (tránh LLM hallucination)
         # Chỉ dùng LLM khi KHÔNG có reasoning result hoặc reasoning result không có answer_text
+        # NHƯNG: Nếu là câu hỏi giới thiệu → LUÔN dùng LLM để diễn đạt lại tự nhiên từ infobox
+        # (Bỏ qua reasoning result vì câu hỏi giới thiệu cần LLM diễn đạt lại, không phải trả về trực tiếp)
         use_reasoning_result = (
             reasoning_result is not None and 
             reasoning_result.answer_text is not None and 
-            len(reasoning_result.answer_text.strip()) > 0
+            len(reasoning_result.answer_text.strip()) > 0 and
+            not is_intro_question  # Câu hỏi giới thiệu LUÔN dùng LLM
         )
         
         # Nhận diện câu hỏi về năm hoạt động - có thể dùng LLM để diễn đạt lại tự nhiên hơn
@@ -936,12 +962,33 @@ class KpopChatbot:
                 except Exception:
                     pass
                 
+                # Đảm bảo infobox được thêm vào context (nếu chưa có từ phần trên)
+                if 'THÔNG TIN CHI TIẾT' not in formatted_context and 'Infobox' not in formatted_context:
+                    entity_data = self.kg.get_entity(main_entity)
+                    if entity_data:
+                        infobox = entity_data.get('infobox', {})
+                        if infobox:
+                            infobox_text = f"\n\n=== THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox) ==="
+                            infobox_text += "\n(Đây là thông tin chi tiết từ Knowledge Graph - SỬ DỤNG để tạo câu trả lời giới thiệu)\n"
+                            for key, value in infobox.items():
+                                if value:  # Chỉ hiển thị fields có giá trị
+                                    infobox_text += f"{key}: {value}\n"
+                            infobox_text += "=== HẾT THÔNG TIN INFOBOX ===\n"
+                            formatted_context += infobox_text
+                
                 # Prompt chuyên biệt cho giới thiệu entity - yêu cầu LLM diễn đạt lại từ infobox
+                # QUAN TRỌNG: LLM PHẢI sử dụng thông tin từ phần "THÔNG TIN CHI TIẾT VỀ ... (Infobox)" trong context
                 llm_query = (
-                    f"Hãy giới thiệu về thực thể K-pop '{base_name}' bằng tiếng Việt (2-4 câu). "
-                    f"Sử dụng thông tin từ phần 'Infobox' trong CONTEXT bên dưới, diễn đạt lại một cách tự nhiên, "
-                    f"không chỉ liệt kê các trường thông tin. Nếu có thông tin về năm hoạt động, thành viên, công ty, thể loại, "
-                    f"hãy kết hợp chúng thành một đoạn văn mạch lạc. Câu hỏi gốc: {query}"
+                    f"Bạn được yêu cầu giới thiệu về thực thể K-pop '{base_name}' bằng tiếng Việt.\n\n"
+                    f"YÊU CẦU:\n"
+                    f"- Sử dụng THÔNG TIN TỪ PHẦN 'THÔNG TIN CHI TIẾT VỀ {main_entity} (Infobox)' trong CONTEXT bên dưới\n"
+                    f"- Diễn đạt lại một cách tự nhiên, mạch lạc (2-4 câu)\n"
+                    f"- KHÔNG chỉ liệt kê các trường thông tin một cách cứng nhắc\n"
+                    f"- Kết hợp các thông tin quan trọng như: năm hoạt động/thành lập, công ty/hãng đĩa, thể loại, thành viên (nếu có)\n"
+                    f"- Tạo thành một đoạn văn giới thiệu hoàn chỉnh, dễ đọc\n"
+                    f"- KHÔNG bịa thêm thông tin không có trong infobox\n\n"
+                    f"Câu hỏi gốc: {query}\n\n"
+                    f"Hãy viết giới thiệu dựa trên thông tin infobox được cung cấp:"
                 )
             
             response = self.llm.generate(
