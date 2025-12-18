@@ -843,31 +843,14 @@ class KpopChatbot:
         # - Facts: từ triples (source, relationship, target) trong graph
         # - Reasoning: từ graph traversal (paths, hops)
         
-        # If reasoning found a direct answer for membership, same group, same company, song-group, or year queries, use it (more accurate than LLM)
-        # QUAN TRỌNG: Ưu tiên reasoning result cho các câu hỏi factual (tránh LLM hallucinate)
-        # Check nếu là song-group question VÀ có reasoning result (kể cả khi confidence thấp)
-        use_reasoning_result = False
-        if is_song_group_company_question or is_song_group_genre_question or is_song_artist_group_genre_question or is_album_group_genre_question or is_album_artist_occupation_question:
-            # Với song-group questions, LUÔN ưu tiên reasoning result nếu có (kể cả khi confidence thấp)
-            if reasoning_result and reasoning_result.answer_text:
-                use_reasoning_result = True
-        elif is_year_question:
-            # Với câu hỏi về năm, LUÔN ưu tiên reasoning result vì LLM thường hallucinate
-            if reasoning_result and reasoning_result.answer_text:
-                use_reasoning_result = True
-        elif (is_membership_question or is_same_group_question or is_same_company_question) and reasoning_result and reasoning_result.answer_text:
-            use_reasoning_result = True
-        # ========== ƯU TIÊN REASONING CHO CÁC CÂU HỎI FACTUAL MỚI ==========
-        elif (is_find_company_question or is_who_sings_question or is_album_belongs_to_question or is_song_in_which_album_question):
-            # Các câu hỏi factual cần câu trả lời chính xác từ KG, KHÔNG dùng LLM để tránh hallucination
-            if reasoning_result and reasoning_result.answer_text:
-                use_reasoning_result = True
-        # ========== ƯU TIÊN REASONING CHO CÁC CÂU HỎI VỀ THỂ LOẠI ==========
-        elif (is_song_group_genre_question or is_song_artist_group_genre_question or is_album_group_genre_question):
-            # Các câu hỏi về thể loại cần câu trả lời chính xác từ KG, KHÔNG dùng LLM để tránh hallucination
-            if reasoning_result and reasoning_result.answer_text:
-                use_reasoning_result = True
-        # ========== END ==========
+        # ✅ QUAN TRỌNG: ƯU TIÊN TẤT CẢ REASONING RESULT TRƯỚC
+        # Nếu có reasoning result với answer_text → LUÔN dùng reasoning (tránh LLM hallucination)
+        # Chỉ dùng LLM khi KHÔNG có reasoning result hoặc reasoning result không có answer_text
+        use_reasoning_result = (
+            reasoning_result is not None and 
+            reasoning_result.answer_text is not None and 
+            len(reasoning_result.answer_text.strip()) > 0
+        )
         
         if use_reasoning_result:
             # For membership/same group/same company questions, ALWAYS prioritize reasoning result if available
@@ -880,23 +863,13 @@ class KpopChatbot:
                     response += f"\n\nDanh sách: {entities_str}"
             # ✅ Bỏ qua LLM generation cho same_group/same_company/song-group questions để tránh trả lời sai
         elif self.llm and use_llm:
-            # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (đúng yêu cầu)
+            # ✅ SỬ DỤNG Small LLM với context từ Knowledge Graph (chỉ khi KHÔNG có reasoning result)
             history = session.get_history(max_turns=3)
             response = self.llm.generate(
                 query,
                 context=formatted_context,  # Context từ GraphRAG (Knowledge Graph)
                 history=history
             )
-        elif reasoning_result and reasoning_result.answer_text:
-            # Fallback: Nếu LLM không available, dùng reasoning result
-            # (Nhưng ưu tiên dùng LLM để đáp ứng yêu cầu bài tập)
-            response = reasoning_result.answer_text
-            if reasoning_result.answer_entities:
-                entities_str = ", ".join(reasoning_result.answer_entities[:10])
-                if len(reasoning_result.answer_entities) > 10:
-                    entities_str += f" và {len(reasoning_result.answer_entities) - 10} khác"
-                if entities_str and entities_str not in response:
-                    response += f"\n\nDanh sách: {entities_str}"
         elif context['facts']:
             # Fallback: Dùng facts từ Knowledge Graph
             response = "Dựa trên đồ thị tri thức:\n" + "\n".join(f"• {f}" for f in context['facts'][:5])
