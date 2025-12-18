@@ -1560,7 +1560,7 @@ class MultiHopReasoner:
         # Pattern: "Ai là thành viên", "Who are members", "thành viên của X", "members of X", "có bao nhiêu/mấy thành viên"
         is_list_members_question = any(kw in query_lower for kw in [
             'ai là thành viên', 'who are', 'thành viên của', 'members of', 
-            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên',
+            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên', 'có các thành viên',
             'bao nhiêu thành viên', 'mấy thành viên', 'có mấy thành viên'
         ]) and 'có phải' not in query_lower and 'không' not in query_lower
         
@@ -1573,10 +1573,10 @@ class MultiHopReasoner:
                     group_entity = entity
                     break
             
-            # Nếu không tìm được từ start_entities, extract từ query
+            # Nếu không tìm được từ start_entities, extract từ query với robust method
             if not group_entity:
-                extracted = self._extract_entities_from_query(query)
-                for e in extracted:
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=1, expected_types=['Group'])
+                for e in all_entities:
                     if self.kg.get_entity_type(e) == 'Group':
                         group_entity = e
                         break
@@ -2557,12 +2557,16 @@ class MultiHopReasoner:
             explanation=f"Lấy thành viên của {group_name}"
         )
         
+        # Normalize entity names for display
+        group_display = self._normalize_entity_name(group_name)
+        members_display = [self._normalize_entity_name(m) for m in members]
+        
         return ReasoningResult(
             query=f"Thành viên của {group_name}",
             reasoning_type=ReasoningType.CHAIN,
             steps=[step],
             answer_entities=members,
-            answer_text=f"{group_name} có {len(members)} thành viên: {', '.join(members)}",
+            answer_text=f"{group_display} có {len(members)} thành viên: {', '.join(members_display)}",
             confidence=1.0,
             explanation=f"1-hop: {group_name} → MEMBER_OF → Artists"
         )

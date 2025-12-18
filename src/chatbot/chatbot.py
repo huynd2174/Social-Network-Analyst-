@@ -220,7 +220,7 @@ class KpopChatbot:
         # Bao gồm cả câu hỏi đếm số lượng: "BTS có bao nhiêu thành viên", "nhóm nhạc BLACKPINK có mấy thành viên"
         is_list_members_question = any(kw in query_lower for kw in [
             'ai là thành viên', 'who are', 'thành viên của', 'members of',
-            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên',
+            'thành viên nhóm', 'thành viên ban nhạc', 'có những thành viên', 'có các thành viên',
             'bao nhiêu thành viên', 'mấy thành viên', 'có mấy thành viên'
         ]) and 'có phải' not in query_lower and 'không' not in query_lower
         
