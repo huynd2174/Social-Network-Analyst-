@@ -30,11 +30,69 @@ class KpopKnowledgeGraph:
         self.edges: List[Dict] = []
         self.entity_index: Dict[str, Set[str]] = defaultdict(set)  # type -> entities
         self.relationship_index: Dict[str, List[Tuple]] = defaultdict(list)  # type -> (src, tgt)
+        self.original_to_cleaned: Dict[str, str] = {}  # Mapping from original ID to cleaned ID
+        self.cleaned_to_original: Dict[str, str] = {}  # Mapping from cleaned ID to original ID (for reverse lookup if needed)
         
         # Load and build graph
         self._load_data()
         self._build_graph()
         self._build_indices()
+    
+    def _clean_entity_id(self, entity_id: str) -> str:
+        """
+        Clean entity ID by removing common prefixes like Genre_, Company_, etc.
+        
+        Args:
+            entity_id: Original entity ID
+            
+        Returns:
+            Cleaned entity ID without prefix
+        """
+        # List of prefixes to remove
+        prefixes = [
+            'Genre_',
+            'Company_',
+            'Album_',
+            'Song_',
+            'Artist_',
+            'Group_',
+            'Occupation_',
+            'Instrument_'
+        ]
+        
+        cleaned_id = entity_id
+        for prefix in prefixes:
+            if cleaned_id.startswith(prefix):
+                cleaned_id = cleaned_id[len(prefix):]
+                break  # Only remove one prefix
+        
+        return cleaned_id
+    
+    def _resolve_entity_id(self, entity_id: str) -> Optional[str]:
+        """
+        Resolve entity ID to cleaned ID used in graph.
+        
+        Args:
+            entity_id: Entity ID (can be original or cleaned)
+            
+        Returns:
+            Cleaned entity ID if exists in graph, None otherwise
+        """
+        # Try direct lookup first (might be cleaned ID)
+        if entity_id in self.graph:
+            return entity_id
+        
+        # Try mapping from original to cleaned
+        cleaned_id = self.original_to_cleaned.get(entity_id)
+        if cleaned_id and cleaned_id in self.graph:
+            return cleaned_id
+        
+        # Try cleaning the ID
+        cleaned_id = self._clean_entity_id(entity_id)
+        if cleaned_id in self.graph:
+            return cleaned_id
+        
+        return None
         
     def _load_data(self):
         """Load merged K-pop data from JSON."""
@@ -52,35 +110,54 @@ class KpopKnowledgeGraph:
         
     def _build_graph(self):
         """Build NetworkX graph from nodes and edges."""
-        # Add nodes
-        for node_id, node_data in self.nodes.items():
+        # Add nodes with cleaned IDs
+        for original_node_id, node_data in self.nodes.items():
+            cleaned_node_id = self._clean_entity_id(original_node_id)
+            
+            # Store mapping
+            self.original_to_cleaned[original_node_id] = cleaned_node_id
+            # Handle case where multiple original IDs map to same cleaned ID (shouldn't happen but be safe)
+            if cleaned_node_id not in self.cleaned_to_original:
+                self.cleaned_to_original[cleaned_node_id] = original_node_id
+            
+            # Clean title if it contains prefix
+            title = node_data.get('title', original_node_id)
+            cleaned_title = self._clean_entity_id(title) if title == original_node_id else title
+            
             self.graph.add_node(
-                node_id,
+                cleaned_node_id,
                 label=node_data.get('label', 'Unknown'),
-                title=node_data.get('title', node_id),
+                title=cleaned_title,
                 infobox=node_data.get('infobox', {}),
                 url=node_data.get('url', ''),
-                depth=node_data.get('depth', 0)
+                depth=node_data.get('depth', 0),
+                original_id=original_node_id  # Keep original ID for reference if needed
             )
             
-        # Add edges
+        # Add edges with cleaned IDs
         # Track edges to handle multiple relationship types between same nodes
         edge_relations = {}  # (source, target) -> list of relationship types
         
         for edge in self.edges:
-            source = edge.get('source')
-            target = edge.get('target')
+            original_source = edge.get('source')
+            original_target = edge.get('target')
             rel_type = edge.get('type', 'RELATED')
             
-            if source and target and source in self.graph and target in self.graph:
-                edge_key = (source, target)
-                if edge_key not in edge_relations:
-                    edge_relations[edge_key] = []
-                edge_relations[edge_key].append({
-                    'type': rel_type,
-                    'confidence': edge.get('confidence', 1.0),
-                    'method': edge.get('method', 'unknown')
-                })
+            if original_source and original_target:
+                # Map original IDs to cleaned IDs
+                cleaned_source = self.original_to_cleaned.get(original_source, self._clean_entity_id(original_source))
+                cleaned_target = self.original_to_cleaned.get(original_target, self._clean_entity_id(original_target))
+                
+                # Only add edge if both nodes exist in graph
+                if cleaned_source in self.graph and cleaned_target in self.graph:
+                    edge_key = (cleaned_source, cleaned_target)
+                    if edge_key not in edge_relations:
+                        edge_relations[edge_key] = []
+                    edge_relations[edge_key].append({
+                        'type': rel_type,
+                        'confidence': edge.get('confidence', 1.0),
+                        'method': edge.get('method', 'unknown')
+                    })
         
         # Add edges with all relationship types
         for (source, target), relations in edge_relations.items():
@@ -104,7 +181,7 @@ class KpopKnowledgeGraph:
                     method=relations[0]['method']
                 )
                 
-        print(f"✅ Built graph with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges")
+        print(f"✅ Built graph with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges (with cleaned IDs)")
         
     def _build_indices(self):
         """Build lookup indices for fast retrieval."""
@@ -121,9 +198,21 @@ class KpopKnowledgeGraph:
         print(f"✅ Built indices for {len(self.entity_index)} entity types and {len(self.relationship_index)} relationship types")
         
     def get_entity(self, entity_id: str) -> Optional[Dict]:
-        """Get entity by ID."""
+        """Get entity by ID (handles both original and cleaned IDs)."""
+        # Try direct lookup first (might be cleaned ID)
         if entity_id in self.graph:
             return dict(self.graph.nodes[entity_id])
+        
+        # Try mapping from original to cleaned
+        cleaned_id = self.original_to_cleaned.get(entity_id)
+        if cleaned_id and cleaned_id in self.graph:
+            return dict(self.graph.nodes[cleaned_id])
+        
+        # Try cleaning the ID
+        cleaned_id = self._clean_entity_id(entity_id)
+        if cleaned_id in self.graph:
+            return dict(self.graph.nodes[cleaned_id])
+        
         return None
         
     def _has_relationship_type(self, edge_data: Dict, rel_type: str) -> bool:
@@ -145,9 +234,21 @@ class KpopKnowledgeGraph:
         return edge_data.get('type') == rel_type
     
     def get_entity_type(self, entity_id: str) -> Optional[str]:
-        """Get entity type by ID."""
+        """Get entity type by ID (handles both original and cleaned IDs)."""
+        # Try direct lookup first (might be cleaned ID)
         if entity_id in self.graph:
             return self.graph.nodes[entity_id].get('label')
+        
+        # Try mapping from original to cleaned
+        cleaned_id = self.original_to_cleaned.get(entity_id)
+        if cleaned_id and cleaned_id in self.graph:
+            return self.graph.nodes[cleaned_id].get('label')
+        
+        # Try cleaning the ID
+        cleaned_id = self._clean_entity_id(entity_id)
+        if cleaned_id in self.graph:
+            return self.graph.nodes[cleaned_id].get('label')
+        
         return None
     
     def extract_year_from_infobox(self, entity_id: str, year_type: str = 'activity') -> Optional[str]:
@@ -210,17 +311,25 @@ class KpopKnowledgeGraph:
         Get neighbors of an entity.
         
         Args:
-            entity_id: Entity to get neighbors for
+            entity_id: Entity to get neighbors for (handles both original and cleaned IDs)
             direction: 'out', 'in', or 'both'
             
         Returns:
             List of (neighbor_id, relationship_type, direction)
             Note: If edge has multiple relationship types, returns one tuple per type
         """
+        # Resolve entity_id to cleaned ID
+        cleaned_entity_id = entity_id
+        if entity_id not in self.graph:
+            cleaned_entity_id = self.original_to_cleaned.get(entity_id, self._clean_entity_id(entity_id))
+        
+        if cleaned_entity_id not in self.graph:
+            return []
+        
         neighbors = []
         
         if direction in ['out', 'both']:
-            for _, target, data in self.graph.out_edges(entity_id, data=True):
+            for _, target, data in self.graph.out_edges(cleaned_entity_id, data=True):
                 # Get all relationship types (single or multiple)
                 rel_types = data.get('types', [data.get('type', 'RELATED')])
                 if not isinstance(rel_types, list):
@@ -230,7 +339,7 @@ class KpopKnowledgeGraph:
                     neighbors.append((target, rel_type, 'out'))
                 
         if direction in ['in', 'both']:
-            for source, _, data in self.graph.in_edges(entity_id, data=True):
+            for source, _, data in self.graph.in_edges(cleaned_entity_id, data=True):
                 # Get all relationship types (single or multiple)
                 rel_types = data.get('types', [data.get('type', 'RELATED')])
                 if not isinstance(rel_types, list):
@@ -245,14 +354,25 @@ class KpopKnowledgeGraph:
         """
         Get all relationships for an entity.
         
+        Args:
+            entity_id: Entity ID (handles both original and cleaned IDs)
+        
         Returns:
             List of relationship dicts with 'source', 'target', 'type', 'types', etc.
             If edge has multiple relationship types, returns one dict per type
         """
+        # Resolve entity_id to cleaned ID
+        cleaned_entity_id = entity_id
+        if entity_id not in self.graph:
+            cleaned_entity_id = self.original_to_cleaned.get(entity_id, self._clean_entity_id(entity_id))
+        
+        if cleaned_entity_id not in self.graph:
+            return []
+        
         relationships = []
         
         # Outgoing relationships
-        for _, target, data in self.graph.out_edges(entity_id, data=True):
+        for _, target, data in self.graph.out_edges(cleaned_entity_id, data=True):
             # Get all relationship types (single or multiple)
             rel_types = data.get('types', [data.get('type', 'RELATED')])
             if not isinstance(rel_types, list):
@@ -260,7 +380,7 @@ class KpopKnowledgeGraph:
             # Return one relationship dict per type
             for rel_type in rel_types:
                 relationships.append({
-                    'source': entity_id,
+                    'source': cleaned_entity_id,
                     'target': target,
                     'type': rel_type,
                     'types': data.get('types', [rel_type]),  # Include all types
@@ -270,7 +390,7 @@ class KpopKnowledgeGraph:
                 })
             
         # Incoming relationships
-        for source, _, data in self.graph.in_edges(entity_id, data=True):
+        for source, _, data in self.graph.in_edges(cleaned_entity_id, data=True):
             # Get all relationship types (single or multiple)
             rel_types = data.get('types', [data.get('type', 'RELATED')])
             if not isinstance(rel_types, list):
@@ -279,7 +399,7 @@ class KpopKnowledgeGraph:
             for rel_type in rel_types:
                 relationships.append({
                     'source': source,
-                    'target': entity_id,
+                    'target': cleaned_entity_id,
                     'type': rel_type,
                     'types': data.get('types', [rel_type]),  # Include all types
                     'direction': 'incoming',
@@ -291,18 +411,32 @@ class KpopKnowledgeGraph:
         
     def find_path(self, source: str, target: str, max_hops: int = 5) -> Optional[List[str]]:
         """Find shortest path between two entities."""
+        # Clean IDs if they contain prefixes
+        cleaned_source = self._clean_entity_id(source)
+        cleaned_target = self._clean_entity_id(target)
+        # Try mapping from original to cleaned if available
+        cleaned_source = self.original_to_cleaned.get(source, cleaned_source)
+        cleaned_target = self.original_to_cleaned.get(target, cleaned_target)
+        
         try:
-            path = nx.shortest_path(self.graph, source, target)
+            path = nx.shortest_path(self.graph, cleaned_source, cleaned_target)
             if len(path) - 1 <= max_hops:
                 return path
-        except nx.NetworkXNoPath:
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
             pass
         return None
         
     def find_all_paths(self, source: str, target: str, max_hops: int = 3) -> List[List[str]]:
         """Find all simple paths between two entities (up to max_hops)."""
+        # Clean IDs if they contain prefixes
+        cleaned_source = self._clean_entity_id(source)
+        cleaned_target = self._clean_entity_id(target)
+        # Try mapping from original to cleaned if available
+        cleaned_source = self.original_to_cleaned.get(source, cleaned_source)
+        cleaned_target = self.original_to_cleaned.get(target, cleaned_target)
+        
         try:
-            paths = list(nx.all_simple_paths(self.graph, source, target, cutoff=max_hops))
+            paths = list(nx.all_simple_paths(self.graph, cleaned_source, cleaned_target, cutoff=max_hops))
             return paths
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             return []
@@ -329,7 +463,10 @@ class KpopKnowledgeGraph:
         
     def search_entities(self, query: str, entity_type: Optional[str] = None, limit: int = 10) -> List[Dict]:
         """Search entities by name/title."""
+        # Clean query to remove prefixes for better matching
+        cleaned_query = self._clean_entity_id(query)
         query_lower = query.lower()
+        cleaned_query_lower = cleaned_query.lower()
         results = []
         
         for node_id, data in self.graph.nodes(data=True):
@@ -337,14 +474,27 @@ class KpopKnowledgeGraph:
             if entity_type and data.get('label') != entity_type:
                 continue
                 
-            # Check if query matches
+            # Check if query matches (try both original query and cleaned query)
             title = data.get('title', node_id).lower()
-            if query_lower in title or query_lower in node_id.lower():
+            node_id_lower = node_id.lower()
+            
+            # Match with cleaned IDs (nodes in graph now use cleaned IDs)
+            if cleaned_query_lower in title or cleaned_query_lower in node_id_lower:
+                score = 1.0 if (cleaned_query_lower == title or cleaned_query_lower == node_id_lower) else 0.8
+                results.append({
+                    'id': node_id,  # Return cleaned ID (as stored in graph)
+                    'type': data.get('label'),
+                    'title': data.get('title', node_id),
+                    'score': score
+                })
+            # Also try matching with original query (in case user searches with prefix)
+            elif query_lower in title or query_lower in node_id_lower:
+                score = 0.7  # Lower score for prefix matches
                 results.append({
                     'id': node_id,
                     'type': data.get('label'),
                     'title': data.get('title', node_id),
-                    'score': 1.0 if query_lower == title else 0.8
+                    'score': score
                 })
                 
         # Sort by score and return top results
@@ -370,8 +520,14 @@ class KpopKnowledgeGraph:
         1. First try to get from infobox (most accurate)
         2. Fallback to MEMBER_OF edges (filtered by type and confidence)
         """
+        # Clean group_name if it contains prefix
+        cleaned_group_name = self._clean_entity_id(group_name)
+        if group_name not in self.graph:
+            cleaned_group_name = self.original_to_cleaned.get(group_name, cleaned_group_name)
+        group_name_to_use = cleaned_group_name if cleaned_group_name in self.graph else group_name
+        
         # Try to get from infobox first (most accurate)
-        group_data = self.get_entity(group_name)
+        group_data = self.get_entity(group_name_to_use)
         if group_data and group_data.get('infobox'):
             infobox = group_data['infobox']
             members_str = infobox.get('Thành viên', '')
@@ -399,18 +555,19 @@ class KpopKnowledgeGraph:
         
         # Fallback: Get from MEMBER_OF edges (with strict filtering)
         members = []
-        for source, _, data in self.graph.in_edges(group_name, data=True):
-            if self._has_relationship_type(data, 'MEMBER_OF'):
-                # Only include if source is actually an Artist
-                source_type = self.get_entity_type(source)
-                if source_type == 'Artist':
-                    # Check confidence if available
-                    confidence = data.get('confidence', 1.0)
-                    if confidence >= 0.7:  # Stricter threshold
-                        # Exclude obvious non-members (check if name looks like a member name)
-                        # Members usually don't have suffixes like "(Album)", "(Song)", etc.
-                        if '(' not in source or any(kw in source.lower() for kw in ['rapper', 'ca sĩ', 'singer']):
-                            members.append(source)
+        if group_name_to_use in self.graph:
+            for source, _, data in self.graph.in_edges(group_name_to_use, data=True):
+                if self._has_relationship_type(data, 'MEMBER_OF'):
+                    # Only include if source is actually an Artist
+                    source_type = self.get_entity_type(source)
+                    if source_type == 'Artist':
+                        # Check confidence if available
+                        confidence = data.get('confidence', 1.0)
+                        if confidence >= 0.7:  # Stricter threshold
+                            # Exclude obvious non-members (check if name looks like a member name)
+                            # Members usually don't have suffixes like "(Album)", "(Song)", etc.
+                            if '(' not in source or any(kw in source.lower() for kw in ['rapper', 'ca sĩ', 'singer']):
+                                members.append(source)
         return members
         
     def get_artist_groups(self, artist_name: str) -> List[str]:
