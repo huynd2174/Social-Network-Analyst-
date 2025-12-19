@@ -265,6 +265,53 @@ class KpopChatbot:
             'có cùng công ty', 'có cùng hãng', 'có cùng label'
         ])
         
+        # Check if this is a "same genre" question - use reasoning directly
+        is_same_genre_question = any(kw in query_lower for kw in [
+            'cùng thể loại', 'same genre', 'cùng dòng nhạc', 'cùng genre',
+            'cùng thể loại hay', 'cùng dòng nhạc hay', 'cùng thể loại không', 'cùng dòng nhạc không',
+            'có cùng thể loại', 'có cùng dòng nhạc', 'có cùng genre'
+        ]) and 'nhóm nhạc của' not in query_lower  # Not via group question
+        
+        # Check if this is a "same genre via group" question
+        # Pattern: "Nhóm nhạc của nghệ sĩ A và B có cùng thể loại không"
+        is_same_genre_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
+            ('cùng thể loại' in query_lower or 'cùng dòng nhạc' in query_lower or 'cùng genre' in query_lower)
+        )
+        
+        # Check if this is a "same year" question
+        is_same_year_question = any(kw in query_lower for kw in [
+            'cùng năm hoạt động', 'cùng năm', 'same year', 'cùng năm thành lập',
+            'cùng năm hoạt động hay', 'cùng năm hay', 'cùng năm hoạt động không', 'cùng năm không',
+            'có cùng năm hoạt động', 'có cùng năm'
+        ])
+        
+        # Check if this is a "same year via group" question
+        is_same_year_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng năm hoạt động' in query_lower or 'cùng năm' in query_lower)
+        )
+        
+        # Check if this is a "same debut year" question
+        is_same_debut_year_question = any(kw in query_lower for kw in [
+            'cùng năm ra mắt', 'cùng năm debut', 'same debut year',
+            'cùng năm ra mắt hay', 'cùng năm debut hay', 'cùng năm ra mắt không', 'cùng năm debut không',
+            'có cùng năm ra mắt', 'có cùng năm debut'
+        ])
+        
+        # Check if this is a "same debut year via group" question
+        is_same_debut_year_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng năm ra mắt' in query_lower or 'cùng năm debut' in query_lower)
+        )
+        
+        # Check if this is a "same company via group" question (besides the existing check_same_company)
+        is_same_company_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng công ty' in query_lower or 'cùng hãng' in query_lower or 'cùng label' in query_lower or 'same company' in query_lower)
+        )
+        
         # ========== CÁC PATTERN MỚI ĐỂ TRÁNH HALLUCINATION ==========
         
         # Pattern: "X thuộc công ty nào?", "Công ty nào quản lý X?", "X là nghệ sĩ của công ty nào?"
@@ -441,6 +488,13 @@ class KpopChatbot:
             eval_pattern_question = (
                 is_same_group_question or
                 is_same_company_question or
+                is_same_genre_question or
+                is_same_genre_via_group_question or
+                is_same_year_question or
+                is_same_year_via_group_question or
+                is_same_debut_year_question or
+                is_same_debut_year_via_group_question or
+                is_same_company_via_group_question or
                 is_list_members_question or
                 is_genre_question or
                 is_song_in_album_question or
@@ -467,7 +521,7 @@ class KpopChatbot:
                 # ========== END PATTERN MỚI ==========
             )
             
-            if is_same_group_question or is_same_company_question or is_list_members_question or is_artist_group_question:
+            if is_same_group_question or is_same_company_question or is_same_genre_question or is_same_genre_via_group_question or is_same_year_question or is_same_year_via_group_question or is_same_debut_year_question or is_same_debut_year_via_group_question or is_same_company_via_group_question or is_list_members_question or is_artist_group_question:
                 # ✅ CHIẾN LƯỢC HYBRID: Rule-based + LLM understanding
                 # 1. Thử rule-based trước (nhanh, chính xác cho tên chuẩn)
                 extracted = self._extract_entities_for_membership(query, expected_labels=expected_labels)
@@ -535,7 +589,7 @@ class KpopChatbot:
                     )
                 elif len(extracted) == 1:
                     # Chỉ có 1 entity → với same_company/same_group questions, cần đủ 2
-                    if is_same_company_question or is_same_group_question:
+                    if is_same_company_question or is_same_group_question or is_same_genre_question or is_same_genre_via_group_question or is_same_year_question or is_same_year_via_group_question or is_same_debut_year_question or is_same_debut_year_via_group_question or is_same_company_via_group_question:
                         # Thử extract lại với logic mạnh hơn
                         # Hoặc để reasoner tự extract từ query
                         reasoning_result = self.reasoner.reason(

@@ -757,7 +757,382 @@ class MultiHopReasoner:
                     explanation="Không extract được entities từ query"
                 )
         
-        # 2b. Câu hỏi về thể loại của nhóm nhạc có ca sĩ thể hiện bài hát X (Song → Artist → Group → Genre) - 3-hop
+        # 2a. Câu hỏi so sánh thể loại của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và B có cùng thể loại không"
+        is_same_genre_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
+            ('cùng thể loại' in query_lower or 'cùng dòng nhạc' in query_lower or 'cùng genre' in query_lower)
+        )
+        
+        if is_same_genre_via_group_question:
+            # Extract entities với LLM fallback - cần 2 artists
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist'])
+            
+            artist_entities = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+            
+            if len(artist_entities) >= 2:
+                return self.check_same_genre_via_group(artist_entities[0], artist_entities[1])
+            elif len(artist_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy nghệ sĩ {artist_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 artist: {artist_entities[0]}, cần ít nhất 2 artists để so sánh thể loại nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được artists từ query"
+                )
+        
+        # 2b. Câu hỏi so sánh thể loại trực tiếp: "A và B có cùng thể loại không"
+        if any(kw in query_lower for kw in [
+            'cùng thể loại', 'same genre', 'cùng dòng nhạc', 'cùng genre',
+            'cùng thể loại hay', 'cùng dòng nhạc hay', 'cùng thể loại không', 'cùng dòng nhạc không',
+            'có cùng thể loại', 'có cùng dòng nhạc', 'có cùng genre'
+        ]) and not is_same_genre_via_group_question:
+            # Extract entities với LLM fallback - có thể là Artist hoặc Group
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_genre(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh thể loại"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a1. Câu hỏi so sánh thể loại của nhóm nhạc (mixed): "Nhóm nhạc của nghệ sĩ A và nhóm nhạc B có cùng thể loại không"
+        is_same_genre_via_group_mixed_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng thể loại' in query_lower or 'cùng dòng nhạc' in query_lower or 'cùng genre' in query_lower) and
+            not is_same_genre_via_group_question  # Not the pure artist-artist version
+        )
+        
+        if is_same_genre_via_group_mixed_question:
+            # Extract entities - có thể là Artist hoặc Group
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_genre_via_group_mixed(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh thể loại nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a2. Câu hỏi so sánh năm hoạt động trực tiếp: "A và B có cùng năm hoạt động không"
+        is_same_year_question = any(kw in query_lower for kw in [
+            'cùng năm hoạt động', 'cùng năm', 'same year', 'cùng năm thành lập',
+            'cùng năm hoạt động hay', 'cùng năm hay', 'cùng năm hoạt động không', 'cùng năm không',
+            'có cùng năm hoạt động', 'có cùng năm'
+        ]) and 'nhóm nhạc của' not in query_lower  # Not via group question
+        
+        if is_same_year_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_year(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm hoạt động"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a3. Câu hỏi so sánh năm hoạt động của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và nhóm nhạc của nghệ sĩ B có cùng năm hoạt động không"
+        is_same_year_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
+            ('cùng năm hoạt động' in query_lower or 'cùng năm' in query_lower) and
+            (query_lower.count('nghệ sĩ') >= 2 or query_lower.count('ca sĩ') >= 2)  # Có 2 nghệ sĩ
+        )
+        
+        if is_same_year_via_group_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist'])
+            
+            artist_entities = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+            
+            if len(artist_entities) >= 2:
+                return self.check_same_year_via_group(artist_entities[0], artist_entities[1])
+            elif len(artist_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy nghệ sĩ {artist_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 artist: {artist_entities[0]}, cần ít nhất 2 artists để so sánh năm hoạt động nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được artists từ query"
+                )
+        
+        # 2a4. Câu hỏi so sánh năm hoạt động của nhóm nhạc (mixed): "Nhóm nhạc của nghệ sĩ A và nhóm nhạc B có cùng năm hoạt động không"
+        is_same_year_via_group_mixed_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng năm hoạt động' in query_lower or 'cùng năm' in query_lower) and
+            not is_same_year_via_group_question  # Not the pure artist-artist version
+        )
+        
+        if is_same_year_via_group_mixed_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_year_via_group_mixed(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm hoạt động nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a5. Câu hỏi so sánh công ty của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và nhóm nhạc của nghệ sĩ B có cùng công ty không"
+        is_same_company_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
+            ('cùng công ty' in query_lower or 'cùng hãng' in query_lower or 'cùng label' in query_lower or 'same company' in query_lower) and
+            (query_lower.count('nghệ sĩ') >= 2 or query_lower.count('ca sĩ') >= 2)  # Có 2 nghệ sĩ
+        ) and not is_same_company_question  # Not the direct same company question
+        
+        if is_same_company_via_group_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist'])
+            
+            artist_entities = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+            
+            if len(artist_entities) >= 2:
+                return self.check_same_company_via_group(artist_entities[0], artist_entities[1])
+            elif len(artist_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy nghệ sĩ {artist_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 artist: {artist_entities[0]}, cần ít nhất 2 artists để so sánh công ty nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được artists từ query"
+                )
+        
+        # 2a6. Câu hỏi so sánh công ty của nhóm nhạc (mixed): "Nhóm nhạc của nghệ sĩ A và nhóm nhạc B có cùng công ty không"
+        is_same_company_via_group_mixed_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng công ty' in query_lower or 'cùng hãng' in query_lower or 'cùng label' in query_lower or 'same company' in query_lower) and
+            not is_same_company_via_group_question  # Not the pure artist-artist version
+        )
+        
+        if is_same_company_via_group_mixed_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_company_via_group_mixed(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh công ty nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a7. Câu hỏi so sánh năm ra mắt trực tiếp: "A và B có cùng năm ra mắt không"
+        is_same_debut_year_question = any(kw in query_lower for kw in [
+            'cùng năm ra mắt', 'cùng năm debut', 'same debut year', 'cùng năm debut',
+            'cùng năm ra mắt hay', 'cùng năm debut hay', 'cùng năm ra mắt không', 'cùng năm debut không',
+            'có cùng năm ra mắt', 'có cùng năm debut'
+        ]) and 'nhóm nhạc của' not in query_lower  # Not via group question
+        
+        if is_same_debut_year_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_debut_year(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm ra mắt"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2a8. Câu hỏi so sánh năm ra mắt của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và nhóm nhạc của nghệ sĩ B có cùng năm ra mắt không"
+        is_same_debut_year_via_group_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
+            ('cùng năm ra mắt' in query_lower or 'cùng năm debut' in query_lower) and
+            (query_lower.count('nghệ sĩ') >= 2 or query_lower.count('ca sĩ') >= 2)  # Có 2 nghệ sĩ
+        )
+        
+        if is_same_debut_year_via_group_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist'])
+            
+            artist_entities = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+            
+            if len(artist_entities) >= 2:
+                return self.check_same_debut_year_via_group(artist_entities[0], artist_entities[1])
+            elif len(artist_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy nghệ sĩ {artist_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai nghệ sĩ.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 artist: {artist_entities[0]}, cần ít nhất 2 artists để so sánh năm ra mắt nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các nghệ sĩ trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được artists từ query"
+                )
+        
+        # 2a9. Câu hỏi so sánh năm ra mắt của nhóm nhạc (mixed): "Nhóm nhạc của nghệ sĩ A và nhóm nhạc B có cùng năm ra mắt không"
+        is_same_debut_year_via_group_mixed_question = (
+            ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
+            ('cùng năm ra mắt' in query_lower or 'cùng năm debut' in query_lower) and
+            not is_same_debut_year_via_group_question  # Not the pure artist-artist version
+        )
+        
+        if is_same_debut_year_via_group_mixed_question:
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            
+            if len(all_entities) >= 2:
+                return self.check_same_debut_year_via_group_mixed(all_entities[0], all_entities[1])
+            elif len(all_entities) == 1:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                    confidence=0.0,
+                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm ra mắt nhóm nhạc"
+                )
+            else:
+                return ReasoningResult(
+                    query=query,
+                    reasoning_type=ReasoningType.COMPARISON,
+                    steps=[],
+                    answer_entities=[],
+                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                    confidence=0.0,
+                    explanation="Không extract được entities từ query"
+                )
+        
+        # 2c. Câu hỏi về thể loại của nhóm nhạc có ca sĩ thể hiện bài hát X (Song → Artist → Group → Genre) - 3-hop
         # Pattern: "thể loại của nhóm nhạc có ca sĩ thể hiện bài hát X"
         is_song_artist_group_genre_question = (
             ('bài hát' in query_lower or 'ca khúc' in query_lower or 'song' in query_lower) and
@@ -1083,7 +1458,7 @@ class MultiHopReasoner:
                         explanation=f"Tìm thấy {len(all_songs)} bài hát của {group_or_artist} nhưng không có bài nào phát hành năm {target_year}"
                     )
         
-        # 2c. Câu hỏi về thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Genre) - 2-hop
+        # 2d. Câu hỏi về thể loại của nhóm nhạc đã thể hiện ca khúc X (Song → Group → Genre) - 2-hop
         # Pattern: "thể loại của nhóm nhạc đã thể hiện ca khúc X", "genre của nhóm nhạc đã thể hiện ca khúc X"
         # QUAN TRỌNG: Check sau song_artist_group_genre_question để tránh conflict
         is_song_group_genre_question = (
@@ -1179,7 +1554,7 @@ class MultiHopReasoner:
                     explanation=f"Không extract được song entity từ query: {query}"
                 )
         
-        # 2d. Câu hỏi về thể loại của nhóm nhạc đã ra mắt album X (Album → Group → Genre)
+        # 2e. Câu hỏi về thể loại của nhóm nhạc đã ra mắt album X (Album → Group → Genre)
         # Pattern: "thể loại của nhóm nhạc đã ra mắt album X", "genre của nhóm nhạc đã ra mắt album X"
         is_album_group_genre_question = (
             ('album' in query_lower) and
@@ -4076,6 +4451,744 @@ class MultiHopReasoner:
             answer_text=answer_text,
             confidence=1.0,
             explanation=f"2-hop comparison: Find companies of both entities and compare"
+        )
+    
+    def check_same_genre(self, entity1: str, entity2: str) -> ReasoningResult:
+        """Check if two entities have the same genre (1-hop comparison: Entity → IS_GENRE → Genre)."""
+        steps = []
+        
+        # Get genres for entity1
+        genres1 = []
+        for _, target, data in self.kg.graph.out_edges(entity1, data=True):
+            if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                genres1.append(target)
+        
+        # Get genres for entity2
+        genres2 = []
+        for _, target, data in self.kg.graph.out_edges(entity2, data=True):
+            if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                genres2.append(target)
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_genres',
+            source_entities=[entity1],
+            relationship='IS_GENRE',
+            target_entities=genres1,
+            explanation=f"Lấy thể loại của {entity1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_genres',
+            source_entities=[entity2],
+            relationship='IS_GENRE',
+            target_entities=genres2,
+            explanation=f"Lấy thể loại của {entity2}"
+        ))
+        
+        # Compare genres
+        common_genres = set(genres1).intersection(set(genres2))
+        
+        # Helper function để clean genre name (loại bỏ prefix "Genre_")
+        def _clean_genre_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Genre_"):
+                return name[6:]
+            return name
+        
+        # Clean genre names cho output tự nhiên
+        genres1_clean = [_clean_genre_name(g) for g in genres1]
+        genres2_clean = [_clean_genre_name(g) for g in genres2]
+        common_clean = [_clean_genre_name(g) for g in common_genres]
+        
+        entity1_display = self._normalize_entity_name(entity1)
+        entity2_display = self._normalize_entity_name(entity2)
+        
+        if common_genres:
+            answer_text = f"Có, {entity1_display} và {entity2_display} cùng thuộc thể loại: {', '.join(common_clean)}"
+        else:
+            answer_text = f"Không, {entity1_display} ({', '.join(genres1_clean) if genres1_clean else 'không rõ thể loại'}) và {entity2_display} ({', '.join(genres2_clean) if genres2_clean else 'không rõ thể loại'}) khác thể loại"
+            
+        return ReasoningResult(
+            query=f"{entity1} và {entity2} có cùng thể loại không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_genres),
+            answer_text=answer_text,
+            confidence=1.0,
+            explanation=f"1-hop comparison: Find genres of both entities and compare"
+        )
+    
+    def check_same_genre_via_group(self, artist1: str, artist2: str) -> ReasoningResult:
+        """Check if groups of two artists have the same genre (2-hop: Artist → MEMBER_OF → Group → IS_GENRE → Genre)."""
+        steps = []
+        
+        # Get groups for artist1
+        groups1 = self.kg.get_artist_groups(artist1)
+        # Get genres of groups1
+        genres1 = []
+        for group in groups1:
+            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                    genres1.append(target)
+        
+        # Get groups for artist2
+        groups2 = self.kg.get_artist_groups(artist2)
+        # Get genres of groups2
+        genres2 = []
+        for group in groups2:
+            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                    genres2.append(target)
+        
+        # Remove duplicates
+        genres1 = list(set(genres1))
+        genres2 = list(set(genres2))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist1],
+            relationship='MEMBER_OF',
+            target_entities=groups1,
+            explanation=f"Lấy nhóm nhạc của {artist1}"
+        ))
+        
+        if groups1:
+            group_genres_steps1 = []
+            for group in groups1:
+                group_genres = []
+                for _, target, data in self.kg.graph.out_edges(group, data=True):
+                    if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                        group_genres.append(target)
+                if group_genres:
+                    group_genres_steps1.extend(group_genres)
+            
+            steps.append(ReasoningStep(
+                hop_number=2,
+                operation='get_genres_from_group',
+                source_entities=groups1,
+                relationship='IS_GENRE',
+                target_entities=list(set(group_genres_steps1)),
+                explanation=f"Lấy thể loại của nhóm nhạc {', '.join(groups1[:2])}"
+            ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist2],
+            relationship='MEMBER_OF',
+            target_entities=groups2,
+            explanation=f"Lấy nhóm nhạc của {artist2}"
+        ))
+        
+        if groups2:
+            group_genres_steps2 = []
+            for group in groups2:
+                group_genres = []
+                for _, target, data in self.kg.graph.out_edges(group, data=True):
+                    if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                        group_genres.append(target)
+                if group_genres:
+                    group_genres_steps2.extend(group_genres)
+            
+            steps.append(ReasoningStep(
+                hop_number=2,
+                operation='get_genres_from_group',
+                source_entities=groups2,
+                relationship='IS_GENRE',
+                target_entities=list(set(group_genres_steps2)),
+                explanation=f"Lấy thể loại của nhóm nhạc {', '.join(groups2[:2])}"
+            ))
+        
+        # Compare genres
+        common_genres = set(genres1).intersection(set(genres2))
+        
+        # Helper function để clean genre name
+        def _clean_genre_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Genre_"):
+                return name[6:]
+            return name
+        
+        # Clean genre names cho output tự nhiên
+        genres1_clean = [_clean_genre_name(g) for g in genres1]
+        genres2_clean = [_clean_genre_name(g) for g in genres2]
+        common_clean = [_clean_genre_name(g) for g in common_genres]
+        
+        artist1_display = self._normalize_entity_name(artist1)
+        artist2_display = self._normalize_entity_name(artist2)
+        
+        if common_genres:
+            answer_text = f"Có, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) cùng thuộc thể loại: {', '.join(common_clean)}"
+        else:
+            answer_text = f"Không, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) thuộc thể loại {', '.join(genres1_clean) if genres1_clean else 'không rõ'} và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) thuộc thể loại {', '.join(genres2_clean) if genres2_clean else 'không rõ'}"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist1} và {artist2} có cùng thể loại không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_genres),
+            answer_text=answer_text,
+            confidence=1.0,
+            explanation=f"2-hop comparison: Find groups of both artists, then find genres of groups and compare"
+        )
+    
+    def check_same_genre_via_group_mixed(self, artist_or_group1: str, artist_or_group2: str) -> ReasoningResult:
+        """Check if group of artist1 and group2 (or vice versa) have the same genre (mixed types)."""
+        steps = []
+        
+        # Determine which is artist and which is group
+        type1 = self.kg.get_entity_type(artist_or_group1)
+        type2 = self.kg.get_entity_type(artist_or_group2)
+        
+        if type1 == 'Artist' and type2 == 'Group':
+            # Artist1 → Group1, Group2
+            groups1 = self.kg.get_artist_groups(artist_or_group1)
+            groups2 = [artist_or_group2]
+        elif type1 == 'Group' and type2 == 'Artist':
+            # Group1, Artist2 → Group2
+            groups1 = [artist_or_group1]
+            groups2 = self.kg.get_artist_groups(artist_or_group2)
+        else:
+            # Both same type - fallback to direct comparison
+            return self.check_same_genre(artist_or_group1, artist_or_group2)
+        
+        # Get genres of groups1
+        genres1 = []
+        for group in groups1:
+            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                    genres1.append(target)
+        
+        # Get genres of groups2
+        genres2 = []
+        for group in groups2:
+            for _, target, data in self.kg.graph.out_edges(group, data=True):
+                if data.get('type') == 'IS_GENRE' and self.kg.get_entity_type(target) == 'Genre':
+                    genres2.append(target)
+        
+        # Remove duplicates
+        genres1 = list(set(genres1))
+        genres2 = list(set(genres2))
+        
+        steps.append(ReasoningStep(
+            hop_number=1 if type1 == 'Group' else 2,
+            operation='get_groups_and_genres',
+            source_entities=[artist_or_group1],
+            relationship='MEMBER_OF' if type1 == 'Artist' else 'IS_GENRE',
+            target_entities=groups1 if type1 == 'Artist' else genres1,
+            explanation=f"Lấy thể loại của {artist_or_group1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1 if type2 == 'Group' else 2,
+            operation='get_groups_and_genres',
+            source_entities=[artist_or_group2],
+            relationship='MEMBER_OF' if type2 == 'Artist' else 'IS_GENRE',
+            target_entities=groups2 if type2 == 'Artist' else genres2,
+            explanation=f"Lấy thể loại của {artist_or_group2}"
+        ))
+        
+        # Compare genres
+        common_genres = set(genres1).intersection(set(genres2))
+        
+        def _clean_genre_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Genre_"):
+                return name[6:]
+            return name
+        
+        genres1_clean = [_clean_genre_name(g) for g in genres1]
+        genres2_clean = [_clean_genre_name(g) for g in genres2]
+        common_clean = [_clean_genre_name(g) for g in common_genres]
+        
+        entity1_display = self._normalize_entity_name(artist_or_group1)
+        entity2_display = self._normalize_entity_name(artist_or_group2)
+        
+        if common_genres:
+            answer_text = f"Có, nhóm nhạc của {entity1_display} và {entity2_display} cùng thuộc thể loại: {', '.join(common_clean)}"
+        else:
+            answer_text = f"Không, nhóm nhạc của {entity1_display} ({', '.join(genres1_clean) if genres1_clean else 'không rõ thể loại'}) và {entity2_display} ({', '.join(genres2_clean) if genres2_clean else 'không rõ thể loại'}) khác thể loại"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist_or_group1} và {artist_or_group2} có cùng thể loại không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_genres),
+            answer_text=answer_text,
+            confidence=1.0,
+            explanation=f"Mixed comparison: Compare genres of groups from different entity types"
+        )
+    
+    def check_same_year(self, entity1: str, entity2: str) -> ReasoningResult:
+        """Check if two entities have the same activity year (from infobox)."""
+        steps = []
+        
+        # Get activity years for both entities
+        year1 = self.kg.extract_year_from_infobox(entity1, 'activity')
+        year2 = self.kg.extract_year_from_infobox(entity2, 'activity')
+        
+        steps.append(ReasoningStep(
+            hop_number=0,
+            operation='get_year_from_infobox',
+            source_entities=[entity1],
+            relationship='INFOBOX',
+            target_entities=[entity1],
+            explanation=f"Lấy năm hoạt động của {entity1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=0,
+            operation='get_year_from_infobox',
+            source_entities=[entity2],
+            relationship='INFOBOX',
+            target_entities=[entity2],
+            explanation=f"Lấy năm hoạt động của {entity2}"
+        ))
+        
+        # Compare years (extract first year if range)
+        def _extract_first_year(year_str):
+            if not year_str:
+                return None
+            if '–' in year_str or '-' in year_str:
+                return year_str.split('–')[0].split('-')[0]
+            return year_str
+        
+        year1_first = _extract_first_year(year1) if year1 else None
+        year2_first = _extract_first_year(year2) if year2 else None
+        
+        entity1_display = self._normalize_entity_name(entity1)
+        entity2_display = self._normalize_entity_name(entity2)
+        
+        # Compare first years
+        if year1_first and year2_first and year1_first == year2_first:
+            answer_text = f"Có, {entity1_display} và {entity2_display} cùng bắt đầu hoạt động vào năm {year1_first}"
+        else:
+            year1_formatted = self._format_year_natural(year1) if year1 else "không rõ"
+            year2_formatted = self._format_year_natural(year2) if year2 else "không rõ"
+            answer_text = f"Không, {entity1_display} ({year1_formatted}) và {entity2_display} ({year2_formatted}) có năm hoạt động khác nhau"
+            
+        return ReasoningResult(
+            query=f"{entity1} và {entity2} có cùng năm hoạt động không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=[entity1, entity2] if (year1_first and year2_first and year1_first == year2_first) else [],
+            answer_text=answer_text,
+            confidence=1.0 if (year1 and year2) else 0.5,
+            explanation=f"Compare activity years from infobox"
+        )
+    
+    def check_same_debut_year(self, entity1: str, entity2: str) -> ReasoningResult:
+        """Check if two entities debuted in the same year (from infobox, extract first year only)."""
+        steps = []
+        
+        # Get debut years for both entities (extract_first_year=True để lấy năm đầu tiên)
+        year1 = self.kg.extract_year_from_infobox(entity1, 'activity', extract_first_year=True)
+        year2 = self.kg.extract_year_from_infobox(entity2, 'activity', extract_first_year=True)
+        
+        steps.append(ReasoningStep(
+            hop_number=0,
+            operation='get_debut_year_from_infobox',
+            source_entities=[entity1],
+            relationship='INFOBOX',
+            target_entities=[entity1],
+            explanation=f"Lấy năm ra mắt của {entity1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=0,
+            operation='get_debut_year_from_infobox',
+            source_entities=[entity2],
+            relationship='INFOBOX',
+            target_entities=[entity2],
+            explanation=f"Lấy năm ra mắt của {entity2}"
+        ))
+        
+        entity1_display = self._normalize_entity_name(entity1)
+        entity2_display = self._normalize_entity_name(entity2)
+        
+        # Compare debut years (already extracted as first year)
+        if year1 and year2 and year1 == year2:
+            answer_text = f"Có, {entity1_display} và {entity2_display} cùng ra mắt vào năm {year1}"
+        else:
+            year1_str = year1 if year1 else "không rõ"
+            year2_str = year2 if year2 else "không rõ"
+            answer_text = f"Không, {entity1_display} ra mắt vào năm {year1_str} và {entity2_display} ra mắt vào năm {year2_str}"
+            
+        return ReasoningResult(
+            query=f"{entity1} và {entity2} có cùng năm ra mắt không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=[entity1, entity2] if (year1 and year2 and year1 == year2) else [],
+            answer_text=answer_text,
+            confidence=1.0 if (year1 and year2) else 0.5,
+            explanation=f"Compare debut years (first year only) from infobox"
+        )
+    
+    def check_same_year_via_group(self, artist1: str, artist2: str) -> ReasoningResult:
+        """Check if groups of two artists have the same activity year (2-hop)."""
+        steps = []
+        
+        # Get groups for both artists
+        groups1 = self.kg.get_artist_groups(artist1)
+        groups2 = self.kg.get_artist_groups(artist2)
+        
+        # Get years of groups1
+        years1 = []
+        for group in groups1:
+            year = self.kg.extract_year_from_infobox(group, 'activity')
+            if year:
+                years1.append((group, year))
+        
+        # Get years of groups2
+        years2 = []
+        for group in groups2:
+            year = self.kg.extract_year_from_infobox(group, 'activity')
+            if year:
+                years2.append((group, year))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist1],
+            relationship='MEMBER_OF',
+            target_entities=groups1,
+            explanation=f"Lấy nhóm nhạc của {artist1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='get_years_from_groups',
+            source_entities=groups1,
+            relationship='INFOBOX',
+            target_entities=[g for g, _ in years1],
+            explanation=f"Lấy năm hoạt động của nhóm nhạc {', '.join(groups1[:2]) if groups1 else 'N/A'}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist2],
+            relationship='MEMBER_OF',
+            target_entities=groups2,
+            explanation=f"Lấy nhóm nhạc của {artist2}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='get_years_from_groups',
+            source_entities=groups2,
+            relationship='INFOBOX',
+            target_entities=[g for g, _ in years2],
+            explanation=f"Lấy năm hoạt động của nhóm nhạc {', '.join(groups2[:2]) if groups2 else 'N/A'}"
+        ))
+        
+        # Extract first years for comparison
+        def _extract_first_year(year_str):
+            if not year_str:
+                return None
+            if '–' in year_str or '-' in year_str:
+                return year_str.split('–')[0].split('-')[0]
+            return year_str
+        
+        years1_first = [_extract_first_year(y) for _, y in years1 if _extract_first_year(y)]
+        years2_first = [_extract_first_year(y) for _, y in years2 if _extract_first_year(y)]
+        
+        # Check if any years match
+        common_years = set(years1_first).intersection(set(years2_first))
+        
+        artist1_display = self._normalize_entity_name(artist1)
+        artist2_display = self._normalize_entity_name(artist2)
+        
+        if common_years:
+            answer_text = f"Có, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) cùng bắt đầu hoạt động vào năm: {', '.join(common_years)}"
+        else:
+            years1_str = ', '.join([self._format_year_natural(y) for _, y in years1[:2]]) if years1 else "không rõ"
+            years2_str = ', '.join([self._format_year_natural(y) for _, y in years2[:2]]) if years2 else "không rõ"
+            answer_text = f"Không, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) hoạt động từ {years1_str} và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) hoạt động từ {years2_str}"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist1} và {artist2} có cùng năm hoạt động không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_years) if common_years else [],
+            answer_text=answer_text,
+            confidence=1.0 if (years1 and years2) else 0.5,
+            explanation=f"2-hop comparison: Find groups of both artists, then compare activity years"
+        )
+    
+    def check_same_year_via_group_mixed(self, artist_or_group1: str, artist_or_group2: str) -> ReasoningResult:
+        """Check if group of artist1 and group2 (or vice versa) have the same activity year (mixed types)."""
+        steps = []
+        
+        type1 = self.kg.get_entity_type(artist_or_group1)
+        type2 = self.kg.get_entity_type(artist_or_group2)
+        
+        if type1 == 'Artist' and type2 == 'Group':
+            groups1 = self.kg.get_artist_groups(artist_or_group1)
+            groups2 = [artist_or_group2]
+        elif type1 == 'Group' and type2 == 'Artist':
+            groups1 = [artist_or_group1]
+            groups2 = self.kg.get_artist_groups(artist_or_group2)
+        else:
+            # Both same type - use direct comparison
+            return self.check_same_year(artist_or_group1, artist_or_group2)
+        
+        # Get years of groups
+        years1 = []
+        for group in groups1:
+            year = self.kg.extract_year_from_infobox(group, 'activity')
+            if year:
+                years1.append((group, year))
+        
+        years2 = []
+        for group in groups2:
+            year = self.kg.extract_year_from_infobox(group, 'activity')
+            if year:
+                years2.append((group, year))
+        
+        # Extract first years for comparison
+        def _extract_first_year(year_str):
+            if not year_str:
+                return None
+            if '–' in year_str or '-' in year_str:
+                return year_str.split('–')[0].split('-')[0]
+            return year_str
+        
+        years1_first = [_extract_first_year(y) for _, y in years1 if _extract_first_year(y)]
+        years2_first = [_extract_first_year(y) for _, y in years2 if _extract_first_year(y)]
+        
+        common_years = set(years1_first).intersection(set(years2_first))
+        
+        entity1_display = self._normalize_entity_name(artist_or_group1)
+        entity2_display = self._normalize_entity_name(artist_or_group2)
+        
+        if common_years:
+            answer_text = f"Có, nhóm nhạc của {entity1_display} và {entity2_display} cùng bắt đầu hoạt động vào năm: {', '.join(common_years)}"
+        else:
+            years1_str = ', '.join([self._format_year_natural(y) for _, y in years1[:2]]) if years1 else "không rõ"
+            years2_str = ', '.join([self._format_year_natural(y) for _, y in years2[:2]]) if years2 else "không rõ"
+            answer_text = f"Không, nhóm nhạc của {entity1_display} hoạt động từ {years1_str} và {entity2_display} hoạt động từ {years2_str}"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist_or_group1} và {artist_or_group2} có cùng năm hoạt động không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_years) if common_years else [],
+            answer_text=answer_text,
+            confidence=1.0 if (years1 and years2) else 0.5,
+            explanation=f"Mixed comparison: Compare activity years of groups from different entity types"
+        )
+    
+    def check_same_debut_year_via_group_mixed(self, artist_or_group1: str, artist_or_group2: str) -> ReasoningResult:
+        """Check if group of artist1 and group2 (or vice versa) debuted in the same year (mixed types, extract first year only)."""
+        steps = []
+        
+        type1 = self.kg.get_entity_type(artist_or_group1)
+        type2 = self.kg.get_entity_type(artist_or_group2)
+        
+        if type1 == 'Artist' and type2 == 'Group':
+            groups1 = self.kg.get_artist_groups(artist_or_group1)
+            groups2 = [artist_or_group2]
+        elif type1 == 'Group' and type2 == 'Artist':
+            groups1 = [artist_or_group1]
+            groups2 = self.kg.get_artist_groups(artist_or_group2)
+        else:
+            # Both same type - use direct comparison
+            return self.check_same_debut_year(artist_or_group1, artist_or_group2)
+        
+        # Get debut years of groups (extract_first_year=True)
+        years1 = []
+        for group in groups1:
+            year = self.kg.extract_year_from_infobox(group, 'activity', extract_first_year=True)
+            if year:
+                years1.append((group, year))
+        
+        years2 = []
+        for group in groups2:
+            year = self.kg.extract_year_from_infobox(group, 'activity', extract_first_year=True)
+            if year:
+                years2.append((group, year))
+        
+        # Extract years (already extracted as first year)
+        years1_list = [y for _, y in years1]
+        years2_list = [y for _, y in years2]
+        
+        common_years = set(years1_list).intersection(set(years2_list))
+        
+        entity1_display = self._normalize_entity_name(artist_or_group1)
+        entity2_display = self._normalize_entity_name(artist_or_group2)
+        
+        if common_years:
+            answer_text = f"Có, nhóm nhạc của {entity1_display} và {entity2_display} cùng ra mắt vào năm: {', '.join(common_years)}"
+        else:
+            years1_str = ', '.join(years1_list[:2]) if years1_list else "không rõ"
+            years2_str = ', '.join(years2_list[:2]) if years2_list else "không rõ"
+            answer_text = f"Không, nhóm nhạc của {entity1_display} ra mắt vào năm {years1_str} và {entity2_display} ra mắt vào năm {years2_str}"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist_or_group1} và {artist_or_group2} có cùng năm ra mắt không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_years) if common_years else [],
+            answer_text=answer_text,
+            confidence=1.0 if (years1 and years2) else 0.5,
+            explanation=f"Mixed comparison: Compare debut years (first year only) of groups from different entity types"
+        )
+    
+    def check_same_company_via_group(self, artist1: str, artist2: str) -> ReasoningResult:
+        """Check if groups of two artists have the same company (2-hop)."""
+        steps = []
+        
+        # Get groups for both artists
+        groups1 = self.kg.get_artist_groups(artist1)
+        groups2 = self.kg.get_artist_groups(artist2)
+        
+        # Get companies of groups1
+        companies1 = []
+        for group in groups1:
+            group_companies = self.kg.get_group_companies(group)
+            companies1.extend(group_companies)
+        companies1 = list(set(companies1))
+        
+        # Get companies of groups2
+        companies2 = []
+        for group in groups2:
+            group_companies = self.kg.get_group_companies(group)
+            companies2.extend(group_companies)
+        companies2 = list(set(companies2))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist1],
+            relationship='MEMBER_OF',
+            target_entities=groups1,
+            explanation=f"Lấy nhóm nhạc của {artist1}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='get_companies_from_groups',
+            source_entities=groups1,
+            relationship='MANAGED_BY',
+            target_entities=companies1,
+            explanation=f"Lấy công ty của nhóm nhạc {', '.join(groups1[:2]) if groups1 else 'N/A'}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=1,
+            operation='get_groups',
+            source_entities=[artist2],
+            relationship='MEMBER_OF',
+            target_entities=groups2,
+            explanation=f"Lấy nhóm nhạc của {artist2}"
+        ))
+        
+        steps.append(ReasoningStep(
+            hop_number=2,
+            operation='get_companies_from_groups',
+            source_entities=groups2,
+            relationship='MANAGED_BY',
+            target_entities=companies2,
+            explanation=f"Lấy công ty của nhóm nhạc {', '.join(groups2[:2]) if groups2 else 'N/A'}"
+        ))
+        
+        common_companies = set(companies1).intersection(set(companies2))
+        
+        def _clean_company_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Company_"):
+                return name[8:]
+            return name
+        
+        companies1_clean = [_clean_company_name(c) for c in companies1]
+        companies2_clean = [_clean_company_name(c) for c in companies2]
+        common_clean = [_clean_company_name(c) for c in common_companies]
+        
+        artist1_display = self._normalize_entity_name(artist1)
+        artist2_display = self._normalize_entity_name(artist2)
+        
+        if common_companies:
+            answer_text = f"Có, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) cùng thuộc công ty: {', '.join(common_clean)}"
+        else:
+            answer_text = f"Không, nhóm nhạc của {artist1_display} ({', '.join([self._normalize_entity_name(g) for g in groups1[:2]]) if groups1 else 'không rõ'}) thuộc công ty {', '.join(companies1_clean) if companies1_clean else 'không rõ'} và nhóm nhạc của {artist2_display} ({', '.join([self._normalize_entity_name(g) for g in groups2[:2]]) if groups2 else 'không rõ'}) thuộc công ty {', '.join(companies2_clean) if companies2_clean else 'không rõ'}"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist1} và {artist2} có cùng công ty không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_companies),
+            answer_text=answer_text,
+            confidence=1.0,
+            explanation=f"2-hop comparison: Find groups of both artists, then compare companies"
+        )
+    
+    def check_same_company_via_group_mixed(self, artist_or_group1: str, artist_or_group2: str) -> ReasoningResult:
+        """Check if group of artist1 and group2 (or vice versa) have the same company (mixed types)."""
+        steps = []
+        
+        type1 = self.kg.get_entity_type(artist_or_group1)
+        type2 = self.kg.get_entity_type(artist_or_group2)
+        
+        if type1 == 'Artist' and type2 == 'Group':
+            groups1 = self.kg.get_artist_groups(artist_or_group1)
+            groups2 = [artist_or_group2]
+        elif type1 == 'Group' and type2 == 'Artist':
+            groups1 = [artist_or_group1]
+            groups2 = self.kg.get_artist_groups(artist_or_group2)
+        else:
+            # Both same type - use existing check_same_company
+            return self.check_same_company(artist_or_group1, artist_or_group2)
+        
+        # Get companies of groups
+        companies1 = []
+        for group in groups1:
+            group_companies = self.kg.get_group_companies(group)
+            companies1.extend(group_companies)
+        companies1 = list(set(companies1))
+        
+        companies2 = []
+        for group in groups2:
+            group_companies = self.kg.get_group_companies(group)
+            companies2.extend(group_companies)
+        companies2 = list(set(companies2))
+        
+        common_companies = set(companies1).intersection(set(companies2))
+        
+        def _clean_company_name(name):
+            if not name:
+                return "không rõ"
+            if name.startswith("Company_"):
+                return name[8:]
+            return name
+        
+        companies1_clean = [_clean_company_name(c) for c in companies1]
+        companies2_clean = [_clean_company_name(c) for c in companies2]
+        common_clean = [_clean_company_name(c) for c in common_companies]
+        
+        entity1_display = self._normalize_entity_name(artist_or_group1)
+        entity2_display = self._normalize_entity_name(artist_or_group2)
+        
+        if common_companies:
+            answer_text = f"Có, nhóm nhạc của {entity1_display} và {entity2_display} cùng thuộc công ty: {', '.join(common_clean)}"
+        else:
+            answer_text = f"Không, nhóm nhạc của {entity1_display} ({', '.join(companies1_clean) if companies1_clean else 'không rõ'}) và {entity2_display} ({', '.join(companies2_clean) if companies2_clean else 'không rõ'}) khác công ty"
+            
+        return ReasoningResult(
+            query=f"Nhóm nhạc của {artist_or_group1} và {artist_or_group2} có cùng công ty không?",
+            reasoning_type=ReasoningType.COMPARISON,
+            steps=steps,
+            answer_entities=list(common_companies),
+            answer_text=answer_text,
+            confidence=1.0,
+            explanation=f"Mixed comparison: Compare companies of groups from different entity types"
         )
         
     def get_labelmates(self, artist_or_group: str) -> ReasoningResult:
