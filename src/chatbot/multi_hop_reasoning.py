@@ -158,12 +158,18 @@ class MultiHopReasoner:
         
         # -1. Câu hỏi về năm hoạt động/phát hành/sáng tác/ra mắt/debut (1-hop, 2-hop, 3-hop)
         # Pattern: "năm hoạt động của X", "năm phát hành của X", "năm sáng tác của X", "X ra mắt vào năm nào", "X debut vào năm nào"
+        # QUAN TRỌNG: Không match với câu hỏi so sánh (có từ "cùng")
         is_year_question = (
             ('năm' in query_lower) and
-            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'sáng tác' in query_lower or 'ra mắt' in query_lower or 'debut' in query_lower) or
+            ('hoạt động' in query_lower or 'phát hành' in query_lower or 'thành lập' in query_lower or 'sáng tác' in query_lower or 'ra mắt' in query_lower or 'debut' in query_lower) and
+            not any(kw in query_lower for kw in ['cùng năm', 'cùng', 'same'])  # Không phải câu hỏi so sánh
+        ) or (
             # Pattern "X debut vào năm nào" (không cần từ "năm" ở đầu)
-            ('debut' in query_lower and 'năm' in query_lower) or
-            ('debut' in query_lower and any(kw in query_lower for kw in ['vào năm', 'năm nào']))
+            ('debut' in query_lower and 'năm' in query_lower) and
+            not any(kw in query_lower for kw in ['cùng năm', 'cùng', 'same'])  # Không phải câu hỏi so sánh
+        ) or (
+            ('debut' in query_lower and any(kw in query_lower for kw in ['vào năm', 'năm nào'])) and
+            not any(kw in query_lower for kw in ['cùng năm', 'cùng', 'same'])  # Không phải câu hỏi so sánh
         )
         
         if is_year_question:
@@ -758,10 +764,12 @@ class MultiHopReasoner:
                 )
         
         # 2a. Câu hỏi so sánh thể loại của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và B có cùng thể loại không"
+        # Pattern này chỉ match khi có 2 nghệ sĩ rõ ràng (ví dụ: "nhóm nhạc của nghệ sĩ A và nhóm nhạc của nghệ sĩ B")
         is_same_genre_via_group_question = (
             ('nhóm nhạc' in query_lower or 'nhóm' in query_lower) and
             ('nghệ sĩ' in query_lower or 'ca sĩ' in query_lower or 'artist' in query_lower) and
-            ('cùng thể loại' in query_lower or 'cùng dòng nhạc' in query_lower or 'cùng genre' in query_lower)
+            ('cùng thể loại' in query_lower or 'cùng dòng nhạc' in query_lower or 'cùng genre' in query_lower) and
+            (query_lower.count('nghệ sĩ') >= 2 or query_lower.count('ca sĩ') >= 2)  # Phải có 2 nghệ sĩ rõ ràng
         )
         
         if is_same_genre_via_group_question:
@@ -833,11 +841,45 @@ class MultiHopReasoner:
         )
         
         if is_same_genre_via_group_mixed_question:
-            # Extract entities - có thể là Artist hoặc Group
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            # Extract entities theo ngữ cảnh câu hỏi
+            artist_entity, group_entity = self._extract_entities_by_context(query, start_entities, expected_types=['Artist', 'Group'])
             
+            if artist_entity and group_entity:
+                # Validate types trước khi so sánh
+                artist_type = self.kg.get_entity_type(artist_entity)
+                group_type = self.kg.get_entity_type(group_entity)
+                if artist_type == 'Artist' and group_type == 'Group':
+                    return self.check_same_genre_via_group_mixed(artist_entity, group_entity)
+                elif artist_type == 'Group' and group_type == 'Artist':
+                    return self.check_same_genre_via_group_mixed(group_entity, artist_entity)
+            
+            # Fallback: dùng _extract_entities_robust
+            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
             if len(all_entities) >= 2:
-                return self.check_same_genre_via_group_mixed(all_entities[0], all_entities[1])
+                # Lọc để đảm bảo có ít nhất 1 Artist và 1 Group
+                artists = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+                groups = [e for e in all_entities if self.kg.get_entity_type(e) == 'Group']
+                
+                if artists and groups:
+                    # Lấy Artist đầu tiên và Group đầu tiên
+                    return self.check_same_genre_via_group_mixed(artists[0], groups[0])
+                elif len(artists) >= 2:
+                    # Nếu có 2 artists, có thể đây là artist-artist question (fallback)
+                    return self.check_same_genre_via_group(artists[0], artists[1])
+                elif len(groups) >= 2:
+                    # Nếu có 2 groups, so sánh trực tiếp
+                    return self.check_same_genre(groups[0], groups[1])
+                else:
+                    # Không đủ entities phù hợp
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm đủ thông tin để so sánh. Tìm thấy {len(artists)} nghệ sĩ và {len(groups)} nhóm nhạc. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                        confidence=0.0,
+                        explanation=f"Không tìm thấy đủ Artist và Group để so sánh"
+                    )
             elif len(all_entities) == 1:
                 return ReasoningResult(
                     query=query,
@@ -936,30 +978,55 @@ class MultiHopReasoner:
         )
         
         if is_same_year_via_group_mixed_question:
-            all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+            # Extract entities theo ngữ cảnh câu hỏi
+            artist_entity, group_entity = self._extract_entities_by_context(query, start_entities, expected_types=['Artist', 'Group'])
             
-            if len(all_entities) >= 2:
-                return self.check_same_year_via_group_mixed(all_entities[0], all_entities[1])
-            elif len(all_entities) == 1:
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
-                    confidence=0.0,
-                    explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm hoạt động nhóm nhạc"
-                )
+            if artist_entity and group_entity:
+                return self.check_same_year_via_group_mixed(artist_entity, group_entity)
             else:
-                return ReasoningResult(
-                    query=query,
-                    reasoning_type=ReasoningType.COMPARISON,
-                    steps=[],
-                    answer_entities=[],
-                    answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
-                    confidence=0.0,
-                    explanation="Không extract được entities từ query"
-                )
+                # Fallback: dùng _extract_entities_robust
+                all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=['Artist', 'Group'])
+                if len(all_entities) >= 2:
+                    # Lọc để đảm bảo có ít nhất 1 Artist và 1 Group
+                    artists = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+                    groups = [e for e in all_entities if self.kg.get_entity_type(e) == 'Group']
+                    
+                    if artists and groups:
+                        return self.check_same_year_via_group_mixed(artists[0], groups[0])
+                    elif len(artists) >= 2:
+                        return self.check_same_year_via_group(artists[0], artists[1])
+                    elif len(groups) >= 2:
+                        return self.check_same_year(groups[0], groups[1])
+                    else:
+                        return ReasoningResult(
+                            query=query,
+                            reasoning_type=ReasoningType.COMPARISON,
+                            steps=[],
+                            answer_entities=[],
+                            answer_text=f"Không tìm đủ thông tin để so sánh. Tìm thấy {len(artists)} nghệ sĩ và {len(groups)} nhóm nhạc.",
+                            confidence=0.0,
+                            explanation=f"Không tìm thấy đủ Artist và Group để so sánh"
+                        )
+                elif len(all_entities) == 1:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text=f"Không tìm đủ thông tin để so sánh. Chỉ tìm thấy {all_entities[0]}. Vui lòng cung cấp tên đầy đủ của cả hai thực thể.",
+                        confidence=0.0,
+                        explanation=f"Chỉ extract được 1 entity: {all_entities[0]}, cần ít nhất 2 entities để so sánh năm hoạt động nhóm nhạc"
+                    )
+                else:
+                    return ReasoningResult(
+                        query=query,
+                        reasoning_type=ReasoningType.COMPARISON,
+                        steps=[],
+                        answer_entities=[],
+                        answer_text="Không tìm thấy thông tin về các thực thể trong câu hỏi. Vui lòng kiểm tra lại tên.",
+                        confidence=0.0,
+                        explanation="Không extract được entities từ query"
+                    )
         
         # 2a5. Câu hỏi so sánh công ty của nhóm nhạc: "Nhóm nhạc của nghệ sĩ A và nhóm nhạc của nghệ sĩ B có cùng công ty không"
         is_same_company_via_group_question = (
@@ -3098,6 +3165,87 @@ class MultiHopReasoner:
         except Exception as e:
             # Nếu LLM fail, return empty list
             return []
+    
+    def _extract_entities_by_context(self, query: str, start_entities: List[str], expected_types: Optional[List[str]] = None) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extract entities từ query theo ngữ cảnh câu hỏi.
+        Tìm entity xuất hiện sau "nghệ sĩ"/"ca sĩ" (Artist) và entity xuất hiện sau "với"/"và" + "nhóm nhạc" (Group).
+        
+        Args:
+            query: User query
+            start_entities: Entities đã có sẵn
+            expected_types: Loại entities mong đợi (Artist, Group, etc.)
+            
+        Returns:
+            Tuple (artist_entity, group_entity) hoặc (None, None) nếu không tìm được
+        """
+        all_entities = self._extract_entities_robust(query, start_entities, min_count=2, expected_types=expected_types)
+        
+        if len(all_entities) < 2:
+            return (None, None)
+        
+        query_lower = query.lower()
+        
+        # Tìm entity xuất hiện sau "nghệ sĩ" hoặc "ca sĩ" (entity 1 - Artist)
+        artist_entity = None
+        artist_keywords = ['nghệ sĩ', 'ca sĩ', 'artist']
+        for keyword in artist_keywords:
+            if keyword in query_lower:
+                keyword_pos = query_lower.find(keyword)
+                # Tìm entity xuất hiện sau keyword này
+                for entity in all_entities:
+                    entity_normalized = self._normalize_entity_name(entity).lower()
+                    entity_pos = query_lower.find(entity_normalized, keyword_pos)
+                    if entity_pos != -1 and entity_pos > keyword_pos:
+                        entity_type = self.kg.get_entity_type(entity)
+                        if entity_type == 'Artist':
+                            artist_entity = entity
+                            break
+                if artist_entity:
+                    break
+        
+        # Tìm entity xuất hiện sau "với" hoặc "và" + "nhóm nhạc" (entity 2 - Group)
+        group_entity = None
+        comparison_keywords = ['với', 'và', 'and', 'with']
+        for keyword in comparison_keywords:
+            if keyword in query_lower:
+                keyword_pos = query_lower.find(keyword)
+                # Kiểm tra xem có "nhóm nhạc" sau "với"/"và" không
+                after_keyword = query_lower[keyword_pos:]
+                if 'nhóm nhạc' in after_keyword or 'nhóm' in after_keyword:
+                    # Tìm entity xuất hiện sau keyword này
+                    for entity in all_entities:
+                        entity_normalized = self._normalize_entity_name(entity).lower()
+                        entity_pos = query_lower.find(entity_normalized, keyword_pos)
+                        if entity_pos != -1 and entity_pos > keyword_pos:
+                            entity_type = self.kg.get_entity_type(entity)
+                            if entity_type == 'Group':
+                                group_entity = entity
+                                break
+                if group_entity:
+                    break
+        
+        # Nếu không tìm được theo ngữ cảnh, fallback: tìm 1 Artist và 1 Group từ all_entities
+        if not artist_entity or not group_entity:
+            artists = [e for e in all_entities if self.kg.get_entity_type(e) == 'Artist']
+            groups = [e for e in all_entities if self.kg.get_entity_type(e) == 'Group']
+            
+            if artists and groups:
+                # Ưu tiên entities xuất hiện sớm hơn trong query
+                def get_entity_position(entity):
+                    entity_normalized = self._normalize_entity_name(entity).lower()
+                    pos = query_lower.find(entity_normalized)
+                    return pos if pos != -1 else 9999
+                
+                artists.sort(key=get_entity_position)
+                groups.sort(key=get_entity_position)
+                
+                if not artist_entity:
+                    artist_entity = artists[0]
+                if not group_entity:
+                    group_entity = groups[0]
+        
+        return (artist_entity, group_entity)
     
     def _extract_entities_robust(self, query: str, start_entities: List[str], min_count: int = 1, expected_types: Optional[List[str]] = None) -> List[str]:
         """
